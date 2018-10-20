@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # python cache
-_pycache_
+__pycache__
 
 # gatherproxy
 netease/gatherproxy

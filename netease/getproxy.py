@@ -3,16 +3,18 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-21 00:07:58
+# @Last Modified time: 2018-10-21 01:19:42
 # -*- coding: utf-8 -*-
 # !/usr/bin/env python
 
-import requests
-import pymysql
-import time
-import threading
 import functools
+import pymysql
+import random
+import requests
+import threading
+import time
 
+from apscheduler.schedulers.blocking import BlockingScheduler
 from utils import get_html, get_json, begin_time, end_time
 
 """
@@ -33,13 +35,16 @@ class GetFreeProxy(object):
     def __init__(self):
         self.db = pymysql.connect("localhost", "root", "", "netease")
         self.insert_sql = '''INSERT INTO ip_proxy( `address`, `http_type`, `is_failured`) VALUES ('%s',%d,%d)'''
-        self.select_sql = '''SELECT * from ip_proxy WHERE `address` = '%s' '''
         self.select_not = '''SELECT * from ip_proxy WHERE `address` = '%s' AND `is_failured` < 5 '''
+        self.select_list = '''SELECT address from ip_proxy WHERE `is_failured` = 0 AND http_type = 0'''
+        self.select_sql = '''SELECT * from ip_proxy WHERE `address` = '%s' '''
         self.select_all = '''SELECT * from ip_proxy'''
         self.update_sql = '''UPDATE ip_proxy SET `is_failured` = %d WHERE `id` = %d'''
-        self.waitjudge = []
         self.canuseip = []
+        self.proxylist = []
+        self.waitjudge = []
         self.cannotuseip = []
+        self.initproxy()
 
     def insertproxy(self, http):
         """
@@ -104,6 +109,27 @@ class GetFreeProxy(object):
                     self.updateproxy(index[0], index[3] + 1)
         except Exception as e:
             pass
+
+    def initproxy(self):
+        """
+        init proxy list
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(self.select_list)
+            results = cursor.fetchall()
+            for index in results:
+                self.proxylist.append(index[0])
+        except Exception as e:
+            pass
+
+    def randomproxy(self):
+        """
+        random proxy from proxy list
+        """
+        print(len(self.proxylist))
+        index = random.randint(0, len(self.proxylist) - 1)
+        return {'http': self.proxylist[index]}
 
     def judgehttp(self, http):
         """
@@ -183,7 +209,7 @@ class GetFreeProxy(object):
         begin_time()
         host = 'http://www.xicidaili.com/nn/'
         for index in range(1, page + 1):
-            html = get_html(host + str(index), {}, host[7:-4])
+            html = get_html(host + str(index), self.randomproxy(), host[7:-4])
             tem = html.find_all('tr')
             for index in range(1, len(tem)):
                 tds = tem[index].find_all('td')
@@ -220,7 +246,7 @@ class GetFreeProxy(object):
 
         begin_time()
         host = 'http://www.goubanjia.com'
-        html = get_html(host, {}, host[7:])
+        html = get_html(host, self.randomproxy(), host[7:])
 
         trs = html.find_all('tr', class_='warning')
         for tr in trs:
@@ -239,6 +265,11 @@ class GetFreeProxy(object):
         self.threadjude()
         end_time()
 
+    def schedulegou(self):
+        sched = BlockingScheduler()
+        sched.add_job(self.goubanjia, 'interval', seconds=60)
+        sched.start()
+
     def data5u(self):
         """
         data5u proxy http://www.data5u.com/
@@ -251,7 +282,7 @@ class GetFreeProxy(object):
         ]
         host = 'http://www.data5u.com/'
         for uri in url_list:
-            html = get_html(+ uri, {}, host[7:-1])
+            html = get_html(+ uri, self.randomproxy(), host[7:-1])
             table = html.find_all('ul', class_='l2')
             for index in table:
                 tds = index.find_all('li')
@@ -283,7 +314,8 @@ class GetFreeProxy(object):
 
     def sixsixthread(self, index, pageindex):
         host = '''http://www.66ip.cn/areaindex_%d/%d.html'''
-        html = get_html(host % (index, pageindex), {}, host[7:-21])
+        html = get_html(host % (index, pageindex),
+                        self.randomproxy(), host[7:-21])
         if not len(html.find_all('table')):
             return []
         trs = html.find_all('table')[2].find_all('tr')
@@ -311,7 +343,7 @@ class GetFreeProxy(object):
 
     def kuaidailithread(self, index):
         host = '''https://www.kuaidaili.com/free/inha/%d/'''
-        html = get_html(host % index, {}, host[8:25])
+        html = get_html(host % index, self.randomproxy(), host[8:25])
         trs = html.find_all('tr')
         for index in range(1, len(trs)):
             tds = trs[index].find_all('td')
@@ -323,3 +355,4 @@ class GetFreeProxy(object):
 
 if __name__ == '__main__':
     GetFreeProxy.testdb()
+    GetFreeProxy.initproxy()

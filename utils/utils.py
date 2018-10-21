@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-20 16:47:10
+# @Last Modified time: 2018-10-21 10:34:47
 
 import requests
 from bs4 import BeautifulSoup
@@ -17,7 +17,8 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br",
     "Accept-Language": "zh-CN,zh;q=0.9",
     "Connection": "keep-alive",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3578.0 Safari/537.36"}
+    "Sec-Metadata": "cause=forced, destination=document, site=cross-site",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3586.0 Safari/537.36"}
 
 start = 0
 
@@ -27,20 +28,23 @@ def get_html(url, proxies, host):
     get html
     @url requests.url
     @proxys requests.proxys
+    @host header host
     @return beautifulSoup analysis result
     """
     headers['Host'] = host
-    try:
-        if len(proxies):
-            html = requests.get(url, headers=headers, verify=False,
-                                timeout=5, proxies=proxproxiesys).text
-        else:
+
+    if len(proxies):
+        print(proxies)
+        html = requests.get(url, headers=headers, verify=False,
+                            timeout=5, proxies=proxies).text
+    else:
+        try:
             html = requests.get(url, headers=headers,
                                 verify=False, timeout=5).text
+        except Exception as e:
+            return BeautifulSoup('<html></html>', 'html.parser')
 
-        return BeautifulSoup(html, 'html.parser')
-    except Exception as e:
-        return BeautifulSoup('<html></html>', 'html.parser')
+    return BeautifulSoup(html, 'html.parser')
 
 
 def get_json(url, proxies, host):
@@ -48,20 +52,17 @@ def get_json(url, proxies, host):
     get json
     @url requests.url
     @proxys requests.proxys
+    @host header host
     @return json
     """
     headers['Host'] = host
-    try:
-        if len(proxies):
-            json = requests.get(url, headers=headers, verify=False,
-                                timeout=3, proxies=proxies).json()
-        else:
-            json = requests.get(url, headers=headers,
-                                verify=False, timeout=3).json()
-
-        return json
-    except Exception as e:
-        return {}
+    if len(proxies):
+        json = requests.get(url, headers=headers, verify=False,
+                            timeout=3, proxies=proxies).json()
+    else:
+        json = requests.get(url, headers=headers,
+                            verify=False, timeout=3).json()
+    return json
 
 
 def begin_time():

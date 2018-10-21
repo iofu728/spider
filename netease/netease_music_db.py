@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-21 11:00:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-21 11:55:54
+# @Last Modified time: 2018-10-21 12:05:04
 
 import threading
 
@@ -29,11 +29,16 @@ class Get_playlist_song():
         """
 
         begin_time()
-        host = 'https://music.163.com/discover/playlist'
+        host = 'http://music.163.com/discover/playlist'
         html = self.proxyclass.get_request_proxy(host, host[8:21], 0)
 
         alist = html.find_all('a', class_='s-fc1')
         for index in alist:
             self.classifylist[index.text] = index['href']
-        print(self.classifylist)
         end_time()
+
+    def get_playlist_id(self, classify):
+        """
+        get playlist id from classify
+        """
+        host = 'http://music.163.com/discover/playlist'

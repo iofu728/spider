@@ -3,7 +3,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-21 11:06:26
+# @Last Modified time: 2018-10-21 13:41:31
 # -*- coding: utf-8 -*-
 # !/usr/bin/env python
 
@@ -16,7 +16,8 @@ import time
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
-from utils.utils import get_html, get_json, begin_time, end_time
+from utils.utils import begin_time, end_time, get_html, get_json
+from utils.db import Db
 
 """
   * gatherproxy.com
@@ -34,7 +35,7 @@ class GetFreeProxy(object):
     """
 
     def __init__(self):
-        self.db = pymysql.connect("localhost", "root", "", "netease")
+        self.Db = Db()
         self.insert_sql = '''INSERT INTO ip_proxy( `address`, `http_type`, `is_failured`) VALUES ('%s',%d,%d)'''
         self.select_not = '''SELECT * from ip_proxy WHERE `address` = '%s' AND `is_failured` < 5 '''
         self.select_list = '''SELECT address from ip_proxy WHERE `is_failured` = 0 AND http_type = 0'''
@@ -77,14 +78,10 @@ class GetFreeProxy(object):
         """
         insert data to db
         """
-
-        try:
-            cursor = self.db.cursor()
-            cursor.execute(self.insert_sql % (http, 0, 0))
-            self.db.commit()
+        results = self.Db.insert_db(self.insert_sql % (http, 0, 0))
+        if results:
             print('Insert ' + http + ' Success!')
-        except Exception as e:
-            self.db.rollback()
+        else:
             pass
 
     def updateproxy(self, id, time):
@@ -92,24 +89,18 @@ class GetFreeProxy(object):
         update data to db
         """
 
-        try:
-            cursor = self.db.cursor()
-            cursor.execute(self.update_sql % (int(time), int(id)))
-            self.db.commit()
+        results = self.Db.update_db(self.update_sql % (int(time), int(id)))
+        if results:
             print('Update ' + str(id) + ' Success!')
-        except Exception as e:
-            self.db.rollback()
+        else:
             pass
 
     def testproxy(self, http):
         """
         test db have or not this data
         """
-
-        try:
-            cursor = self.db.cursor()
-            cursor.execute(self.select_sql % http)
-            results = cursor.fetchall()
+        results = self.Db.select_db(self.select_sql % http)
+        if results:
             if not len(results):
                 print('Insert ' + http)
                 self.insertproxy(http)
@@ -119,37 +110,33 @@ class GetFreeProxy(object):
             else:
                 print('Have exist ' + http)
                 pass
-        except Exception as e:
+        else:
             pass
 
     def updatecannotuse(self, http):
         """
         update db proxy cann't use
         """
-
-        try:
-            cursor = self.db.cursor()
-            cursor.execute(self.select_not % http)
-            results = cursor.fetchall()
-            if len(results):
-                print('Update can not use ' + http)
-                for index in results:
-                    self.updateproxy(index[0], index[3] + 1)
-        except Exception as e:
+        results = self.Db.select_db(self.select_not % http)
+        if results and len(results):
+            print('Update can not use ' + http)
+            for index in results:
+                self.updateproxy(index[0], index[3] + 1)
+        else:
             pass
 
     def initproxy(self):
         """
         init proxy list
         """
-        self.proxylist = []
-        try:
-            cursor = self.db.cursor()
-            cursor.execute(self.select_list)
-            results = cursor.fetchall()
+
+        results = self.Db.select_db(self.select_list)
+        if results:
+            self.proxylist = []
             for index in results:
                 self.proxylist.append(index[0])
-        except Exception as e:
+            print(str(len(self.proxylist)) + ' ip proxy can use.')
+        else:
             pass
 
     def judgehttp(self, http):
@@ -206,15 +193,14 @@ class GetFreeProxy(object):
         '''
 
         begin_time()
-        try:
-            cursor = self.db.cursor()
-            cursor.execute(self.select_all)
-            results = cursor.fetchall()
+        results = self.Db.select_db(self.select_all)
+        if results:
             for index in results:
                 self.waitjudge.append(index[1])
             self.threadjude()
-        except Exception as e:
+        else:
             pass
+        self.initproxy()
         end_time()
 
     def xiciproxy(self, page):

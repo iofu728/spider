@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-21 12:49:22
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-21 13:34:02
+# @Last Modified time: 2018-10-22 09:15:59
 import pymysql
 
 
@@ -24,6 +24,19 @@ class Db(object):
             cursor = self.db.cursor()
             cursor.execute(sql)
             return cursor.fetchall()
+        except Exception as e:
+            return False
+
+    def select_one(self, sql):
+        """
+        select one
+        @return False: Expection; []: Success
+        """
+
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(sql)
+            return cursor.fetchone()
         except Exception as e:
             return False
 

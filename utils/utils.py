@@ -2,12 +2,14 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-21 11:37:40
+# @Last Modified time: 2018-10-21 20:45:42
 
 import requests
 from bs4 import BeautifulSoup
 import time
+import urllib3
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 headers = {
     'Connection': 'keep-alive',
@@ -37,11 +39,11 @@ def get_html(url, proxies, host):
     if len(proxies):
         print(proxies)
         html = requests.get(url, headers=headers, verify=False,
-                            timeout=5, proxies=proxies).text
+                            timeout=3, proxies=proxies).text
     else:
         try:
             html = requests.get(url, headers=headers,
-                                verify=False, timeout=5).text
+                                verify=False, timeout=3).text
         except Exception as e:
             return BeautifulSoup('<html></html>', 'html.parser')
 
@@ -59,10 +61,10 @@ def get_json(url, proxies, host):
     headers['Host'] = host
     if len(proxies):
         json = requests.get(url, headers=headers, verify=False,
-                            timeout=3, proxies=proxies).json()
+                            timeout=2, proxies=proxies).json()
     else:
         json = requests.get(url, headers=headers,
-                            verify=False, timeout=3).json()
+                            verify=False, timeout=2).json()
     return json
 
 

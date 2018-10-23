@@ -3,7 +3,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-22 09:17:12
+# @Last Modified time: 2018-10-23 16:30:27
 # -*- coding: utf-8 -*-
 # !/usr/bin/env python
 
@@ -36,12 +36,11 @@ class GetFreeProxy(object):
 
     def __init__(self):
         self.Db = Db()
-        self.insert_sql = '''INSERT INTO ip_proxy( `address`, `http_type`) VALUES ('%s',%d)'''
-        self.select_not = '''SELECT * from ip_proxy WHERE `address` = '%s' AND `is_failured` < 5 AND http_type=%d'''
+        self.insert_sql = '''INSERT INTO ip_proxy( `address`, `http_type`) VALUES %s '''
         self.select_list = '''SELECT address, http_type from ip_proxy WHERE `is_failured` = 0'''
-        self.select_sql = '''SELECT * from ip_proxy WHERE `address` = '%s' AND http_type = %d '''
-        self.select_all = '''SELECT * from ip_proxy WHERE `is_failured` != 5 AND http_type = 1'''
-        self.update_sql = '''UPDATE ip_proxy SET `is_failured` = %d WHERE `id` = %d'''
+        self.select_sql = '''SELECT `id`, address, `is_failured` from ip_proxy WHERE `address` in %s '''
+        self.select_all = '''SELECT `address`, `http_type` from ip_proxy WHERE `is_failured` != 5'''
+        self.replace_ip = '''REPLACE INTO ip_proxy(`id`, `address`, `http_type`, `is_failured`) VALUES %s'''
         self.typemap = {1: 'https', 0: 'http'}
         self.canuseip = []
         self.waitjudge = []
@@ -63,7 +62,7 @@ class GetFreeProxy(object):
 
         httptype = url[4] == 's'
         index = random.randint(
-            0, len(self.proxylists if httptype else self.proxylists) - 1)
+            0, len(self.proxylists if httptype else self.proxylist) - 1)
         if httptype:
             proxies = {'https': self.proxylists[index]}
         else:
@@ -87,8 +86,7 @@ class GetFreeProxy(object):
                 else:
                     return html
         except Exception as e:
-            self.cannotuseip.append(
-                [proxies[self.typemap[httptype]], httptype])
+            self.cannotuseip.append(proxies[self.typemap[httptype]])
             if httptype:
                 if index < len(self.proxylists) and proxies['https'] == self.proxylists[index]:
                     self.proxylists.remove(proxies['https'])
@@ -106,78 +104,115 @@ class GetFreeProxy(object):
 
         if url not in self.failuredtime:
             self.failuredtime[url] = 0
-            print("retry " + str(self.failuredtime[url]))
+            # print("retry " + str(self.failuredtime[url]))
             self.get_request_proxy(url, host, types)
         elif self.failuredtime[url] < 3:
             self.failuredtime[url] += 1
-            print("retry " + str(self.failuredtime[url]))
+            # print("retry " + str(self.failuredtime[url]))
             self.get_request_proxy(url, host, types)
         else:
-            print("Request Failured three times!")
-            file_d = open("log", 'a')
-            file_d.write(time.strftime("%Y-%m-%d %H:%M:%S ",
-                                       time.localtime()) + url + '\n')
-            file_d.close()
+            # print("Request Failured three times!")
+            self.log_write(url)
+            self.failuredtime[url] = 0
             return False
 
-    def insertproxy(self, ids):
+    def log_write(self, url):
+        """
+        failure log
+        """
+
+        file_d = open("log", 'a')
+        file_d.write(time.strftime("%Y-%m-%d %H:%M:%S ",
+                                   time.localtime()) + url + '\n')
+        file_d.close()
+
+    def insertproxy(self, insertlist):
         """
         insert data to db
         """
-        results = self.Db.insert_db(self.insert_sql % (ids[0], int(ids[1])))
+        results = self.Db.insert_db(self.insert_sql % str(insertlist)[1:-1])
         if results:
-            print('Insert ' + ids[0] + ' ' + str(ids[1]) + ' Success!')
+            print('Insert ' + str(len(insertlist)) + ' items Success!')
         else:
             pass
 
-    def updateproxy(self, id, time):
+    def updateproxy(self, updatelist, types):
         """
         update data to db
         """
 
-        results = self.Db.update_db(self.update_sql % (int(time), int(id)))
+        results = self.Db.update_db(self.replace_ip % str(updatelist)[1:-1])
+        typemap = {0: 'can use ', 1: 'can not use '}
         if results:
-            print('Update ' + str(id) + ' Success!')
+            print('Update ' + typemap[types] +
+                  str(len(updatelist)) + ' items Success!')
         else:
             pass
 
-    def testproxy(self, ids):
+    def selectproxy(self, targetlist):
+        """
+        select ip proxy by ids
+        """
+        if not len(targetlist):
+            return []
+        elif len(targetlist) == 1:
+            waitlist = '(\'' + targetlist[0] + '\')'
+        else:
+            waitlist = tuple(targetlist)
+        return self.Db.select_db(self.select_sql % str(waitlist))
+
+    def dbcanuseproxy(self):
         """
         test db have or not this data
         """
-        results = self.Db.select_db(self.select_sql % (ids[0], int(ids[1])))
-        if results != 0:
-            idindex = ids[0] + ' ' + str(ids[1])
-            if not len(results):
-                print('Insert ' + idindex)
-                self.insertproxy(ids)
-            elif results[0][3]:
-                print('Update ' + idindex)
-                self.updateproxy(results[0][0], 0)
-            else:
-                print('Have exist ' + idindex)
-                pass
-        else:
-            pass
 
-    def updatecannotuse(self, ids):
-        """
-        update db proxy cann't use
-        """
-        results = self.Db.select_db(self.select_not % (ids[0], int(ids[1])))
-        if results != 0 and len(results):
-            print('Update can not use ' + ids[0] + ' ' + str(ids[1]))
-            for index in results:
-                self.updateproxy(index[0], index[3] + 1)
+        results = self.selectproxy(self.canuseip)
+
+        insertlist = []
+        updatelist = []
+        ipmap = {}
+        if results:
+            for ip_info in results:
+                ipmap[ip_info[1]] = [ip_info[0], ip_info[2]]
+
+            for ip_now in self.canuseip:
+                http_type = ip_now[4] == 's'
+                if ip_now in ipmap:
+                    if ipmap[ip_now][1]:
+
+                        updatelist.append(
+                            (ipmap[ip_now][0], ip_now, http_type, 0))
+                else:
+                    insertlist.append((ip_now, http_type))
+            if len(insertlist):
+                self.insertproxy(insertlist)
+            if len(updatelist):
+                self.updateproxy(updatelist, 0)
         else:
             pass
+        self.canuseip = []
 
     def cleancannotuse(self):
         """
-        clean cann't use ip list
+        update db proxy cann't use
         """
-        for index in self.cannotuseip:
-            self.updatecannotuse(index)
+        results = self.selectproxy(self.cannotuseip)
+        updatelist = []
+        ipmap = {}
+        if results:
+            for ip_info in results:
+                ipmap[ip_info[1]] = [ip_info[0], ip_info[2]]
+
+            for ip_now in self.cannotuseip:
+                http_type = ip_now[4] == 's'
+                if ip_now in ipmap:
+                    updatelist.append(
+                        (ipmap[ip_now][0], ip_now, http_type, ipmap[ip_now][1] + 1))
+
+            if len(updatelist):
+                self.updateproxy(updatelist, 1)
+        else:
+            pass
         self.cannotuseip = []
 
     def initproxy(self):
@@ -199,41 +234,42 @@ class GetFreeProxy(object):
         else:
             pass
 
-    def judgeurl(self, urls):
+    def judgeurl(self, urls, times):
         """
         use /api/playlist to judge http; use /discover/playlist judge https
         1. don't timeout = 5
         2. response.result.tracks.size() != 1
         """
 
-        print(urls)
-        proxies = {self.typemap[urls[1]]: urls[0]}
+        http_type = urls[4] == 's'
+        proxies = {self.typemap[http_type]: urls}
 
-        test_url = 'https://music.163.com/discover/playlist/?order=hot&limit=35&offset=0' if urls[
-            1] else 'http://music.163.com/api/playlist/detail?id=432853362'
-        if urls[1]:
+        test_url = 'https://music.163.com/discover/playlist/?order=hot&limit=35&offset=0' if http_type else 'http://music.163.com/api/playlist/detail?id=432853362'
+        if http_type:
             try:
                 html = get_html(test_url, proxies, test_url[8:21])
                 alist = html.find_all('a', class_='s-fc1')
                 if len(alist) == 73:
-                    self.canuseip.append([urls[0], urls[1]])
+                    self.canuseip.append(urls)
                 else:
-                    self.cannotuseip.append([urls[0], urls[1]])
+                    self.cannotuseip.append(urls)
             except Exception as e:
-                self.cannotuseip.append([urls[0], urls[1]])
+                self.cannotuseip.append(urls)
                 pass
         else:
             try:
                 data = get_json(test_url, proxies, test_url[7:20])
                 result = data['result']
                 tracks = result['tracks']
-                print(len(tracks))
                 if len(tracks) == 56:
-                    self.canuseip.append([urls[0], urls[1]])
+                    if times < 2:
+                        self.judgeurl(urls, times + 1)
+                    else:
+                        self.canuseip.append(urls)
                 else:
-                    self.cannotuseip.append([urls[0], urls[1]])
+                    self.cannotuseip.append(urls)
             except Exception as e:
-                self.cannotuseip.append([urls[0], urls[1]])
+                self.cannotuseip.append(urls)
                 pass
 
     def threadjude(self):
@@ -247,16 +283,14 @@ class GetFreeProxy(object):
             blockthreads = []
             for index in range(block * 1000, min(num, 1000 * (block + 1))):
                 work = threading.Thread(
-                    target=self.judgeurl, args=(text[index],))
+                    target=self.judgeurl, args=(text[index], 0,))
                 blockthreads.append(work)
             for work in blockthreads:
                 work.start()
             for work in blockthreads:
                 work.join()
-            for index in self.canuseip:
-                self.testproxy(index)
+            self.dbcanuseproxy()
             self.cleancannotuse()
-            self.canuseip = []
         self.waitjudge = []
 
     def testdb(self):
@@ -268,7 +302,7 @@ class GetFreeProxy(object):
         results = self.Db.select_db(self.select_all)
         if results != 0:
             for index in results:
-                self.waitjudge.append([index[1], index[2]])
+                self.waitjudge.append(index[0])
             self.threadjude()
         else:
             pass
@@ -295,11 +329,11 @@ class GetFreeProxy(object):
                 tds = tem[index].find_all('td')
                 ip = tds[5].text.lower()
                 self.waitjudge.append(
-                    [ip + '://' + tds[1].text + ':' + tds[2].text, ip == 'https'])
+                    ip + '://' + tds[1].text + ':' + tds[2].text)
         self.threadjude()
         end_time()
 
-    def gatherproxy(self):
+    def gatherproxy(self, types):
         """
         :100: very nice website
         first of all you should download proxy ip txt from:
@@ -309,10 +343,13 @@ class GetFreeProxy(object):
         begin_time()
         file_d = open('proxy/gatherproxy', 'r')
         for index in file_d.readlines():
-            self.waitjudge.append(['http://' + index[0:-1], 0])
-            self.waitjudge.append(['https://' + index[0:-1], 1])
-        text = file_d.readlines()
-        num = len(text)
+            if types == 0:
+                self.waitjudge.append('http://' + index[0:-1])
+            elif types == 1:
+                self.waitjudge.append('https://' + index[0:-1])
+            else:
+                self.waitjudge.append('http://' + index[0:-1])
+                self.waitjudge.append('https://' + index[0:-1])
         self.threadjude()
         end_time()
 
@@ -342,8 +379,7 @@ class GetFreeProxy(object):
                 0]['class'][1]
             uncode = functools.reduce(
                 lambda x, y: x * 10 + (ord(y) - ord('A')), map(lambda x: x, encode), 0)
-            self.waitjudge.append(
-                [ip + ':' + str(int(uncode / 8)), ip[4] == 's'])
+            self.waitjudge.append(ip + ':' + str(int(uncode / 8)))
         self.threadjude()
         end_time()
 
@@ -372,7 +408,7 @@ class GetFreeProxy(object):
                 tds = index.find_all('li')
                 ip = tds[3].text
                 self.waitjudge.append(
-                    [ip + '://' + tds[0].text + ':' + tds[1].text, ip == 'https'])
+                    ip + '://' + tds[0].text + ':' + tds[1].text)
         self.threadjude()
         end_time()
 
@@ -405,10 +441,8 @@ class GetFreeProxy(object):
         trs = html.find_all('table')[2].find_all('tr')
         for test in range(1, len(trs) - 1):
             tds = trs[test].find_all('td')
-            self.waitjudge.append(
-                ['http://' + tds[0].text + ':' + tds[1].text, 0])
-            self.waitjudge.append(
-                ['https://' + tds[0].text + ':' + tds[1].text, 1])
+            self.waitjudge.append('http://' + tds[0].text + ':' + tds[1].text)
+            self.waitjudge.append('https://' + tds[0].text + ':' + tds[1].text)
 
     def kuaidaili(self, page):
         """
@@ -437,7 +471,7 @@ class GetFreeProxy(object):
         for index in range(1, len(trs)):
             tds = trs[index].find_all('td')
             ip = tds[3].text.lower() + "://" + tds[0].text + ':' + tds[1].text
-            self.waitjudge.append([ip, ip[4] == 's'])
+            self.waitjudge.append(ip)
 
 
 if __name__ == '__main__':

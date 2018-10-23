@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-21 20:45:42
+# @Last Modified time: 2018-10-23 19:51:04
 
 import requests
 from bs4 import BeautifulSoup
@@ -37,7 +37,7 @@ def get_html(url, proxies, host):
     headers['Host'] = host
 
     if len(proxies):
-        print(proxies)
+        # print(proxies)
         html = requests.get(url, headers=headers, verify=False,
                             timeout=3, proxies=proxies).text
     else:

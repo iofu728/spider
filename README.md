@@ -10,12 +10,12 @@
 
 ## Key
 
-* 高可用IP代理池
+* <u>`高可用IP代理池`</u>
   + 通过获得Gatherproxy, Goubanjia, xici 等Free Proxy WebSite 数据建立代理池
   + 解析Goubanjia port数据
   + 快速检验IP可用性
   + 配合Requests 自动分配代理Ip, 带有Retry机制, 失败写入DB机制
-* Netease
+* <u>`Netease`</u>
   + classify -> playlist id -> song_detail
   + V1 写文件 一次运行版本 无代理，无记录进度机制
   + V1.5 少量代理IP

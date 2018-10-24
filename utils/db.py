@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
+# @Description: DB operation
 # @Author: gunjianpan
 # @Date:   2018-10-21 12:49:22
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-23 20:49:42
+# @Last Modified time: 2018-10-24 13:15:31
 import pymysql
 
 
@@ -12,7 +13,7 @@ class Db(object):
     """
 
     def __init__(self):
-        self.db = pymysql.connect("localhost", "root", "", "netease")
+        self.db = pymysql.connect("address", "name", "password", "namespace") ## change to your own mysql info
 
     def select_db(self, sql):
         """

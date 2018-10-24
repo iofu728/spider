@@ -1,16 +1,12 @@
-<p align="center"><a href="https://wyydsb.xin" target="_blank" rel="noopener noreferrer"><img width="100" src="https://cdn.nlark.com/yuque/0/2018/jpeg/104214/1540345708659-6599af79-2d19-407a-a438-e7f8abd743ba.jpeg" alt="Spider logo"></a></p>
+<p align="center"><a href="https://wyydsb.xin" target="_blank" rel="noopener noreferrer"><img width="100" src="https://cdn.nlark.com/yuque/0/2018/jpeg/104214/1540358574166-46cbbfd2-69fa-4406-aba9-784bf65efdf9.jpeg" alt="Spider logo"></a></p>
 <h1 align="center">Spider Man</h1>
 
 [![GitHub](https://img.shields.io/github/license/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider/master/LICENSE)
 [![GitHub tag](https://img.shields.io/github/tag/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider)
 [![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider)
 
-<div align="center">
-  <strong>
-     通过搭建高可用代理IP池 实现高并发爬虫集合
-     Highly concurrent Spider collection by building a highly available proxy IP pool
-  </strong>
-</div>
+<div align="center"><strong>通过搭建高可用代理IP池 实现高并发爬虫集合</strong></div>
+<div align="center"><strong>Highly concurrent Spider collection by building a highly available proxy IP pool</strong></div>
 
 ## Key
 

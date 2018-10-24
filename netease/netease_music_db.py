@@ -2,10 +2,10 @@
 # @Author: gunjianpan
 # @Date:   2018-10-21 11:00:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-23 21:28:35
+# @Last Modified time: 2018-10-24 09:45:51
 
+import codecs
 import threading
-import time
 
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
@@ -34,7 +34,7 @@ class Get_playlist_song():
         self.select_ids = '''SELECT `id`, playlist_id from playlist_queue WHERE classify = '%s' AND is_finished = 0 '''
         self.select_song = '''SELECT `id`, `song_id`, `time`, `play_time` from playlist_detail WHERE song_id in %s AND classify = '%s' '''
         self.insert_sql = '''INSERT INTO playlist_queue(`playlist_id`, `classify`) VALUES %s'''
-        self.insert_song = '''LOAD DATA INFILE "/Users/gunjianpan/Desktop/git/spider/song_detail" INTO TABLE playlist_detail FIELDS TERMINATED BY "," OPTIONALLY ENCLOSED BY "'" LINES TERMINATED BY "\n" (`song_id`, `song_name`, `classify`, `time`, `play_time`)'''
+        self.insert_song = '''LOAD DATA INFILE '/Users/gunjianpan/Desktop/git/spider/song_detail' INTO TABLE playlist_detail FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' LINES TERMINATED BY '\n' (`song_id`, `song_name`, `classify`, `time`, `play_time`)'''
         self.replace_song = '''REPLACE INTO playlist_detail(`id`,`song_id`,`classify`,`song_name`,`time`,`play_time`) VALUES %s'''
         self.replace_queue = '''REPLACE INTO playlist_queue(`id`, `playlist_id`, `classify`, `is_finished`) VALUES %s'''
 
@@ -150,9 +150,6 @@ class Get_playlist_song():
         if not results:
             return []
         hadexist = []
-        file_d = open("queue", 'a')
-        file_d.seek(0)
-        file_d.truncate()
         for index in results:
             hadexist.append(index[0])
         insertlist = []
@@ -209,6 +206,7 @@ class Get_playlist_song():
             self.test_song(classify, ids)
             self.songlist = []
             self.songmap = {}
+            self.finishlist = []
             self.successtime = 0
             print(classify + ' Over!')
 
@@ -277,7 +275,7 @@ class Get_playlist_song():
         replacelist = []
         insertlist = []
         replacequeue = []
-        file_d = open("song_detail", 'a')
+        file_d = codecs.open("song_detail", 'a', encoding='utf-8')
         file_d.seek(0)
         file_d.truncate()
         idsmap = {}
@@ -291,7 +289,7 @@ class Get_playlist_song():
                     (dbdetail[0], song, classify, songdetail[2], songdetail[0] + dbdetail[1], songdetail[1] + dbdetail[2]))
             else:
                 file_d.write(
-                    str([song, songdetail[2].replace(',', ' ')[0:30], classify, songdetail[0], songdetail[1]])[1:-1] + '\n')
+                    u'' + str([song, u'' + str(u'' + songdetail[2].replace(',', ' '))[0:20], classify, songdetail[0], songdetail[1]])[1:-1] + '\n')
                 insertlist.append(
                     (song, songdetail[2], classify, songdetail[0], songdetail[1]))
         for playlist in self.finishlist:

@@ -3,7 +3,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-21 11:00:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-24 13:17:36
+# @Last Modified time: 2018-10-26 16:25:33
 
 import codecs
 import threading
@@ -35,7 +35,7 @@ class Get_playlist_song():
         self.select_ids = '''SELECT `id`, playlist_id from playlist_queue WHERE classify = '%s' AND is_finished = 0 '''
         self.select_song = '''SELECT `id`, `song_id`, `time`, `play_time` from playlist_detail WHERE song_id in %s AND classify = '%s' '''
         self.insert_sql = '''INSERT INTO playlist_queue(`playlist_id`, `classify`) VALUES %s'''
-        self.insert_song = '''LOAD DATA INFILE '/Users/gunjianpan/Desktop/git/spider/song_detail' INTO TABLE playlist_detail FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' LINES TERMINATED BY '\n' (`song_id`, `song_name`, `classify`, `time`, `play_time`)''' ## change to your file absolute address
+        self.insert_song = '''LOAD DATA INFILE '/Users/gunjianpan/Desktop/git/spider/song_detail' INTO TABLE playlist_detail FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' LINES TERMINATED BY '\n' (`song_id`, `song_name`, `classify`, `time`, `play_time`)'''  # change to your file absolute address
         self.replace_song = '''REPLACE INTO playlist_detail(`id`,`song_id`,`classify`,`song_name`,`time`,`play_time`) VALUES %s'''
         self.replace_queue = '''REPLACE INTO playlist_queue(`id`, `playlist_id`, `classify`, `is_finished`) VALUES %s'''
 
@@ -192,6 +192,7 @@ class Get_playlist_song():
         get song detail threadings
         """
 
+        begin_time()
         for classify in self.classifylist:
             ids = self.get_list_ids(classify)
             threadings = []
@@ -210,6 +211,7 @@ class Get_playlist_song():
             self.finishlist = []
             self.successtime = 0
             print(classify + ' Over!')
+        end_time()
 
     def clean_data(self):
         """

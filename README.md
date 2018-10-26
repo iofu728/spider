@@ -20,6 +20,7 @@
   + V1 写文件 一次运行版本 无代理，无记录进度机制
   + V1.5 少量代理IP
   + V2 代理IP池 记录进度 写入MySQL
+    - 对写库进行优化 Load data/ Replace INTO
 
 ## 开发指南
 

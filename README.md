@@ -2,7 +2,7 @@
 <h1 align="center">Spider Press Man</h1>
 
 [![GitHub](https://img.shields.io/github/license/iofu728/spider-press.svg?style=popout-square)](https://github.com/iofu728/spider-press/master/LICENSE)
-[![GitHub tag](https://img.shields.io/github/tag/iofu728/spider-press.svg?style=popout-square)](https://github.com/iofu728/spider-press/release)
+[![GitHub tag](https://img.shields.io/github/tag/iofu728/spider-press.svg?style=popout-square)](https://github.com/iofu728/spider-press/releases)
 [![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/iofu728/spider-press.svg?style=popout-square)](https://github.com/iofu728/spider-press)
 
 <div align="center"><strong>高可用代理IP池 高并发爬虫 不均匀的压力分发系统 </strong></div>

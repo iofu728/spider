@@ -1,7 +1,7 @@
 <p align="center"><a href="https://wyydsb.xin" target="_blank" rel="noopener noreferrer"><img width="100" src="https://cdn.nlark.com/yuque/0/2018/jpeg/104214/1540358574166-46cbbfd2-69fa-4406-aba9-784bf65efdf9.jpeg" alt="Spider logo"></a></p>
 <h1 align="center">Spider Press Man</h1>
 
-[![GitHub](https://img.shields.io/github/license/iofu728/spider-press.svg?style=popout-square)](https://github.com/iofu728/spider-press/master/LICENSE)
+[![GitHub](https://img.shields.io/github/license/iofu728/spider-press.svg?style=popout-square)](https://github.com/iofu728/spider-press/blob/master/LICENSE)
 [![GitHub tag](https://img.shields.io/github/tag/iofu728/spider-press.svg?style=popout-square)](https://github.com/iofu728/spider-press/releases)
 [![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/iofu728/spider-press.svg?style=popout-square)](https://github.com/iofu728/spider-press)
 

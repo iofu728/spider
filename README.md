@@ -10,23 +10,23 @@
 
 ## Key
 
-* <u>`高可用IP代理池`</u>
-  + 通过获得Gatherproxy, Goubanjia, xici 等Free Proxy WebSite 数据建立代理池
-  + 解析Goubanjia port数据
-  + 快速检验IP可用性
-  + 配合Requests 自动分配代理Ip, 带有Retry机制, 失败写入DB机制
+* <u>`Highly Available Proxy IP Pool`</u>
+  + By obtaining data from Gatherproxy, Goubanjia, xici etc. Free Proxy WebSite
+  + Analysis the Goubanjia port data
+  + Quickly verify IP availability
+  + Cooperate with Requests to automatically assign proxy Ip, with Retry mechanism, fail to write DB mechanism
 * <u>`Netease`</u>
   + classify -> playlist id -> song_detail
-  + V1 写文件 一次运行版本 无代理，无记录进度机制
-  + V1.5 少量代理IP
-  + V2 代理IP池 记录进度 写入MySQL
-    - 对写库进行优化 Load data/ Replace INTO
+  + V1 Write file, One run version, no proxy, no record progress mechanism
+  + V1.5 Small amount of proxy IP
+  + V2 Proxy IP pool, Record progress, Write to MySQL
+    - Optimize the write to DB `Load data/ Replace INTO`
 * <u>`Press Test`</u>
   + By highly available proxy IP pool to pretend user.
   + Give some web service uneven pressure
   + To do: press uniform
 
-## 开发指南
+## Development
 
 ```bash
 $ git clone https://github.com/iofu728/spider.git
@@ -41,7 +41,7 @@ $ xxx = press.press.Press_test()
 $ xxx.one_press_attack(url, host, qps, types, total)
 ```
 
-## 目录结构
+## Structure
 ```bash
 .
 ├── LICENSE                        // LICENSE
@@ -64,7 +64,7 @@ $ xxx.one_press_attack(url, host, qps, types, total)
     └── utils.py                   // requests operation
 ```
 
-## 设计文档
+## Design document
 * [Netease Music Spider for DB](https://wyydsb.xin/other/neteasedb.html)
 * [Netease Music Spider](https://wyydsb.xin/other/netease.html)
 

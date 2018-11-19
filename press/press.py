@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-11-10 11:17:16
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-11-19 09:44:06
+# @Last Modified time: 2018-11-19 10:40:56
 import codecs
 import threading
 
@@ -46,3 +46,11 @@ class Press_test():
         for work in threadings:
             work.join()
         end_time()
+
+    def one_press_attack(self, url, host, qps, types, total):
+        """
+        press url from a long time
+        """
+        for index in range(total):
+            self.press_threading(url, host, qps, types)
+        print('Over')

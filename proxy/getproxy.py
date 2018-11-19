@@ -3,8 +3,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-26 16:26:13
-# -*- coding: utf-8 -*-
+# @Last Modified time: 2018-11-11 20:28:33
 # !/usr/bin/env python
 
 import functools

@@ -3,7 +3,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-21 11:00:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-11-16 00:00:11
+# @Last Modified time: 2019-01-25 10:35:37
 
 import codecs
 import threading
@@ -44,10 +44,10 @@ class Get_playlist_song():
         get classify from /discover/playlist
         """
 
-        begin_time()
+        version = begin_time()
         self.classifylist = {}
         host = 'https://music.163.com/discover/playlist'
-        html = self.proxyclass.get_request_proxy(host, host[8:21], 0)
+        html = self.proxyclass.get_request_proxy(host, 0)
 
         if not html:
             print('Empty')
@@ -64,7 +64,7 @@ class Get_playlist_song():
         for index in alist:
             self.classifylist[index.text] = index['href']
         self.proxyclass.cleancannotuse()
-        end_time()
+        end_time(version)
 
     def get_playlist_id(self, classify, offset):
         """
@@ -76,7 +76,7 @@ class Get_playlist_song():
         url = host + self.classifylist[classify] + (
             '?' if allclassify else '&') + 'order=hot&limit=35&offset=' + str(offset)
         # html = self.proxyclass.get_request_proxy(url, host[8:], 0)
-        html = get_html(url, {}, host[8:])
+        html = get_html(url, {})
 
         if not html:
             if self.can_retry(url):
@@ -117,7 +117,7 @@ class Get_playlist_song():
         get play list id in threading
         """
 
-        begin_time()
+        version = begin_time()
         if not len(self.classifylist):
             self.get_classify()
 
@@ -136,7 +136,7 @@ class Get_playlist_song():
             self.test_queue(index)
             self.playlists = []
             print(index + " Over")
-        end_time()
+        end_time(version)
 
     def test_queue(self, classify):
         """
@@ -192,7 +192,7 @@ class Get_playlist_song():
         get song detail threadings
         """
 
-        begin_time()
+        version = begin_time()
         for classify in self.classifylist:
             ids = self.get_list_ids(classify)
             threadings = []
@@ -211,7 +211,7 @@ class Get_playlist_song():
             self.finishlist = []
             self.successtime = 0
             print(classify + ' Over!')
-        end_time()
+        end_time(version)
 
     def clean_data(self):
         """
@@ -232,7 +232,7 @@ class Get_playlist_song():
         """
 
         host = 'http://music.163.com/api/playlist/detail?id=' + str(id)
-        json = self.proxyclass.get_request_proxy(host, host[7:20], 1)
+        json = self.proxyclass.get_request_proxy(host, 1)
         if json == 0:
             if self.can_retry(host):
                 self.get_song_detail(id)

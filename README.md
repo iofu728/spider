@@ -25,20 +25,37 @@
   + By highly available proxy IP pool to pretend user.
   + Give some web service uneven pressure
   + To do: press uniform
+* <u>`Get news from google/baidu`</u> -`news/news.py`
+  + get news from search engine by Proxy Engine
+  + one model: careful analysis `DOM`
+  + the other model: rough analysis `Chinese words`
+* <u>`build md file`</u> -`buildmd/buildmd.py`
+  + load data from `youdaoyun`
+  + by series of rules to deal data to .md
 
 ## Development
+
+`docker` is in the road.
 
 ```bash
 $ git clone https://github.com/iofu728/spider.git
 $ cd spider
 $ ipython
+# using proxy pool
+$ import proxy.getproxy
+$ proxyclass = proxy.getproxy.GetFreeProxy()
+$ proxyclass.get_request_proxy(url, types)
 # netease spider
 $ import netease.netease_music_db
 $ xxx = netease.netease_music_db.Get_playlist_song()
 # press
 $ import press.press
 $ xxx = press.press.Press_test()
-$ xxx.one_press_attack(url, host, qps, types, total)
+$ xxx.one_press_attack(url, qps, types, total)
+# news
+$ import news.news
+# buildmd
+$ import buildmd.buildmd
 ```
 
 ## Structure
@@ -46,12 +63,17 @@ $ xxx.one_press_attack(url, host, qps, types, total)
 .
 ├── LICENSE                        // LICENSE
 ├── README.md                      // README
-├── log                           // failured log
+├── buildmd
+│   └── buildmd.py                 // buildmd.py
+├── log                            // failured log
 ├── netease
 │   ├── netease_music_base.py      // v1 spider
 │   ├── netease_music_db.py        // v2 spider
 │   ├── result.txt                 // result
 │   └── table.sql                  // netease sql
+├── news
+│   ├── china_city_list.csv        // chinese_city
+│   └── news.py                    // news.py
 ├── press
 │   └── press.py                   // press
 ├── proxy
@@ -60,6 +82,7 @@ $ xxx.one_press_attack(url, host, qps, types, total)
 │   └── table.sql                  // proxy sql
 ├── song_detail
 └── utils
+    ├── agent                      // Header.Agent
     ├── db.py                      // db operation
     └── utils.py                   // requests operation
 ```

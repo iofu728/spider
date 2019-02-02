@@ -3,20 +3,17 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-11-11 20:28:33
+# @Last Modified time: 2019-01-31 19:48:18
 # !/usr/bin/env python
 
 import functools
-import pymysql
 import random
-import requests
 import threading
 import time
 
 from apscheduler.schedulers.blocking import BlockingScheduler
-from bs4 import BeautifulSoup
 from utils.db import Db
-from utils.utils import begin_time, end_time, get_html, get_json
+from utils.utils import begin_time, end_time, get_html, get_json, get_basic
 
 """
   * gatherproxy.com
@@ -34,11 +31,11 @@ class GetFreeProxy(object):
     """
 
     def __init__(self):
-        self.Db = Db()
+        self.Db = Db(0)
         self.insert_sql = '''INSERT INTO ip_proxy( `address`, `http_type`) VALUES %s '''
         self.select_list = '''SELECT address, http_type from ip_proxy WHERE `is_failured` = 0'''
         self.select_sql = '''SELECT `id`, address, `is_failured` from ip_proxy WHERE `address` in %s '''
-        self.select_all = '''SELECT `address`, `http_type` from ip_proxy WHERE `is_failured` != 5'''
+        self.select_all = '''SELECT `address`, `http_type` from ip_proxy WHERE `is_failured` != 5 and http_type in %s'''
         self.replace_ip = '''REPLACE INTO ip_proxy(`id`, `address`, `http_type`, `is_failured`) VALUES %s'''
         self.typemap = {1: 'https', 0: 'http'}
         self.canuseip = []
@@ -49,7 +46,7 @@ class GetFreeProxy(object):
         self.failuredtime = {}
         self.initproxy()
 
-    def get_request_proxy(self, url, host, types):
+    def get_request_proxy(self, url, types):
         """
         use proxy to send requests, and record the proxy cann't use
         @types 1:json, 0:html
@@ -68,18 +65,20 @@ class GetFreeProxy(object):
             proxies = {'http': self.proxylist[index]}
 
         try:
-            if types:
-                json = get_json(url, proxies, host)
+            if types == 1:
+                json = get_json(url, proxies)
                 if 'code' in json and json['code'] != 200:
-                    ppap = self.retry(url, host, types)
+                    ppap = self.retry(url, types)
                     if not ppap:
                         return False
                 else:
                     return json
+            elif types == 2:
+                return get_basic(url, proxies)
             else:
-                html = get_html(url, proxies, host)
+                html = get_html(url, proxies)
                 if 'code' in html or not html:
-                    ppap = self.retry(url, host, types)
+                    ppap = self.retry(url, types)
                     if not ppap:
                         return False
                 else:
@@ -92,11 +91,11 @@ class GetFreeProxy(object):
             else:
                 if index < len(self.proxylist) and proxies['http'] == self.proxylist[index]:
                     self.proxylist.remove(proxies['http'])
-            ppap = self.retry(url, host, types)
+            ppap = self.retry(url, types)
             if not ppap:
                 return False
 
-    def retry(self, url, host, types):
+    def retry(self, url, types):
         """
         retry once
         """
@@ -104,11 +103,11 @@ class GetFreeProxy(object):
         if url not in self.failuredtime:
             self.failuredtime[url] = 0
             # print("retry " + str(self.failuredtime[url]))
-            self.get_request_proxy(url, host, types)
+            self.get_request_proxy(url, types)
         elif self.failuredtime[url] < 3:
             self.failuredtime[url] += 1
             # print("retry " + str(self.failuredtime[url]))
-            self.get_request_proxy(url, host, types)
+            self.get_request_proxy(url, types)
         else:
             # print("Request Failured three times!")
             self.log_write(url)
@@ -243,33 +242,47 @@ class GetFreeProxy(object):
         http_type = urls[4] == 's'
         proxies = {self.typemap[http_type]: urls}
 
-        test_url = 'https://music.163.com/discover/playlist/?order=hot&limit=35&offset=0' if http_type else 'http://music.163.com/api/playlist/detail?id=432853362'
-        if http_type:
-            try:
-                html = get_html(test_url, proxies, test_url[8:21])
-                alist = html.find_all('a', class_='s-fc1')
-                if len(alist) == 73:
+        test_url = 'https://music.163.com/api/playlist/detail?id=432853362' if http_type else 'http://music.163.com/api/playlist/detail?id=432853362'
+        try:
+            data = get_json(test_url, proxies)
+            result = data['result']
+            tracks = result['tracks']
+            if len(tracks) == 56:
+                if times < 2:
+                    self.judgeurl(urls, times + 1)
+                else:
                     self.canuseip.append(urls)
-                else:
-                    self.cannotuseip.append(urls)
-            except Exception as e:
+            else:
                 self.cannotuseip.append(urls)
-                pass
-        else:
-            try:
-                data = get_json(test_url, proxies, test_url[7:20])
-                result = data['result']
-                tracks = result['tracks']
-                if len(tracks) == 56:
-                    if times < 2:
-                        self.judgeurl(urls, times + 1)
-                    else:
-                        self.canuseip.append(urls)
-                else:
-                    self.cannotuseip.append(urls)
-            except Exception as e:
-                self.cannotuseip.append(urls)
-                pass
+        except Exception as e:
+            self.cannotuseip.append(urls)
+            pass
+        # if http_type:
+        #     try:
+        #         html = get_html(test_url, proxies, test_url[8:21])
+        #         alist = html.find_all('a', class_='s-fc1')
+        #         if len(alist) == 73:
+        #             self.canuseip.append(urls)
+        #         else:
+        #             self.cannotuseip.append(urls)
+        #     except Exception as e:
+        #         self.cannotuseip.append(urls)
+        #         pass
+        # else:
+        #     try:
+        #         data = get_json(test_url, proxies, test_url[7:20])
+        #         result = data['result']
+        #         tracks = result['tracks']
+        #         if len(tracks) == 56:
+        #             if times < 2:
+        #                 self.judgeurl(urls, times + 1)
+        #             else:
+        #                 self.canuseip.append(urls)
+        #         else:
+        #             self.cannotuseip.append(urls)
+        #     except Exception as e:
+        #         self.cannotuseip.append(urls)
+        #         pass
 
     def threadjude(self):
         """
@@ -290,15 +303,21 @@ class GetFreeProxy(object):
                 work.join()
             self.dbcanuseproxy()
             self.cleancannotuse()
+
         self.waitjudge = []
 
-    def testdb(self):
+    def testdb(self, types):
         '''
         test proxy in db can use
         '''
 
-        begin_time()
-        results = self.Db.select_db(self.select_all)
+        version = begin_time()
+        typestr = ''
+        if types == 2:
+            typestr = '(0,1)'
+        else:
+            typestr = '(' + str(types) + ')'
+        results = self.Db.select_db(self.select_all % typestr)
         if results != 0:
             for index in results:
                 self.waitjudge.append(index[0])
@@ -306,7 +325,7 @@ class GetFreeProxy(object):
         else:
             pass
         self.initproxy()
-        end_time()
+        end_time(version)
 
     def xiciproxy(self, page):
         """
@@ -318,10 +337,10 @@ class GetFreeProxy(object):
             print("Please input num!")
             return []
 
-        begin_time()
+        version = begin_time()
         host = 'http://www.xicidaili.com/nn/'
         for index in range(1, page + 1):
-            html = get_html(host + str(index), {}, host[7:-4])
+            html = get_html(host + str(index), {})
             # html = self.get_request_proxy(host + str(index), host[7:-4], 0)
             tem = html.find_all('tr')
             for index in range(1, len(tem)):
@@ -330,7 +349,7 @@ class GetFreeProxy(object):
                 self.waitjudge.append(
                     ip + '://' + tds[1].text + ':' + tds[2].text)
         self.threadjude()
-        end_time()
+        end_time(version)
 
     def gatherproxy(self, types):
         """
@@ -339,7 +358,7 @@ class GetFreeProxy(object):
         http://www.gatherproxy.com/zh/proxylist/country/?c=China
         """
 
-        begin_time()
+        version = begin_time()
         file_d = open('proxy/gatherproxy', 'r')
         for index in file_d.readlines():
             if types == 0:
@@ -350,7 +369,9 @@ class GetFreeProxy(object):
                 self.waitjudge.append('http://' + index[0:-1])
                 self.waitjudge.append('https://' + index[0:-1])
         self.threadjude()
-        end_time()
+        end_time(version)
+        if types == 2:
+            self.testdb(2)
 
     def goubanjia(self):
         """
@@ -360,9 +381,9 @@ class GetFreeProxy(object):
         goubanjia proxy http://www.goubanjia.com
         """
 
-        begin_time()
+        version = begin_time()
         host = 'http://www.goubanjia.com'
-        html = self.get_request_proxy(host, host[7:], 0)
+        html = self.get_request_proxy(host, 0)
 
         if not html:
             return []
@@ -380,7 +401,7 @@ class GetFreeProxy(object):
                 lambda x, y: x * 10 + (ord(y) - ord('A')), map(lambda x: x, encode), 0)
             self.waitjudge.append(ip + ':' + str(int(uncode / 8)))
         self.threadjude()
-        end_time()
+        end_time(version)
 
     def schedulegou(self):
         sched = BlockingScheduler()
@@ -393,13 +414,13 @@ class GetFreeProxy(object):
         no one can use
         """
 
-        begin_time()
+        version = begin_time()
         url_list = [
             '', 'free/gngn/index.shtml', 'free/gwgn/index.shtml'
         ]
         host = 'http://www.data5u.com/'
         for uri in url_list:
-            html = self.get_request_proxy(host + uri, host[7:-1], 0)
+            html = self.get_request_proxy(host + uri, 0)
             if not html:
                 continue
             table = html.find_all('ul', class_='l2')
@@ -409,14 +430,14 @@ class GetFreeProxy(object):
                 self.waitjudge.append(
                     ip + '://' + tds[0].text + ':' + tds[1].text)
         self.threadjude()
-        end_time()
+        end_time(version)
 
     def sixsixip(self, area, page):
         """
         66ip proxy http://www.66ip.cn/areaindex_{area}/{page}.html
         """
 
-        begin_time()
+        version = begin_time()
         threadings = []
         for index in range(1, area + 1):
             for pageindex in range(1, page + 1):
@@ -429,12 +450,12 @@ class GetFreeProxy(object):
         for work in threadings:
             work.join()
         self.threadjude()
-        end_time()
+        end_time(version)
 
     def sixsixthread(self, index, pageindex):
         host = '''http://www.66ip.cn/areaindex_%d/%d.html'''
         html = self.get_request_proxy(
-            host % (index, pageindex), host[7:-21], 0)
+            host % (index, pageindex), 0)
         if not html:
             return []
         trs = html.find_all('table')[2].find_all('tr')
@@ -448,7 +469,7 @@ class GetFreeProxy(object):
         kuaidaili https://www.kuaidaili.com/free/
         """
 
-        begin_time()
+        version = begin_time()
         threadings = []
         for index in range(1, page + 1):
             work = threading.Thread(
@@ -459,11 +480,11 @@ class GetFreeProxy(object):
         for work in threadings:
             work.join()
         self.threadjude()
-        end_time()
+        end_time(version)
 
     def kuaidailithread(self, index):
         host = '''https://www.kuaidaili.com/free/inha/%d/'''
-        html = self.get_request_proxy(host % index, host[8:25], 0)
+        html = self.get_request_proxy(host % index, 0)
         if not html:
             return []
         trs = html.find_all('tr')
@@ -474,5 +495,6 @@ class GetFreeProxy(object):
 
 
 if __name__ == '__main__':
-    GetFreeProxy.testdb()
-    GetFreeProxy.initproxy()
+    a = GetFreeProxy()
+    a.initproxy()
+    a.testdb(0)

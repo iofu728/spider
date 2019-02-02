@@ -11,3 +11,12 @@ log
 
 # song_detail
 song_detail
+
+# idea
+.idea/
+
+# data
+*/data/
+
+# utils.agent
+utils/agent

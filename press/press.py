@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-11-10 11:17:16
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-11-19 10:40:56
+# @Last Modified time: 2019-01-27 16:28:13
 import codecs
 import threading
 
@@ -24,9 +24,9 @@ class Press_test():
         press have no data input
         """
         if types == 1:
-            html = self.proxyclass.get_request_proxy(url, host, 0)
+            html = self.proxyclass.get_request_proxy(url, 0)
         else:
-            html = get_html(url, {}, host)
+            html = get_html(url, {})
 
         if html == False and times < 5:
             self.basic_press(url, host, times + 1, types)
@@ -35,7 +35,7 @@ class Press_test():
         """
         press url at constant qps
         """
-        begin_time()
+        version = begin_time()
         threadings = []
         for index in range(qps):
             work = threading.Thread(
@@ -45,7 +45,7 @@ class Press_test():
             work.start()
         for work in threadings:
             work.join()
-        end_time()
+        end_time(version)
 
     def one_press_attack(self, url, host, qps, types, total):
         """

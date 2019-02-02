@@ -2,8 +2,9 @@
 * @Author: gunjianpan
 * @Date:   2018-10-19 15:01:18
 * @Last Modified by:   gunjianpan
-* @Last Modified time: 2018-10-19 15:22:59
+* @Last Modified time: 2019-01-27 23:39:47
 */
+use netease;
 CREATE TABLE if not exists `ip_proxy` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT 'auto-increment primary keys',
   `address` varchar(50) NOT NULL DEFAULT '0' COMMENT 'proxy address',

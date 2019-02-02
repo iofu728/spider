@@ -3,7 +3,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-21 12:49:22
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2018-10-26 16:15:43
+# @Last Modified time: 2019-01-27 16:28:03
 import pymysql
 
 
@@ -12,9 +12,12 @@ class Db(object):
     db operation, without sql injection
     """
 
-    def __init__(self):
+    def __init__(self, keys):
         # change to your own mysql info
-        self.db = pymysql.connect("address", "name", "password", "namespace")
+        if keys:
+            self.db = pymysql.connect("localhost", "root", "", "china_regions")
+        else:
+            self.db = pymysql.connect("localhost", "root", "", "netease")
 
     def select_db(self, sql):
         """

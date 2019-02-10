@@ -3,7 +3,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-01-31 19:48:18
+# @Last Modified time: 2019-02-09 21:50:52
 # !/usr/bin/env python
 
 import functools
@@ -31,7 +31,7 @@ class GetFreeProxy(object):
     """
 
     def __init__(self):
-        self.Db = Db(0)
+        self.Db = Db("netease")
         self.insert_sql = '''INSERT INTO ip_proxy( `address`, `http_type`) VALUES %s '''
         self.select_list = '''SELECT address, http_type from ip_proxy WHERE `is_failured` = 0'''
         self.select_sql = '''SELECT `id`, address, `is_failured` from ip_proxy WHERE `address` in %s '''
@@ -67,12 +67,12 @@ class GetFreeProxy(object):
         try:
             if types == 1:
                 json = get_json(url, proxies)
-                if 'code' in json and json['code'] != 200:
-                    ppap = self.retry(url, types)
-                    if not ppap:
-                        return False
-                else:
-                    return json
+                # if 'code' in json and json['code'] != 200:
+                #     ppap = self.retry(url, types)
+                #     if not ppap:
+                #         return False
+                # else:
+                return json
             elif types == 2:
                 return get_basic(url, proxies)
             else:
@@ -99,7 +99,7 @@ class GetFreeProxy(object):
         """
         retry once
         """
-
+        print('retry')
         if url not in self.failuredtime:
             self.failuredtime[url] = 0
             # print("retry " + str(self.failuredtime[url]))
@@ -169,7 +169,7 @@ class GetFreeProxy(object):
         insertlist = []
         updatelist = []
         ipmap = {}
-        if results:
+        if results != False:
             for ip_info in results:
                 ipmap[ip_info[1]] = [ip_info[0], ip_info[2]]
 
@@ -177,7 +177,6 @@ class GetFreeProxy(object):
                 http_type = ip_now[4] == 's'
                 if ip_now in ipmap:
                     if ipmap[ip_now][1]:
-
                         updatelist.append(
                             (ipmap[ip_now][0], ip_now, http_type, 0))
                 else:

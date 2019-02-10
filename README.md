@@ -35,25 +35,37 @@
 
 ## Development
 
+**All model is base on `proxy.getproxy`, so it is very !import.**
+
 `docker` is in the road.
 
 ```bash
 $ git clone https://github.com/iofu728/spider.git
 $ cd spider
+$ pip install -r requirement.txt
+
+# you shoudld load file from http://gatherproxy.com
 $ ipython
+
 # using proxy pool
-$ import proxy.getproxy
-$ proxyclass = proxy.getproxy.GetFreeProxy()
-$ proxyclass.get_request_proxy(url, types)
+$ from  proxy.getproxy import GetFreeProxy
+$ requests = GetFreeProxy()
+$ requests.gatherproxy(0) # load http proxy to pool
+$ requests.get_request_proxy(url, types) # use proxy
+
+
 # netease spider
 $ import netease.netease_music_db
 $ xxx = netease.netease_music_db.Get_playlist_song()
+
 # press
 $ import press.press
 $ xxx = press.press.Press_test()
 $ xxx.one_press_attack(url, qps, types, total)
+
 # news
 $ import news.news
+
 # buildmd
 $ import buildmd.buildmd
 ```

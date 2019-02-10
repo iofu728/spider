@@ -1,0 +1,6 @@
+pymysql
+requests
+bs4
+apscheduler
+pkuseg
+pandas

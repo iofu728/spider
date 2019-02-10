@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-01-25 01:36:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-01-27 23:40:28
+# @Last Modified time: 2019-02-09 11:07:33
 
 import codecs
 import threading
@@ -23,7 +23,6 @@ class Get_baidu_news():
     """
 
     def __init__(self):
-        self.Db = Db(0)
         self.proxyclass = GetFreeProxy()
         self.failuredmap = {}
         self.summarizations = {}
@@ -110,7 +109,6 @@ class Get_google_news():
     """
 
     def __init__(self):
-        self.Db = Db(0)
         self.proxyclass = GetFreeProxy()
         self.failuredmap = {}
         self.summarizations = {}
@@ -204,7 +202,7 @@ class find_location(object):
     """
 
     def __init__(self):
-        self.Db = Db(1)
+        self.Db = Db("china_regions")
         china = pd.read_csv('news/china_city_list.csv', encoding='gbk')
         self.province = list(china.groupby(by=['Province']).count().axes[0])
         self.city = list(china.groupby(by=['City']).count().axes[0])

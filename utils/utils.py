@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-01-31 19:57:46
+# @Last Modified time: 2019-02-09 22:53:19
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,14 +14,14 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 headers = {
     'pragma': 'no-cache',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-site': 'same-origin',
-    'sec-fetch-user': '?F',
+    # 'sec-fetch-dest': 'empty',
+    # 'sec-fetch-site': 'same-origin',
+    # 'sec-fetch-user': '?F',
     # 'sec-origin-policy': '0',
     # 'upgrade-insecure-requests': '1',
-    'X-Requested-With': 'XMLHttpRequest',
+    # 'X-Requested-With': 'XMLHttpRequest',
     'cache-control': 'no-cache',
-    'Cookie': '_yadk_uid=k8KAOQIUGyO4c4rVCUlNqIUA4kUFDRYi; OUTFOX_SEARCH_USER_ID_NCOO=1474393958.8972402; OUTFOX_SEARCH_USER_ID="286391570@10.168.17.188"; _ga=GA1.2.638310443.1538404678; _ntes_nnid=3cad562c4927812c1dddd9c50d2fbc0f,1539430622809; Hm_lvt_30b679eb2c90c60ff8679ce4ca562fcc=1539738828,1541134733; UM_distinctid=16827203c6c21c-0d26720168820b-6c350b7c-1aeaa0-16827203c6dba3; P_INFO=iofu728@163.com|1547088005|0|youdao_zhiyun2018|00&99|bej&1546844692&search#US&null#10#0#0|178950&0|search&mail163|iofu728@163.com; Hm_lvt_daa6306fe91b10d0ed6b39c4b0a407cd=1548683344; JSESSIONID=aaaAfmUj78kvK9pC1orIw; YNOTE_SESS=v2|8VIMwTO_xRpLnfU50fwuRkW0fJLRfw40eLRHwK0H6FRkY0MJLP4guR6ukLJK6LYWRPyhMeFRMUG06Zh4UEk4PS0e4PMPLRMeLR; YNOTE_PERS=v2|urstoken||YNOTE||web||-1||1548734008314||103.192.227.202||iofu728@163.com||Y5hfOEOMzm0Ju0LJLnHUA0OfkfpZhLkM0TBn4PLhMpy0gB0MzMO4TF0PuO4kEPLJy0g4nLqzhHwy06FOLeBOfJBR; YNOTE_CSTK=S0RcfVHi; _gid=GA1.2.1164334667.1548840559; arp_scroll_position=0; _gat=1; Hm_lpvt_daa6306fe91b10d0ed6b39c4b0a407cd=1548929812; YNOTE_LOGIN=5||1548929814020',
+    'Cookie': '',
     # 'Upgrade-Insecure-Requests': '1',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
     "Accept-Encoding": "",
@@ -49,16 +49,15 @@ def get_html(url, proxies):
     headers['User-Agent'] = agent_lists[index]
 
     if len(proxies):
-        print(proxies)
         html = requests.get(url, headers=headers, verify=False,
-                            timeout=3, proxies=proxies, allow_redirects=False)
+                            timeout=5, proxies=proxies, allow_redirects=False)
         if html.status_code == 301 or html.status_code == 302:
             url = BeautifulSoup(html.text, 'html.parser').a['href']
             headers['Host'] = url.split('/')[2]
             html = requests.get(url, headers=headers, verify=False,
-                                timeout=3, proxies=proxies, allow_redirects=False)
-
-        html.encoding = html.apparent_encoding
+                                timeout=5, proxies=proxies, allow_redirects=False)
+        if html.apparent_encoding == 'utf-8' or 'gbk' in html.apparent_encoding:
+            html.encoding = html.apparent_encoding
         html = html.text
     else:
         try:
@@ -69,12 +68,13 @@ def get_html(url, proxies):
                 headers['Host'] = url.split('/')[2]
                 html = requests.get(url, headers=headers, verify=False,
                                     timeout=3, allow_redirects=False)
-            html.encoding = html.apparent_encoding
+            if html.apparent_encoding == 'utf-8' or 'gbk' in html.apparent_encoding:
+                html.encoding = html.apparent_encoding
             html = html.text
         except Exception as e:
             print('Error')
             return BeautifulSoup('<html></html>', 'html.parser')
-
+    # print(html)
     return BeautifulSoup(html, 'html.parser')
 
 
@@ -91,10 +91,10 @@ def get_json(url, proxies):
     headers['User-Agent'] = agent_lists[index]
     if len(proxies):
         json = requests.get(url, headers=headers, verify=False,
-                            timeout=2, proxies=proxies).json()
+                            timeout=5, proxies=proxies).json()
     else:
         json = requests.get(url, headers=headers,
-                            verify=False, timeout=2).json()
+                            verify=False, timeout=5).json()
     return json
 
 
@@ -118,6 +118,14 @@ def get_basic(url, proxies):
         basic = requests.get(url, headers=headers,
                              verify=False, timeout=30)
     return basic
+
+
+def changeCookie(cookie):
+    """
+    change cookie
+    """
+    global headers
+    headers['Cookie'] = cookie
 
 
 start = []

@@ -3,7 +3,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-21 11:00:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-01-25 10:35:37
+# @Last Modified time: 2019-02-09 11:06:24
 
 import codecs
 import threading
@@ -22,7 +22,7 @@ class Get_playlist_song():
     """
 
     def __init__(self):
-        self.Db = Db()
+        self.Db = Db("netease")
         self.classifylist = {}
         self.proxyclass = GetFreeProxy()
         self.playlists = []

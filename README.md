@@ -35,7 +35,7 @@
 
 ## Development
 
-**All model is base on `proxy.getproxy`, so it is very !import.**
+**All model base on `proxy.getproxy`, so it is very !import.**
 
 `docker` is in the road.
 

@@ -3,6 +3,13 @@
 # python cache
 __pycache__
 
+# jupyter
+.ipynb_checkpoints
+
+# test
+test*
+Untitled*
+
 # gatherproxy
 gatherproxy
 
@@ -13,10 +20,13 @@ log
 song_detail
 
 # idea
-.idea/
+.idea
 
 # data
-*/data/
+data
+
+*.csv
+*.txt
 
 # utils.agent
 utils/agent

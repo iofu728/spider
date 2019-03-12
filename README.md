@@ -8,30 +8,49 @@
 <div align="center"><strong>高可用代理IP池 高并发爬虫 不均匀的压力分发系统 </strong></div>
 <div align="center"><strong>Highly Available Proxy IP Pool, Highly Concurrent Spider, Uneven Pressure Distribution System</strong></div>
 
-## Key
+## Proxy pool
+
+> proxy pool is the heart of this project.
 
 * <u>`Highly Available Proxy IP Pool`</u>
   + By obtaining data from Gatherproxy, Goubanjia, xici etc. Free Proxy WebSite
   + Analysis the Goubanjia port data
   + Quickly verify IP availability
   + Cooperate with Requests to automatically assign proxy Ip, with Retry mechanism, fail to write DB mechanism
-* <u>`Netease`</u>
+  + two model for proxy shell
+    * model 1: load gather proxy && update proxy list file
+    * model 2: update proxy pool db && test available
+
+## Application
+
+1. <u>`Netease Music song playlist crawl`</u> - <u>`netease/netease_music_db.py`</u>
   + classify -> playlist id -> song_detail
   + V1 Write file, One run version, no proxy, no record progress mechanism
   + V1.5 Small amount of proxy IP
   + V2 Proxy IP pool, Record progress, Write to MySQL
     - Optimize the write to DB `Load data/ Replace INTO`
-* <u>`Press Test`</u>
+2. <u>`Press Test System`</u> - <u>`press/press.py`</u>
   + By highly available proxy IP pool to pretend user.
   + Give some web service uneven pressure
   + To do: press uniform
-* <u>`Get news from google/baidu`</u> -`news/news.py`
+3. <u>`google & baidu info crawl`</u> - <u>`news/news.py`</u>
   + get news from search engine by Proxy Engine
   + one model: careful analysis `DOM`
   + the other model: rough analysis `Chinese words`
-* <u>`build md file`</u> -`buildmd/buildmd.py`
+4. <u>`Youdao Note documents crawl`</u> -`buildmd/buildmd.py`
   + load data from `youdaoyun`
   + by series of rules to deal data to .md
+5. <u>`csdn && zhihu && jianshu view info crawl`</u> - <u>`blog/titleview.py`</u>
+6. <u>`PKU Class brush`</u> - <u>`brushclass/brushclass.py`</u>
+  + when your zhongyi's class have places, It will send you some email.
+7. <u>`ZiMuZu download list crawl`</u> - <u>`zimuzu/zimuzu.py`</u>
+  + when you want to download lots of show like Season 22, Season 21.
+  + If click one by one, It is very boring, so zimuzu.py is all you need.
+  + The thing you only need do is to wait the program run.
+  + And you copy the Thunder url for one to download the movies.
+  + Now The Winter will coming, I think you need it to review `<Game of Thrones>`.
+
+**----To be continued----**
 
 ## Development
 
@@ -53,21 +72,10 @@ $ requests = GetFreeProxy()
 $ requests.gatherproxy(0) # load http proxy to pool
 $ requests.get_request_proxy(url, types) # use proxy
 
+# proxy shell
+$ ipython blog/titleviews.py -- --model=1 >> log 2>&1 # model = 1: load gather model or python blog/titleviews.py --model=1 >> proxy.log 2>&1
+$ ipython blog/titleviews.py -- --model=0 >> log 2>&1 # model = 0: update gather model
 
-# netease spider
-$ import netease.netease_music_db
-$ xxx = netease.netease_music_db.Get_playlist_song()
-
-# press
-$ import press.press
-$ xxx = press.press.Press_test()
-$ xxx.one_press_attack(url, qps, types, total)
-
-# news
-$ import news.news
-
-# buildmd
-$ import buildmd.buildmd
 ```
 
 ## Structure
@@ -75,28 +83,32 @@ $ import buildmd.buildmd
 .
 ├── LICENSE                        // LICENSE
 ├── README.md                      // README
+├── blog
+│   └── titleviews.py              // Zhihu && CSDN && jianshu
+├── brushclass
+│   └── brushclass.py              // PKU elective
 ├── buildmd
-│   └── buildmd.py                 // buildmd.py
-├── log                            // failured log
+│   └── buildmd.py                 // Youdao Note
+├── log
 ├── netease
-│   ├── netease_music_base.py      // v1 spider
-│   ├── netease_music_db.py        // v2 spider
-│   ├── result.txt                 // result
-│   └── table.sql                  // netease sql
+│   ├── netease_music_base.py
+│   ├── netease_music_db.py        // Netease Music
+│   └── table.sql
 ├── news
-│   ├── china_city_list.csv        // chinese_city
-│   └── news.py                    // news.py
+│   └── news.py                    // Google && Baidu
 ├── press
-│   └── press.py                   // press
+│   └── press.py                   // Press text
 ├── proxy
-│   ├── gatherproxy                // gatherproxy data
-│   ├── getproxy.py                // proxy pool
-│   └── table.sql                  // proxy sql
-├── song_detail
-└── utils
-    ├── agent                      // Header.Agent
-    ├── db.py                      // db operation
-    └── utils.py                   // requests operation
+│   ├── gatherproxy
+│   ├── getproxy.py                // Proxy pool
+│   └── table.sql
+├── requirement.txt
+├── utils
+│   ├── agent                      // random User-Agent
+│   ├── db.py
+│   └── utils.py
+└── zimuzu
+    └── zimuzu.py                  // zimuzi
 ```
 
 ## Design document

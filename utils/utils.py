@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-02-09 22:53:19
+# @Last Modified time: 2019-02-28 10:06:47
 
 import requests
 from bs4 import BeautifulSoup
@@ -34,6 +34,7 @@ start = 0
 file = open('utils/agent', 'r').readlines()
 agent_lists = [" ".join(index.split()[1:])[1:-1] for index in file]
 agent_len = len(agent_lists) - 1
+html_timeout = 5
 
 
 def get_html(url, proxies):
@@ -50,12 +51,13 @@ def get_html(url, proxies):
 
     if len(proxies):
         html = requests.get(url, headers=headers, verify=False,
-                            timeout=5, proxies=proxies, allow_redirects=False)
+                            timeout=html_timeout, proxies=proxies, allow_redirects=False)
         if html.status_code == 301 or html.status_code == 302:
             url = BeautifulSoup(html.text, 'html.parser').a['href']
+            print(url)
             headers['Host'] = url.split('/')[2]
             html = requests.get(url, headers=headers, verify=False,
-                                timeout=5, proxies=proxies, allow_redirects=False)
+                                timeout=html_timeout, proxies=proxies, allow_redirects=False)
         if html.apparent_encoding == 'utf-8' or 'gbk' in html.apparent_encoding:
             html.encoding = html.apparent_encoding
         html = html.text
@@ -64,10 +66,11 @@ def get_html(url, proxies):
             html = requests.get(url, headers=headers,
                                 verify=False, timeout=3, allow_redirects=False)
             if html.status_code == 301 or html.status_code == 302:
+                print(url)
                 url = BeautifulSoup(html.text, 'html.parser').a['href']
                 headers['Host'] = url.split('/')[2]
                 html = requests.get(url, headers=headers, verify=False,
-                                    timeout=3, allow_redirects=False)
+                                    timeout=html_timeout, allow_redirects=False)
             if html.apparent_encoding == 'utf-8' or 'gbk' in html.apparent_encoding:
                 html.encoding = html.apparent_encoding
             html = html.text
@@ -90,12 +93,46 @@ def get_json(url, proxies):
     index = random.randint(0, agent_len)
     headers['User-Agent'] = agent_lists[index]
     if len(proxies):
-        json = requests.get(url, headers=headers, verify=False,
-                            timeout=5, proxies=proxies).json()
+        try:
+            json = requests.get(url, headers=headers, verify=False,
+                                timeout=5, proxies=proxies).json()
+            return json
+        except Exception as e:
+            return
     else:
-        json = requests.get(url, headers=headers,
-                            verify=False, timeout=5).json()
-    return json
+        try:
+            json = requests.get(url, headers=headers,
+                                verify=False, timeout=5).json()
+            return json
+        except Exception as e:
+            return
+
+
+def post_json(url, data, proxies):
+    """
+    post json
+    @url requests.url
+    @proxies requests.proxys
+    @data form-data
+    @return json
+    """
+    headers['Host'] = url.split('/')[2]
+    index = random.randint(0, agent_len)
+    headers['User-Agent'] = agent_lists[index]
+    if len(proxies):
+        try:
+            json = requests.post(url, headers=headers, verify=False, data=data,
+                                 timeout=30, proxies=proxies).json()
+            return json
+        except Exception as e:
+            return
+    else:
+        try:
+            json = requests.post(url, headers=headers, data=data,
+                                 verify=False, timeout=30).json()
+            return json
+        except Exception as e:
+            return
 
 
 def get_basic(url, proxies):
@@ -112,12 +149,19 @@ def get_basic(url, proxies):
     index = random.randint(0, agent_len)
     headers['User-Agent'] = agent_lists[index]
     if len(proxies):
-        basic = requests.get(url, headers=headers, verify=False,
-                             timeout=30, proxies=proxies)
+        try:
+            basic = requests.get(url, headers=headers, verify=False,
+                                 timeout=30, proxies=proxies)
+            return basic
+        except Exception as e:
+            print('Error')
     else:
-        basic = requests.get(url, headers=headers,
-                             verify=False, timeout=30)
-    return basic
+        try:
+            basic = requests.get(url, headers=headers,
+                                 verify=False, timeout=30)
+            return basic
+        except Exception as e:
+            print('Error')
 
 
 def changeCookie(cookie):
@@ -128,8 +172,25 @@ def changeCookie(cookie):
     headers['Cookie'] = cookie
 
 
+def changeHeaders(header):
+    """
+    change Headers
+    """
+    global headers
+    headers = {**headers, **header}
+
+
+def changeHtmlTimeout(timeout):
+    """
+    change html timeout
+    """
+    global html_timeout
+    html_timeout = timeout
+
+
 start = []
 spendList = []
+failured_map = {}
 
 
 def begin_time():
@@ -159,3 +220,26 @@ def spend_time(version):
 
 def empty():
     spendList = []
+
+
+def can_retry(url, index=None):
+    """
+    judge can retry once
+    """
+
+    global failured_map
+
+    if url not in failured_map:
+        failured_map[url] = 0
+        # print("Retry " + str(self.failured_map[url]) + ' ' + url)
+        return True
+    elif failured_map[url] < 2:
+        failured_map[url] += 1
+        # print("Retry " + str(self.failured_map[url]) + ' ' + url)
+        return True
+    else:
+        if index is not None:
+            index = str(index)
+        print("Failured " + url)
+        failured_map[url] = 0
+        return False

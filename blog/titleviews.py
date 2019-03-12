@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-02-10 22:37:09
+# @Last Modified time: 2019-03-12 20:22:57
 
 import argparse
 import codecs
@@ -12,9 +12,10 @@ import time
 import re
 
 from bs4 import BeautifulSoup
+from datetime import datetime
 from proxy.getproxy import GetFreeProxy
 from utils.db import Db
-from utils.utils import begin_time, get_html, end_time, changeCookie
+from utils.utils import begin_time, get_html, end_time, changeCookie, get_json
 
 
 class TitleViews(object):
@@ -86,33 +87,56 @@ class TitleViews(object):
         with open('blog/data/cookie', 'r') as f:
             cookie = f.readline()
         changeCookie(cookie[:-1])
-        url = "https://www.zhihu.com/api/v4/creator/content_statistics/articles?order_field=object_created&order_sort=descend&begin_date=2018-09-01&end_date=2019-02-09&page_no="
+        url_basic = [
+            'https://www.zhihu.com/api/v4/creator/content_statistics/',
+            'articles?order_field=object_created&order_sort=descend&begin_date=2018-09-01&end_date=',
+            datetime.now().strftime("%Y-%m-%d"),
+            '&page_no='
+        ]
+        url = "".join(url_basic)
         json = self.get_request(url + '1', 1)
         if not json:
             return
         for index in json['data']:
-            if index['title'] in self.title2slug:
-                temp_slug = self.title2slug[index['title']]
-                self.zhihu_id[temp_slug] = int(index['url_token'])
-                self.zhihu_views[temp_slug] = int(index['read_count'])
+            zhihu_title = index['title']
+            zhihu_id = int(index['url_token'])
+            zhihu_count = int(index['read_count'])
+
+            if zhihu_title in self.title2slug:
+                temp_slug = self.title2slug[zhihu_title]
+                self.zhihu_id[temp_slug] = zhihu_id
+                self.zhihu_views[temp_slug] = zhihu_count
+            elif zhihu_id in self.zhihu_id_map:
+                temp_slug = self.zhihu_id_map[zhihu_id]
+                self.zhihu_id[temp_slug] = zhihu_id
+                self.zhihu_views[temp_slug] = zhihu_count
             else:
                 print(index['title'])
 
         for index in range(json['count'] // 10):
+            print('zhihu', index)
             json = self.get_request(url + str(index + 2), 1)
             if not json:
                 continue
             for index in json['data']:
-                if index['title'] in self.title2slug:
-                    temp_slug = self.title2slug[index['title']]
-                    self.zhihu_id[temp_slug] = int(index['url_token'])
-                    self.zhihu_views[temp_slug] = int(index['read_count'])
+                zhihu_title = index['title']
+                zhihu_id = int(index['url_token'])
+                zhihu_count = int(index['read_count'])
+
+                if zhihu_title in self.title2slug:
+                    temp_slug = self.title2slug[zhihu_title]
+                    self.zhihu_id[temp_slug] = zhihu_id
+                    self.zhihu_views[temp_slug] = zhihu_count
+                elif zhihu_id in self.zhihu_id_map:
+                    temp_slug = self.zhihu_id_map[zhihu_id]
+                    self.zhihu_id[temp_slug] = zhihu_id
+                    self.zhihu_views[temp_slug] = zhihu_count
                 else:
                     print(index['title'])
 
     def get_request(self, url, types):
 
-        result = self.requests.get_request_proxy(url, types)
+        result = get_json(url, {})
 
         if not result:
             if self.can_retry(url):
@@ -176,11 +200,16 @@ class TitleViews(object):
                     continue
                 title = index.find_all('a', class_='title')[
                     0].text.replace('`', '')
+                jianshu_id = int(index['data-note-id'])
+                jianshu_count = int(index.find_all('a')[-2].text)
                 if title in self.title2slug:
                     temp_slug = self.title2slug[title]
-                    self.jianshu_id[temp_slug] = int(index['data-note-id'])
-                    self.jianshu_views[temp_slug] = int(
-                        index.find_all('a')[-2].text)
+                    self.jianshu_id[temp_slug] = jianshu_id
+                    self.jianshu_views[temp_slug] = jianshu_count
+                elif jianshu_id in self.jianshu_id_map:
+                    temp_slug = self.jianshu_id_map[jianshu_id]
+                    self.jianshu_id[temp_slug] = jianshu_id
+                    self.jianshu_views[temp_slug] = jianshu_count
                 else:
                     print(title)
 
@@ -205,11 +234,16 @@ class TitleViews(object):
                 csdn_id = int(div_lists['data-articleid'])
                 title = div_lists.a.contents[2].replace(
                     '\n', '').strip().replace('`', '')
+                csdn_count = int(div_lists.find_all(
+                    'span', class_='read-num')[0].span.text)
                 if title in self.title2slug:
                     temp_slug = self.title2slug[title]
                     self.csdn_id[temp_slug] = csdn_id
-                    self.csdn_views[temp_slug] = int(
-                        div_lists.find_all('span', class_='read-num')[0].span.text)
+                    self.csdn_views[temp_slug] = csdn_count
+                elif csdn_id in self.csdn_id_map:
+                    temp_slug = self.csdn_id_map[csdn_id]
+                    self.csdn_id[temp_slug] = csdn_id
+                    self.csdn_views[temp_slug] = csdn_count
                 else:
                     print(title)
 
@@ -248,6 +282,12 @@ class TitleViews(object):
             print("SELECT Error!")
         else:
             self.exist_data = {index[1]: list(index) for index in result}
+            self.zhihu_id_map = {index[6]: index[1]
+                                 for index in result if index[6]}
+            self.csdn_id_map = {index[7]: index[1]
+                                for index in result if index[7]}
+            self.jianshu_id_map = {index[8]: index[1]
+                                   for index in result if index[8]}
             for index in self.exist_data:
                 self.exist_data[index][-1] = self.exist_data[index][-1].strftime(
                     '%Y-%m-%d %H:%M:%S')
@@ -259,23 +299,26 @@ class TitleViews(object):
         self.getJianshuViews()
         self.getCsdnViews()
         for index in self.zhihu_views.keys():
-            if self.zhihu_views[index] == self.exist_data[index][3]:
+            if self.zhihu_views[index] == self.exist_data[index][3] and self.zhihu_id[index] == self.exist_data[index][6]:
                 continue
             wait_map[index] = self.exist_data[index]
             wait_map[index][3] = self.zhihu_views[index]
+            wait_map[index][6] = self.zhihu_id[index]
         for index in self.csdn_views.keys():
-            if self.csdn_views[index] == self.exist_data[index][4]:
+            if self.csdn_views[index] == self.exist_data[index][4] and self.csdn_id[index] == self.exist_data[index][7]:
                 continue
             if index not in wait_map:
                 wait_map[index] = self.exist_data[index]
             wait_map[index][4] = self.csdn_views[index]
+            wait_map[index][7] = self.csdn_id[index]
         for index in self.jianshu_views.keys():
-            if self.jianshu_views[index] == self.exist_data[index][5]:
+            if self.jianshu_views[index] == self.exist_data[index][5] and self.jianshu_id[index] == self.exist_data[index][8]:
                 continue
             wait_map[index] = self.exist_data[index]
             wait_map[index][5] = self.jianshu_views[index]
+            wait_map[index][8] = self.jianshu_id[index]
         update_list = [tuple(index) for index in wait_map.values()]
-        # return update_list
+        # return update_list:q
         if not len(update_list):
             return
         results = self.Db.update_db(self.update_sql % str(update_list)[1:-1])

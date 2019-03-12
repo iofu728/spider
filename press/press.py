@@ -2,13 +2,14 @@
 # @Author: gunjianpan
 # @Date:   2018-11-10 11:17:16
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-01-27 16:28:13
+# @Last Modified time: 2019-02-11 12:48:22
 import codecs
 import threading
+import time
 
 from proxy.getproxy import GetFreeProxy
 from utils.db import Db
-from utils.utils import begin_time, get_html, end_time
+from utils.utils import begin_time, get_html, end_time, get_json
 
 
 class Press_test():
@@ -19,19 +20,20 @@ class Press_test():
     def __init__(self):
         self.proxyclass = GetFreeProxy()
 
-    def basic_press(self, url, host, times, types):
+    def basic_press(self, url, times, types):
         """
         press have no data input
         """
+        url = url + str(int(round(time.time() * 1000)))
         if types == 1:
-            html = self.proxyclass.get_request_proxy(url, 0)
+            html = self.proxyclass.get_request_proxy(url, 1)
         else:
-            html = get_html(url, {})
+            html = get_json(url, {})
 
         if html == False and times < 5:
-            self.basic_press(url, host, times + 1, types)
+            self.basic_press(url, times + 1, types)
 
-    def press_threading(self, url, host, qps, types):
+    def press_threading(self, url, qps, types):
         """
         press url at constant qps
         """
@@ -39,7 +41,7 @@ class Press_test():
         threadings = []
         for index in range(qps):
             work = threading.Thread(
-                target=self.basic_press, args=(url, host, 0, types))
+                target=self.basic_press, args=(url, 0, types))
             threadings.append(work)
         for work in threadings:
             work.start()
@@ -47,10 +49,10 @@ class Press_test():
             work.join()
         end_time(version)
 
-    def one_press_attack(self, url, host, qps, types, total):
+    def one_press_attack(self, url, qps, types, total):
         """
         press url from a long time
         """
         for index in range(total):
-            self.press_threading(url, host, qps, types)
+            self.press_threading(url, qps, types)
         print('Over')

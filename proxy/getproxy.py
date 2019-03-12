@@ -3,17 +3,20 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-02-09 21:50:52
+# @Last Modified time: 2019-03-12 20:01:44
 # !/usr/bin/env python
 
+import argparse
 import functools
 import random
 import threading
 import time
+import requests
 
 from apscheduler.schedulers.blocking import BlockingScheduler
+from bs4 import BeautifulSoup
 from utils.db import Db
-from utils.utils import begin_time, end_time, get_html, get_json, get_basic
+from utils.utils import begin_time, end_time, get_html, get_json, get_basic, post_json
 
 """
   * gatherproxy.com
@@ -46,7 +49,7 @@ class GetFreeProxy(object):
         self.failuredtime = {}
         self.initproxy()
 
-    def get_request_proxy(self, url, types):
+    def get_request_proxy(self, url, types, data=None):
         """
         use proxy to send requests, and record the proxy cann't use
         @types 1:json, 0:html
@@ -75,6 +78,8 @@ class GetFreeProxy(object):
                 return json
             elif types == 2:
                 return get_basic(url, proxies)
+            elif types == 3:
+                return post_json(url, data, proxies)
             else:
                 html = get_html(url, proxies)
                 if 'code' in html or not html:
@@ -99,7 +104,7 @@ class GetFreeProxy(object):
         """
         retry once
         """
-        print('retry')
+        # print('retry')
         if url not in self.failuredtime:
             self.failuredtime[url] = 0
             # print("retry " + str(self.failuredtime[url]))
@@ -492,8 +497,113 @@ class GetFreeProxy(object):
             ip = tds[3].text.lower() + "://" + tds[0].text + ':' + tds[1].text
             self.waitjudge.append(ip)
 
+    def get_cookie(self):
+        headers = {
+            'pragma': 'no-cache',
+            # 'sec-fetch-dest': 'empty',
+            # 'sec-fetch-site': 'same-origin',
+            # 'sec-fetch-user': '?F',
+            # 'sec-origin-policy': '0',
+            # 'upgrade-insecure-requests': '1',
+            'cache-control': 'no-cache',
+            'Host': 'www.gatherproxy.com',
+            'Origin': 'http://www.gatherproxy.com',
+            'Referer': 'http://www.gatherproxy.com/proxylist/anonymity/?t=Transparent',
+            'Cookie': '_lang=en-US; _ga=GA1.2.1084455496.1548351129; _gid=GA1.2.1515017701.1552361687; ASP.NET_SessionId=ckin3pzyqyoyt3zg54zrtrct; _gat=1; arp_scroll_position=57',
+            # 'Upgrade-Insecure-Requests': '1',
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            "Accept-Encoding": "",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            # :todo: change user-agent
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
+        }
+        login_url = 'http://www.gatherproxy.com/subscribe/login'
+
+        cookie_req = requests.get(login_url, headers=headers, verify=False)
+        cookie_html = BeautifulSoup(cookie_req.text, 'html.parser')
+        verify_text = cookie_html.find_all('div', class_='label')[2].span.text
+        verify_list = verify_text.replace('= ','').strip().split()
+        num_map = {'Zero': 0,'One': 1,'Two': 2, 'Three':3,'Four':4,'Fine':5,'Six':6,'Seven':7,'Eight': 8, 'Nine':9, 'Ten': 10}
+        verify_num = [verify_list[0], verify_list[2]]
+        for index, num in enumerate(verify_num):
+            if num.isdigit():
+                verify_num[index] = int(num)
+            elif num in num_map:
+                verify_num[index] = num_map[num]
+            else:
+                print('Error', index)
+                # return False
+        verify_code = 0
+        error = True
+
+        operation = verify_list[1]
+        if operation == '+' or operation == 'plus' or operation == 'add' or operation == 'multiplied':
+            verify_code = verify_num[0] + verify_num[1]
+            error = False
+        if operation == '-' or operation == 'minus':
+            verify_code = verify_num[0] - verify_num[1]
+            error = False
+        if operation == 'X' or operation == 'multiplication':
+            verify_code = verify_num[0] * verify_num[1]
+            error = False
+        if error:
+            print('Error', operation)
+            # return False
+        with open('proxy/data/passage', 'r') as f:
+            passage = [index[:-1] for index in f.readlines()]
+        data = {'Username': passage[0], 'Password': passage[1], 'Captcha': str(verify_code)}
+        time.sleep(2.163)
+        r = requests.session()
+        r.cookies = cj.LWPCookieJar()
+        login_req = r.post(login_url, headers=headers, data=data, verify=False)
+
+
+
+    def load_gather(self):
+
+        headers = {
+            'pragma': 'no-cache',
+            # 'sec-fetch-dest': 'empty',
+            # 'sec-fetch-site': 'same-origin',
+            # 'sec-fetch-user': '?F',
+            # 'sec-origin-policy': '0',
+            # 'upgrade-insecure-requests': '1',
+            'cache-control': 'no-cache',
+            'Host': 'www.gatherproxy.com',
+            'Origin': 'http://www.gatherproxy.com',
+            'Referer': 'http://www.gatherproxy.com/proxylist/anonymity/?t=Transparent',
+            'Cookie': '_lang=en-US; _ga=GA1.2.1084455496.1548351129; _gid=GA1.2.1515017701.1552361687; ASP.NET_SessionId=ckin3pzyqyoyt3zg54zrtrct; _gat=1; arp_scroll_position=57',
+            # 'Upgrade-Insecure-Requests': '1',
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            "Accept-Encoding": "",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            # :todo: change user-agent
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
+        }
+        url = 'http://www.gatherproxy.com/subscribe/infos'
+        sid_url_req = requests.get(url, headers=headers, verify=False)
+        sid_url_html = BeautifulSoup(sid_url_req.text, 'html.parser')
+        sid_url = sid_url_html.find_all('div', class_='wrapper')[1].find_all('a')[0]['href']
+        sid = sid_url.split('sid=')[1]
+        sid_url = 'http://www.gatherproxy.com' + sid_url
+
+        data = {'ID':sid , 'C': '', 'P': '', 'T': '', 'U': '0'}
+        gatherproxy = requests.post(sid_url, headers=headers, data=data,verify=False)
+        with open('proxy/gatherproxy', 'w') as f:
+            f.write(gatherproxy.text)
+
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='gunjianpan proxy pool code')
+    parser.add_argument('--model', type=int, default=1, metavar='N',
+                        help='model of load_gather or test')
+    model = parser.parse_args().model
     a = GetFreeProxy()
-    a.initproxy()
-    a.testdb(0)
+    if model==1:
+        a.load_gather()
+    else:
+        a.initproxy()
+        a.gatherproxy(2)
+        a.testdb(2)

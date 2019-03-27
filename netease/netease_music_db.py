@@ -3,7 +3,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-21 11:00:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-02-09 11:06:24
+# @Last Modified time: 2019-03-27 23:49:14
 
 import codecs
 import threading
@@ -11,7 +11,16 @@ import threading
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
 from utils.db import Db
-from utils.utils import begin_time, get_html, end_time
+from utils.utils import begin_time, end_time, basic_req, can_retry
+
+get_request_proxy = GetFreeProxy().get_request_proxy
+
+"""
+  * netease @http
+  * music.163.com/discover/playlist
+  * music.163.com
+  * music.163.com/api/playlist/detail?id={}
+"""
 
 
 class Get_playlist_song():
@@ -24,7 +33,6 @@ class Get_playlist_song():
     def __init__(self):
         self.Db = Db("netease")
         self.classifylist = {}
-        self.proxyclass = GetFreeProxy()
         self.playlists = []
         self.failuredmap = {}
         self.songmap = {}
@@ -47,23 +55,21 @@ class Get_playlist_song():
         version = begin_time()
         self.classifylist = {}
         host = 'https://music.163.com/discover/playlist'
-        html = self.proxyclass.get_request_proxy(host, 0)
+        html = get_request_proxy(host, 0)
 
         if not html:
             print('Empty')
-            self.proxyclass.cleancannotuse()
-            if self.can_retry(host):
+            if can_retry(host):
                 self.get_classify()
             return []
 
         alist = html.find_all('a', class_='s-fc1')
         if not len(alist):
-            if self.can_retry(host):
+            if can_retry(host):
                 self.get_classify()
             print(html)
         for index in alist:
             self.classifylist[index.text] = index['href']
-        self.proxyclass.cleancannotuse()
         end_time(version)
 
     def get_playlist_id(self, classify, offset):
@@ -75,42 +81,18 @@ class Get_playlist_song():
         allclassify = classify == '全部风格'
         url = host + self.classifylist[classify] + (
             '?' if allclassify else '&') + 'order=hot&limit=35&offset=' + str(offset)
-        # html = self.proxyclass.get_request_proxy(url, host[8:], 0)
-        html = get_html(url, {})
+        html = basic_req(url, 0)
 
         if not html:
-            if self.can_retry(url):
+            if can_retry(url):
                 self.get_playlist_id(classify, offset)
-            else:
-                self.proxyclass.log_write(url)
             return []
         alist = html.find_all('a', class_='icon-play')
         if not len(alist):
-            if self.can_retry(url):
+            if can_retry(url):
                 self.get_playlist_id(classify, offset)
-            else:
-                self.proxyclass.log_write(url)
         for index in alist:
             self.playlists.append(index['data-res-id'])
-
-    def can_retry(self, url):
-        """
-        judge can retry once
-        """
-
-        if url not in self.failuredmap:
-            self.failuredmap[url] = 0
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        elif self.failuredmap[url] < 2:
-            self.failuredmap[url] += 1
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        else:
-            print("Failured " + url)
-            self.proxyclass.log_write(url)
-            self.failuredmap[url] = 0
-            return False
 
     def get_playlist_id_thread(self):
         """
@@ -131,7 +113,6 @@ class Get_playlist_song():
                 work.start()
             for work in threadings:
                 work.join()
-            self.proxyclass.cleancannotuse()
             print(len(self.playlists))
             self.test_queue(index)
             self.playlists = []
@@ -232,22 +213,18 @@ class Get_playlist_song():
         """
 
         host = 'http://music.163.com/api/playlist/detail?id=' + str(id)
-        json = self.proxyclass.get_request_proxy(host, 1)
+        json = get_request_proxy(host, 1)
         if json == 0:
-            if self.can_retry(host):
+            if can_retry(host):
                 self.get_song_detail(id)
-            else:
-                self.proxyclass.log_write(host)
             return []
         result = json['result']
         tracks = result['tracks']
 
         if len(tracks) <= 1:
-            if self.can_retry(host):
+            if can_retry(host):
                 self.get_song_detail(id)
-            else:
-                self.proxyclass.log_write(host)
-                return []
+            return []
         else:
             playcount = result['playCount']
             for track in tracks:

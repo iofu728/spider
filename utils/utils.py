@@ -2,113 +2,120 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-02-28 10:06:47
+# @Last Modified time: 2019-03-27 18:17:06
 
+import os
+import pickle
+import random
 import requests
-from bs4 import BeautifulSoup
+import smtplib
 import time
 import urllib3
-import random
+
+from bs4 import BeautifulSoup
+from email.mime.text import MIMEText
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 headers = {
     'pragma': 'no-cache',
-    # 'sec-fetch-dest': 'empty',
-    # 'sec-fetch-site': 'same-origin',
-    # 'sec-fetch-user': '?F',
-    # 'sec-origin-policy': '0',
-    # 'upgrade-insecure-requests': '1',
-    # 'X-Requested-With': 'XMLHttpRequest',
     'cache-control': 'no-cache',
     'Cookie': '',
-    # 'Upgrade-Insecure-Requests': '1',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
     "Accept-Encoding": "",
     "Accept-Language": "zh-CN,zh;q=0.9",
-    # :todo: change user-agent
+    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"}
 
-start = 0
-
-file = open('utils/agent', 'r').readlines()
+with open('utils/data/agent', 'r') as f:
+    file = f.readlines()
 agent_lists = [" ".join(index.split()[1:])[1:-1] for index in file]
 agent_len = len(agent_lists) - 1
 html_timeout = 5
+json_timeout = 5
+start = []
+spendList = []
+failured_map = {}
 
 
-def get_html(url, proxies):
+def basic_req(url, types, proxies=None, data=None, header=None):
     """
-    get html
-    @url requests.url
-    @proxys requests.proxys
-    @host header host
-    @return beautifulSoup analysis result
+    requests
+    @types XY: X=0.->get;   =1.->post;
+               Y=0.->html;  =1.->json; =2.->basic
     """
+    req_set(url)
+    result = None
+    if not types:
+        result = get_html(url, proxies, header)
+    elif types == 1:
+        result = get_json(url, proxies, header)
+    elif types == 2:
+        result = get_basic(url, proxies, header)
+    elif types == 11:
+        result = post_json(url, proxies, data, header)
+    elif types == 12:
+        result = post_basic(url, proxies, data, header)
+    else:
+        print(types, ' type is not supported!!!')
+    return result
+
+
+def req_set(url):
+    """
+    req set
+    """
+    global headers
     headers['Host'] = url.split('/')[2]
     index = random.randint(0, agent_len)
     headers['User-Agent'] = agent_lists[index]
 
-    if len(proxies):
-        html = requests.get(url, headers=headers, verify=False,
+
+def get_html(url, proxies=None, header=None):
+    """
+    get html
+    @url requests.url
+    @proxies requests.proxies
+    @return beautifulSoup analysis result
+    """
+    # print(proxies, header)
+    if header is None:
+        header = headers
+    try:
+        html = requests.get(url, headers=header, verify=False,
                             timeout=html_timeout, proxies=proxies, allow_redirects=False)
         if html.status_code == 301 or html.status_code == 302:
             url = BeautifulSoup(html.text, 'html.parser').a['href']
-            print(url)
+            print('Redirect: ', url)
             headers['Host'] = url.split('/')[2]
-            html = requests.get(url, headers=headers, verify=False,
+            html = requests.get(url, headers=header, verify=False,
                                 timeout=html_timeout, proxies=proxies, allow_redirects=False)
         if html.apparent_encoding == 'utf-8' or 'gbk' in html.apparent_encoding:
             html.encoding = html.apparent_encoding
         html = html.text
-    else:
-        try:
-            html = requests.get(url, headers=headers,
-                                verify=False, timeout=3, allow_redirects=False)
-            if html.status_code == 301 or html.status_code == 302:
-                print(url)
-                url = BeautifulSoup(html.text, 'html.parser').a['href']
-                headers['Host'] = url.split('/')[2]
-                html = requests.get(url, headers=headers, verify=False,
-                                    timeout=html_timeout, allow_redirects=False)
-            if html.apparent_encoding == 'utf-8' or 'gbk' in html.apparent_encoding:
-                html.encoding = html.apparent_encoding
-            html = html.text
-        except Exception as e:
-            print('Error')
-            return BeautifulSoup('<html></html>', 'html.parser')
-    # print(html)
+    except Exception as e:
+        # print('Error')
+        html = '<html></html>'
     return BeautifulSoup(html, 'html.parser')
 
 
-def get_json(url, proxies):
+def get_json(url, proxies=None, header=None):
     """
     get json
     @url requests.url
     @proxys requests.proxys
-    @host header host
     @return json
     """
-    headers['Host'] = url.split('/')[2]
-    index = random.randint(0, agent_len)
-    headers['User-Agent'] = agent_lists[index]
-    if len(proxies):
-        try:
-            json = requests.get(url, headers=headers, verify=False,
-                                timeout=5, proxies=proxies).json()
-            return json
-        except Exception as e:
-            return
-    else:
-        try:
-            json = requests.get(url, headers=headers,
-                                verify=False, timeout=5).json()
-            return json
-        except Exception as e:
-            return
+    if header is None:
+        header = headers
+    try:
+        return requests.get(url, headers=header, verify=False,
+                            timeout=json_timeout, proxies=proxies).json()
+    except Exception as e:
+        return
 
 
-def post_json(url, data, proxies):
+def post_json(url, proxies=None, data=None, header=None):
     """
     post json
     @url requests.url
@@ -116,52 +123,46 @@ def post_json(url, data, proxies):
     @data form-data
     @return json
     """
-    headers['Host'] = url.split('/')[2]
-    index = random.randint(0, agent_len)
-    headers['User-Agent'] = agent_lists[index]
-    if len(proxies):
-        try:
-            json = requests.post(url, headers=headers, verify=False, data=data,
-                                 timeout=30, proxies=proxies).json()
-            return json
-        except Exception as e:
-            return
-    else:
-        try:
-            json = requests.post(url, headers=headers, data=data,
-                                 verify=False, timeout=30).json()
-            return json
-        except Exception as e:
-            return
+    if header is None:
+        header = headers
+    try:
+        return requests.post(url, headers=header, verify=False, data=data,
+                             timeout=json_timeout, proxies=proxies).json()
+    except Exception as e:
+        return
 
 
-def get_basic(url, proxies):
+def post_basic(url, proxies=None, data=None, header=None):
+    """
+    post json
+    @url requests.url
+    @proxies requests.proxys
+    @data form-data
+    @return json
+    """
+    if header is None:
+        header = headers
+    try:
+        return requests.post(url, headers=header, verify=False, data=data,
+                             timeout=json_timeout, proxies=proxies)
+    except Exception as e:
+        return
+
+
+def get_basic(url, proxies=None, header=None):
     """
     get img
     @url requests.url
     @proxys requests.proxys
-    @host header host
     @return basic
     """
-    headers['Accept'] = 'image/webp,image/apng,image/*,*/*;q=0.8'
-    headers['Sec-Fetch-Dest'] = 'image'
-    headers['Host'] = url.split('/')[2]
-    index = random.randint(0, agent_len)
-    headers['User-Agent'] = agent_lists[index]
-    if len(proxies):
-        try:
-            basic = requests.get(url, headers=headers, verify=False,
-                                 timeout=30, proxies=proxies)
-            return basic
-        except Exception as e:
-            print('Error')
-    else:
-        try:
-            basic = requests.get(url, headers=headers,
-                                 verify=False, timeout=30)
-            return basic
-        except Exception as e:
-            print('Error')
+    if header is None:
+        header = headers
+    try:
+        return requests.get(url, headers=header, verify=False,
+                            timeout=html_timeout, proxies=proxies)
+    except Exception as e:
+        return
 
 
 def changeCookie(cookie):
@@ -188,9 +189,12 @@ def changeHtmlTimeout(timeout):
     html_timeout = timeout
 
 
-start = []
-spendList = []
-failured_map = {}
+def changeJsonTimeout(timeout):
+    """
+    change json timeout
+    """
+    global json_timeout
+    json_timeout = timeout
 
 
 def begin_time():
@@ -231,15 +235,81 @@ def can_retry(url, index=None):
 
     if url not in failured_map:
         failured_map[url] = 0
-        # print("Retry " + str(self.failured_map[url]) + ' ' + url)
         return True
     elif failured_map[url] < 2:
         failured_map[url] += 1
-        # print("Retry " + str(self.failured_map[url]) + ' ' + url)
         return True
     else:
-        if index is not None:
-            index = str(index)
-        print("Failured " + url)
         failured_map[url] = 0
         return False
+
+
+def send_email(context, subject):
+    """
+    send email
+    """
+    data_path = 'brushclass/data/'
+
+    with open(data_path + 'email', 'r') as f:
+        email = f.readlines()
+    mail_host = 'smtp.163.com'
+    # 163用户名
+    mail_user = email[0][:-1]
+    # 密码(部分邮箱为授权码)
+    mail_pass = email[1][:-1]
+    # 邮件发送方邮箱地址
+    sender = email[0][:-1] + '@163.com'
+    # 邮件接受方邮箱地址，注意需要[]包裹，这意味着你可以写多个邮件地址群发
+    receivers = [email[2][:-1] + '@163.com']
+
+    # 设置email信息
+    # 邮件内容设置
+    message = MIMEText(context, 'plain', 'utf-8')
+    # 邮件主题
+    message['Subject'] = subject
+    # 发送方信息
+    message['From'] = sender
+    # 接受方信息
+    message['To'] = receivers[0]
+
+    # 登录并发送邮件
+    try:
+        smtpObj = smtplib.SMTP_SSL(mail_host)
+        # 连接到服务器
+        smtpObj.connect(mail_host, 465)
+        # 登录到服务器
+        smtpObj.login(mail_user, mail_pass)
+        # 发送
+        smtpObj.sendmail(
+            sender, receivers, message.as_string())
+        # 退出
+        smtpObj.quit()
+        print('success')
+        return True
+    except smtplib.SMTPException as e:
+        print('error', e)  # 打印错误
+        return False
+
+
+def dump_bigger(data, output_file):
+    """
+    pickle.dump big file which size more than 4GB
+    """
+    max_bytes = 2**31 - 1
+    bytes_out = pickle.dumps(data, protocol=4)
+    with open(output_file, 'wb') as f_out:
+        for idx in range(0, len(bytes_out), max_bytes):
+            f_out.write(bytes_out[idx:idx + max_bytes])
+
+
+def load_bigger(input_file):
+    """
+    pickle.load big file which size more than 4GB
+    """
+    max_bytes = 2**31 - 1
+    bytes_in = bytearray(0)
+    input_size = os.path.getsize(input_file)
+    with open(input_file, 'rb') as f_in:
+        for _ in range(0, input_size, max_bytes):
+            bytes_in += f_in.read(max_bytes)
+    return pickle.loads(bytes_in)

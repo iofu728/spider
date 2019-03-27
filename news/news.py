@@ -2,19 +2,26 @@
 # @Author: gunjianpan
 # @Date:   2019-01-25 01:36:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-02-09 11:07:33
+# @Last Modified time: 2019-03-27 23:51:45
 
-import codecs
 import threading
 import time
 import pandas as pd
 import pkuseg
 import re
 
-from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
 from utils.db import Db
-from utils.utils import begin_time, get_html, end_time
+from utils.utils import begin_time, end_time, basic_req, can_retry
+
+get_request_proxy = GetFreeProxy().get_request_proxy
+
+"""
+  * news @http
+  * www.baidu.com/s?
+  * www.jianshu.com/u/
+  * blog.csdn.net
+"""
 
 
 class Get_baidu_news():
@@ -23,7 +30,6 @@ class Get_baidu_news():
     """
 
     def __init__(self):
-        self.proxyclass = GetFreeProxy()
         self.failuredmap = {}
         self.summarizations = {}
 
@@ -50,7 +56,6 @@ class Get_baidu_news():
         self.summarizations = sum(summarizations, [])
         with open('news_posion.txt', 'w') as f:
             f.write('\n'.join(self.summarizations))
-        self.proxyclass.cleancannotuse()
         end_time(version)
 
     def summarization_once(self, index):
@@ -64,15 +69,14 @@ class Get_baidu_news():
                 str(index * 20)
         else:
             url = 'http://news.baidu.com/ns?rn=20&ie=utf-8&cl=2&ct=1&bs=%E6%AF%92%E7%8B%97%E8%82%89&rsv_bp=1&sr=0&f=8&prevct=no&tn=news&word=%E5%81%B7%E7%8B%97'
-        news_lists = self.proxyclass.get_request_proxy(
-            url, 0)
+        news_lists = get_request_proxy(url, 0)
         if not news_lists:
-            if self.can_retry(url):
+            if can_retry(url):
                 self.summarization_once(index)
             return
         summarization_lists = news_lists.find_all('div', class_='result')
         if not len(summarization_lists):
-            if self.can_retry(url):
+            if can_retry(url):
                 self.summarization_once(index)
             return
         print('num: ', len(summarization_lists), url)
@@ -83,25 +87,6 @@ class Get_baidu_news():
             texts.append(temp_text[:-8])
         self.summarizations[int(index)] = texts
 
-    def can_retry(self, url):
-        """
-        judge can retry once
-        """
-
-        if url not in self.failuredmap:
-            self.failuredmap[url] = 0
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        elif self.failuredmap[url] < 2:
-            self.failuredmap[url] += 1
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        else:
-            print("Failured " + url)
-            self.proxyclass.log_write(url)
-            self.failuredmap[url] = 0
-            return False
-
 
 class Get_google_news():
     """
@@ -109,7 +94,6 @@ class Get_google_news():
     """
 
     def __init__(self):
-        self.proxyclass = GetFreeProxy()
         self.failuredmap = {}
         self.summarizations = {}
         self.hrefs = {}
@@ -142,7 +126,6 @@ class Get_google_news():
             f.write('\n'.join(self.summarizations))
         with open('google_steal_href.txt', 'w') as f:
             f.write('\n'.join(self.hrefs))
-        self.proxyclass.cleancannotuse()
         end_time(version)
 
     def summarization_once(self, index):
@@ -157,12 +140,12 @@ class Get_google_news():
                 str(index * 10)
         else:
             url = 'https://www.google.com.hk/search?q=%E5%81%B7%E7%8B%97&newwindow=1&safe=strict&tbm=nws&ei=O8VKXJ7nFoP_8QX1oK_gDA&start=0&sa=N&ved=0ahUKEwje8JTAvojgAhWDf7wKHXXQC8w4ChDy0wMISQ&biw=1627&bih=427&dpr=2'
-        news_lists = get_html(url, {})
+        news_lists = basic_req(url, 0)
         href_lists = news_lists.find_all('a', class_=['RTNUJf', 'l lLrAF'])
         summarization_lists = news_lists.find_all('div', class_='gG0TJc')
 
         if not len(href_lists) or not len(summarization_lists):
-            if self.can_retry(url):
+            if can_retry(url):
                 self.summarization_once(index)
             return
         print('num: ', len(summarization_lists), url)
@@ -175,25 +158,6 @@ class Get_google_news():
             texts.append(temp_text)
         self.summarizations[int(index)] = texts
         self.hrefs[int(index)] = hrefs
-
-    def can_retry(self, url):
-        """
-        judge can retry once
-        """
-
-        if url not in self.failuredmap:
-            self.failuredmap[url] = 0
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        elif self.failuredmap[url] < 2:
-            self.failuredmap[url] += 1
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        else:
-            print("Failured " + url)
-            # self.proxyclass.log_write(url)
-            self.failuredmap[url] = 0
-            return False
 
 
 class find_location(object):
@@ -341,7 +305,6 @@ class Get_baidu():
     """
 
     def __init__(self):
-        self.proxyclass = GetFreeProxy()
         self.failuredmap = {}
         self.total_map = {}
         self.text_map = {}
@@ -377,7 +340,6 @@ class Get_baidu():
         word = [self.word[k] for k in sorted(self.word.keys())]
         with open('test', 'w') as f:
             f.write("\n".join(word))
-        self.proxyclass.cleancannotuse()
         end_time(version)
 
     def summarization_once(self, index):
@@ -388,16 +350,16 @@ class Get_baidu():
         texts = []
         url = 'https://www.baidu.com/s?ie=utf-8&mod=1&isbd=1&isid=919fab3c0002c9f1&wd=%E5%81%B7%E7%8B%97&oq=%E5%81%B7%E7%8B%97&tn=baiduhome_pg&ie=utf-8&rsv_idx=2&rsv_pq=919fab3c0002c9f1&rsv_t=7e30ggF%2BMa91oOURk1bMtN8af5unSwOR08TodNBB%2F%2B6B6RBEwUi8l8IAe28ACA%2B8b5I5&gpc=stf%3D1517038564%2C1548574564%7Cstftype%3D1&tfflag=1&bs=%E5%81%B7%E7%8B%97&rsv_sid=undefined&_ss=1&clist=28bc21fb856a58b7%09350102124f079888%0928bc21fb856a58b7%0928bc2159845c1cf3%0928bc2015823fa56b%0928a121fb84a7d1a6&hsug=&f4s=1&csor=2&_cr1=34767&pn=' + \
             str(index * 10)
-        news_lists = self.proxyclass.get_request_proxy(url, 0)
+        news_lists = get_request_proxy(url, 0)
         if not news_lists:
-            if self.can_retry(url):
+            if can_retry(url):
                 self.summarization_once(index)
             return
         test = news_lists.find_all(
             'div', class_=['c-row c-gap-top-small', 'c-span18 c-span-last'])
         word = self.cleantxt(news_lists.text)
         if not len(word):
-            if self.can_retry(url):
+            if can_retry(url):
                 self.summarization_once(index)
             return
         temp_map = self.find_location.test_province(
@@ -409,25 +371,6 @@ class Get_baidu():
         fil = re.compile(u'[^\u4e00-\u9fa5]+', re.UNICODE)
         return fil.sub(' ', raw)
 
-    def can_retry(self, url):
-        """
-        judge can retry once
-        """
-
-        if url not in self.failuredmap:
-            self.failuredmap[url] = 0
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        elif self.failuredmap[url] < 2:
-            self.failuredmap[url] += 1
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        else:
-            print("Failured " + url)
-            self.proxyclass.log_write(url)
-            self.failuredmap[url] = 0
-            return False
-
 
 class Get_baidu_bjh():
     """
@@ -435,7 +378,6 @@ class Get_baidu_bjh():
     """
 
     def __init__(self):
-        self.proxyclass = GetFreeProxy()
         self.failuredmap = {}
         self.fail = []
         self.href_map = {}
@@ -464,7 +406,6 @@ class Get_baidu_bjh():
         self.href_map = sum(href_map, [])
         with open('bjh_href_poison.txt', 'w') as f:
             f.write("\n".join(self.href_map))
-        self.proxyclass.cleancannotuse()
         end_time(version)
 
     def href_once(self, index):
@@ -475,14 +416,14 @@ class Get_baidu_bjh():
         texts = []
         url = 'https://www.baidu.com/s?tn=news&rtt=4&bsst=1&cl=2&wd=毒狗肉&pn=' + \
             str(index * 10)
-        news_lists = self.proxyclass.get_request_proxy(url, 0)
+        news_lists = get_request_proxy(url, 0)
         if not news_lists:
-            if self.can_retry(url):
+            if can_retry(url):
                 self.href_once(index)
             return
         test = news_lists.find_all('div', class_='result')
         if not len(test):
-            if self.can_retry(url):
+            if can_retry(url):
                 self.href_once(index)
             return
         href_list = [index.a['href'] for index in test]
@@ -491,26 +432,6 @@ class Get_baidu_bjh():
     def cleantxt(self, raw):
         fil = re.compile(u'[^\u4e00-\u9fa5]+', re.UNICODE)
         return fil.sub(' ', raw)
-
-    def can_retry(self, url):
-        """
-        judge can retry once
-        """
-
-        if url not in self.failuredmap:
-            self.failuredmap[url] = 0
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        elif self.failuredmap[url] < 2:
-            self.failuredmap[url] += 1
-            # print("Retry " + str(self.failuredmap[url]) + ' ' + url)
-            return True
-        else:
-            print("Failured " + url)
-            self.proxyclass.log_write(url)
-            self.failuredmap[url] = 0
-            self.fail.append(url)
-            return False
 
     def get_detail(self):
         """
@@ -538,7 +459,6 @@ class Get_baidu_bjh():
         with open('bjh.log', 'w') as f:
             f.write('\n'.join(self.fail))
         self.fail = []
-        # self.proxyclass.cleancannotuse()
         end_time(version)
 
     def detail_once(self, index, url):
@@ -546,9 +466,9 @@ class Get_baidu_bjh():
         get html from news
         """
         # print(index)
-        news_lists = self.proxyclass.get_request_proxy(url, 0)
+        news_lists = get_request_proxy(url, 0)
         if not news_lists:
-            if self.can_retry(url):
+            if can_retry(url):
                 self.detail_once(index, url)
             return
         test = news_lists.find_all(
@@ -556,7 +476,7 @@ class Get_baidu_bjh():
         if not len(test):
             test = self.cleantxt(news_lists.text)
             if not len(test):
-                if self.can_retry(url):
+                if can_retry(url):
                     self.detail_once(index, url)
                 return
             self.word_list[index] = test

@@ -2,12 +2,19 @@
 # @Author: gunjianpan
 # @Date:   2019-02-28 09:47:07
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-02-28 10:57:23
+# @Last Modified time: 2019-03-28 00:16:05
 
 import re
 
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, get_html, end_time, changeCookie, changeHeaders, changeHtmlTimeout, can_retry
+from utils.utils import begin_time, end_time, can_retry
+
+get_request_proxy = GetFreeProxy().get_request_proxy
+
+"""
+  * zimuzu @http
+  * zmz005.com/o5itP3
+"""
 
 
 class southPark(object):
@@ -15,16 +22,13 @@ class southPark(object):
     load download South Park url from zimuzu
     """
 
-    def __init__(self):
-        self.proxyclass = GetFreeProxy()
-
     def load_url(self):
         """
         load url form zimuzu
         """
 
         url = 'http://zmz005.com/o5itP3'
-        detail = self.proxyclass.get_request_proxy(url, 0)
+        detail = get_request_proxy(url, 0)
         total = []
 
         if not detail:

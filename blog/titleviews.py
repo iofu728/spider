@@ -2,20 +2,23 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-12 20:22:57
+# @Last Modified time: 2019-03-27 23:43:44
 
 import argparse
-import codecs
 import datetime
-import threading
-import time
 import re
 
 from bs4 import BeautifulSoup
-from datetime import datetime
 from proxy.getproxy import GetFreeProxy
 from utils.db import Db
-from utils.utils import begin_time, get_html, end_time, changeCookie, get_json
+from utils.utils import begin_time, end_time, changeCookie, basic_req, can_retry
+
+"""
+  * blog @http
+  * www.zhihu.com/api/v4/creator/content_statistics
+  * www.jianshu.com/u/
+  * blog.csdn.net
+"""
 
 
 class TitleViews(object):
@@ -25,7 +28,6 @@ class TitleViews(object):
 
     def __init__(self):
         self.Db = Db("blog")
-        self.requests = GetFreeProxy()
         self.local_views = {}
         self.title_map = {}
         self.title2slug = {}
@@ -90,7 +92,7 @@ class TitleViews(object):
         url_basic = [
             'https://www.zhihu.com/api/v4/creator/content_statistics/',
             'articles?order_field=object_created&order_sort=descend&begin_date=2018-09-01&end_date=',
-            datetime.now().strftime("%Y-%m-%d"),
+            datetime.datetime.now().strftime("%Y-%m-%d"),
             '&page_no='
         ]
         url = "".join(url_basic)
@@ -136,49 +138,33 @@ class TitleViews(object):
 
     def get_request(self, url, types):
 
-        result = get_json(url, {})
+        result = basic_req(url, 1)
 
         if not result:
-            if self.can_retry(url):
+            if can_retry(url):
                 self.get_request(url, types)
             return
         return result
 
     def get_request_v2(self, url, types):
 
-        result = get_html(url, {})
+        result = basic_req(url, 0)
 
         if not result or not len(result.find_all('div', class_='content')):
-            if self.can_retry(url):
+            if can_retry(url):
                 self.get_request(url, types)
             return
         return result
 
     def get_request_v3(self, url, types):
 
-        result = get_html(url, {})
+        result = basic_req(url, 0)
 
         if result is None or not result or not len(result.find_all('p', class_='content')):
-            if self.can_retry(url):
+            if can_retry(url):
                 self.get_request(url, types)
             return
         return result
-
-    def can_retry(self, url):
-        """
-        judge can retry once
-        """
-        if url not in self.failured_map:
-            self.failured_map[url] = 0
-            return True
-        elif self.failured_map[url] < 2:
-            self.failured_map[url] += 1
-            return True
-        else:
-            print("Failured " + url)
-            self.requests.log_write(url)
-            self.failured_map[url] = 0
-            return False
 
     def getJianshuViews(self):
         """

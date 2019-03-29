@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-27 23:43:44
+# @Last Modified time: 2019-03-28 21:09:01
 
 import argparse
 import datetime
@@ -11,7 +11,7 @@ import re
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
 from utils.db import Db
-from utils.utils import begin_time, end_time, changeCookie, basic_req, can_retry
+from utils.utils import begin_time, end_time, changeCookie, basic_req, can_retry, changeHtmlTimeout
 
 """
   * blog @http
@@ -19,7 +19,7 @@ from utils.utils import begin_time, end_time, changeCookie, basic_req, can_retry
   * www.jianshu.com/u/
   * blog.csdn.net
 """
-
+get_request_proxy = GetFreeProxy().get_request_proxy
 
 class TitleViews(object):
     """
@@ -146,13 +146,13 @@ class TitleViews(object):
             return
         return result
 
-    def get_request_v2(self, url, types):
+    def get_request_v2(self, url, types, header):
 
-        result = basic_req(url, 0)
+        result = get_request_proxy(url, 0, header=header)
 
         if not result or not len(result.find_all('div', class_='content')):
             if can_retry(url):
-                self.get_request(url, types)
+                self.get_request_v2(url, types, header)
             return
         return result
 
@@ -162,7 +162,7 @@ class TitleViews(object):
 
         if result is None or not result or not len(result.find_all('p', class_='content')):
             if can_retry(url):
-                self.get_request(url, types)
+                self.get_request_v3(url, types)
             return
         return result
 
@@ -170,6 +170,21 @@ class TitleViews(object):
         """
         get jianshu views
         """
+        header = {
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            'accept-encoding': 'gzip, deflate, br',
+            'accept-language': 'zh-CN,zh;q=0.9',
+            'cache-control': 'no-cache',
+            'pragma': 'no-cache',
+            'sec-ch-ua': 'Google Chrome 75',
+            'sec-fetch-dest': 'document',
+            'sec-fetch-mode': 'navigate',
+            'sec-fetch-site': 'cross-site',
+            'sec-fetch-user': '?F',
+            'sec-origin-policy': '0',
+            'upgrade-insecure-requests': '1',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3736.0 Safari/537.36'
+        }
 
         basic_url = 'https://www.jianshu.com/u/2e0f69e4a4f0'
 
@@ -177,7 +192,7 @@ class TitleViews(object):
             url = basic_url if rounds == 1 else basic_url + \
                 '?order_by=shared_at&page=' + str(rounds)
             print(url)
-            html = self.get_request_v2(url, 0)
+            html = self.get_request_v2(url, 0, header)
             if html is None:
                 print('None')
                 return
@@ -279,6 +294,7 @@ class TitleViews(object):
                     '%Y-%m-%d %H:%M:%S')
 
     def update_view(self):
+        changeHtmlTimeout(10)
         wait_map = {}
         self.select_all()
         self.getZhihuView()

@@ -5,3 +5,7 @@ apscheduler
 pkuseg
 pandas
 pysimdjson
+asyncio
+aiohttp
+apscheduler
+pickle

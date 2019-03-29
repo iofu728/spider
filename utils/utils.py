@@ -1,8 +1,9 @@
-# -*- coding: utf-8 -*-
-# @Author: gunjianpan
-# @Date:   2018-10-19 15:33:46
-# @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-27 18:17:06
+'''
+@Author: gunjianpan
+@Date:   2018-10-19 15:33:46
+@Last Modified by:   gunjianpan
+@Last Modified time: 2019-03-30 00:59:48
+'''
 
 import os
 import pickle
@@ -248,46 +249,41 @@ def send_email(context, subject):
     """
     send email
     """
-    data_path = 'brushclass/data/'
+    data_path = 'utils/data/'
 
-    with open(data_path + 'email', 'r') as f:
-        email = f.readlines()
+    with open(data_path + 'emailSend', 'r') as f:
+        email_send = [ii.strip().split(',') for ii in f.readlines()]
+    with open(data_path + 'emailRec', 'r') as f:
+        origin_file = f.readlines()
+        email_rec = [ii.strip().split(',')[0]
+                     for ii in origin_file if ii.strip().split(',')[1] == '0']
+        email_cc = [ii.strip().split(',')[0]
+                    for ii in origin_file if ii.strip().split(',')[1] == '1']
+    send_len = len(email_send)
+    send_index = random.randint(0, send_len - 1)
     mail_host = 'smtp.163.com'
-    # 163用户名
-    mail_user = email[0][:-1]
-    # 密码(部分邮箱为授权码)
-    mail_pass = email[1][:-1]
-    # 邮件发送方邮箱地址
-    sender = email[0][:-1] + '@163.com'
-    # 邮件接受方邮箱地址，注意需要[]包裹，这意味着你可以写多个邮件地址群发
-    receivers = [email[2][:-1] + '@163.com']
+    mail_user = email_send[send_index][0]
+    mail_pass = email_send[send_index][1]
+    sender = mail_user + '@163.com'
 
-    # 设置email信息
-    # 邮件内容设置
     message = MIMEText(context, 'plain', 'utf-8')
-    # 邮件主题
     message['Subject'] = subject
-    # 发送方信息
     message['From'] = sender
-    # 接受方信息
-    message['To'] = receivers[0]
+    message['To'] = ', '.join(email_rec)
+    message['Cc'] = ', '.join(email_cc)
 
-    # 登录并发送邮件
     try:
         smtpObj = smtplib.SMTP_SSL(mail_host)
-        # 连接到服务器
+
         smtpObj.connect(mail_host, 465)
-        # 登录到服务器
         smtpObj.login(mail_user, mail_pass)
-        # 发送
-        smtpObj.sendmail(
-            sender, receivers, message.as_string())
-        # 退出
+        smtpObj.sendmail(sender, email_rec + email_cc, message.as_string())
         smtpObj.quit()
-        print('success')
+
+        print('Send email success!!')
         return True
     except smtplib.SMTPException as e:
-        print('error', e)  # 打印错误
+        print('Send email error', e)
         return False
 
 

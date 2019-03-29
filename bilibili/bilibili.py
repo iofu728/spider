@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-03-16 15:18:10
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-28 00:09:51
+# @Last Modified time: 2019-03-28 10:39:30
 import threading
 import time
 import random
@@ -577,7 +577,7 @@ class Up():
                 if not check_index in self.comment[av_id]:
                     print(pn, av_id, check_index)
                     need_check = True
-                    check_index -= (ii + 1)
+                    check_index -= (20 - ii)
                     break
                 check_index -= 1
             if not need_check:

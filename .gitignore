@@ -19,8 +19,9 @@ log
 # song_detail
 song_detail
 
-# idea
+# ide
 .idea
+.vscode
 
 # data
 data

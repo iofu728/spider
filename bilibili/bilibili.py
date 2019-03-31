@@ -1,8 +1,10 @@
-# -*- coding: utf-8 -*-
-# @Author: gunjianpan
-# @Date:   2019-03-16 15:18:10
-# @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-28 10:39:30
+'''
+@Author: gunjianpan
+@Date:   2019-03-16 15:18:10
+@Last Modified by:   gunjianpan
+@Last Modified time: 2019-04-01 01:54:41
+'''
+
 import threading
 import time
 import random
@@ -189,7 +191,8 @@ class Up():
         need = ['view', 'like', 'coin', 'favorite',
                 'reply', 'share', 'danmaku']
         data = [json[index] for index in need]
-        data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data]
+        data = [time.strftime("%Y-%m-%d %H:%M:%S",
+                              time.localtime(time.time())), *data]
         with open('press/data/yybzz', 'a') as f:
             f.write(','.join([str(index) for index in data]) + '\n')
         print(','.join([str(index) for index in data]))
@@ -216,7 +219,8 @@ class Up():
         need = ['view', 'like', 'coin', 'favorite',
                 'reply', 'share', 'danmaku']
         data = [json[index] for index in need]
-        data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data]
+        data = [time.strftime("%Y-%m-%d %H:%M:%S",
+                              time.localtime(time.time())), *data]
         data.append(rank)
         data.append(score)
         if not rank % 10 and rank not in self.rank:
@@ -252,9 +256,11 @@ class Up():
                 self.check_rank(av_id, times + 1)
             return
         if len(rank_list):
-            data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data, *rank_list[:2], *rank_list[3:5]]
+            data = [time.strftime(
+                "%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data, *rank_list[:2], *rank_list[3:5]]
         else:
-            data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data]
+            data = [time.strftime("%Y-%m-%d %H:%M:%S",
+                                  time.localtime(time.time())), *data]
 
         with open(data_path + '%d.csv' % (av_id), 'a') as f:
             f.write(','.join([str(index) for index in data]) + '\n')
@@ -321,9 +327,11 @@ class Up():
                 'reply', 'share', 'danmaku']
         data = [json[index] for index in need]
         if len(rank_list):
-            data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data, *rank_list[:2], *rank_list[3:5]]
+            data = [time.strftime(
+                "%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data, *rank_list[:2], *rank_list[3:5]]
         else:
-            data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data]
+            data = [time.strftime("%Y-%m-%d %H:%M:%S",
+                                  time.localtime(time.time())), *data]
         self.origin_data_v2[av_id] = data
 
     def have_error(self, json, types=None):
@@ -405,7 +413,8 @@ class Up():
         one_day_data = self.origin_data_v2[av_id] if av_id in self.origin_data_v2 else [
         ]
 
-        data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data_time)), av_id, follower, follower_2, *origin_data, *one_day_data]
+        data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data_time)),
+                av_id, follower, follower_2, *origin_data, *one_day_data]
         with open(data_path + 'public.csv', 'a') as f:
             f.write(','.join([str(ii) for ii in data]) + '\n')
 
@@ -536,6 +545,11 @@ class Up():
             time.sleep(120)
 
     def get_check(self):
+        now_hour = int(time.strftime("%H", time.localtime(time.time())))
+        now_min = int(time.strftime("%M", time.localtime(time.time())))
+        now_time = now_hour + now_min / 60
+        if now_time > 0.5 and now_time < 8.5:
+            return
         with open('%scomment.pkl' % yybzz_path, 'rb') as f:
             self.comment = pickle.load(f)
 

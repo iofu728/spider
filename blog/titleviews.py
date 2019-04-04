@@ -7,6 +7,7 @@
 import argparse
 import datetime
 import re
+import os
 
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
@@ -18,8 +19,14 @@ from utils.utils import begin_time, end_time, changeCookie, basic_req, can_retry
   * www.zhihu.com/api/v4/creator/content_statistics
   * www.jianshu.com/u/
   * blog.csdn.net
+    .data/
+    ├── cookie   // zhihu cookie
+    ├── google   // google analysis data
+    ├── slug     // blog title slug
+    └── title    // blog title list
 """
 get_request_proxy = GetFreeProxy().get_request_proxy
+
 
 class TitleViews(object):
     """
@@ -48,6 +55,8 @@ class TitleViews(object):
         """
         load local view
         """
+        if not os.path.exists("blog/data/google"):
+            return
         with open("blog/data/google", 'r') as f:
             test = f.readlines()
         test = test[7:]
@@ -66,10 +75,16 @@ class TitleViews(object):
         """
         get title map
         """
-        with open('blog/data/slug', 'r') as f:
-            slug = f.readlines()
-        with open('blog/data/title', 'r') as f:
-            title = f.readlines()
+        if os.path.exists('blog/data/slug'):
+            with open('blog/data/slug', 'r') as f:
+                slug = f.readlines()
+        else:
+            slug = []
+        if os.path.exists('blog/data/title'):
+            with open('blog/data/title', 'r') as f:
+                title = f.readlines()
+        else:
+            title = []
         self.title_map = {tempslug.split(
             '"')[1]: title[num].split('"')[1] for num, tempslug in enumerate(slug)}
         title2slug = {
@@ -86,8 +101,11 @@ class TitleViews(object):
         return None if arr is None else arr.group(1)
 
     def getZhihuView(self):
-        with open('blog/data/cookie', 'r') as f:
-            cookie = f.readline()
+        if os.path.exists('blog/data/cookie'):
+            with open('blog/data/cookie', 'r') as f:
+                cookie = f.readline()
+        else:
+            cookie = ' '
         changeCookie(cookie[:-1])
         url_basic = [
             'https://www.zhihu.com/api/v4/creator/content_statistics/',
@@ -333,6 +351,9 @@ class TitleViews(object):
     def new_day(self):
         day_data = self.Db.select_db(
             "SELECT `today_views`, `existed_views` from page_views order by `id` desc limit 1")
+        if not os.path.exists('../blog/log/basic'):
+            print('File not exist!!!')
+            return
         with open("../blog/log/basic", 'r') as f:
             existed_spider = int(f.readlines()[1])
         today_date = datetime.datetime.now().strftime('%Y-%m-%d')

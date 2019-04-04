@@ -6,6 +6,7 @@
 
 import threading
 import time
+import os
 import re
 import random
 
@@ -25,7 +26,13 @@ get_request_proxy = GetFreeProxy().get_request_proxy
   * pub.alimama.com/favorites/group/newList.json?toPage=1&perPageSize=40&keyword=&t=
   * note.youdao.com/yws/api/personal/file?method=listRecent&offset=0&limit=30&keyfrom=web&cstk=E3CF_lx8
   * pub.alimama.com/items/search.json?auctionTag=&perPageSize=50&shopTag=&_tb_token_={}
+    .data/
+    ├── collect        // tb collect file
+    ├── cookie         // youdao note cookie
+    ├── cookie_alimama // alimama cookie
+    └── cookie_collect // tb cookie
 """
+
 
 class Buildmd(object):
     """docstring for buildmd"""
@@ -54,7 +61,7 @@ class Buildmd(object):
         """
         return 'http://note.youdao.com/yws/public/note/' + str(tid) + '?editorType=0&cstk=S0RcfVHi'
 
-    def find_title(self, index):
+    def find_title(self, index: int):
         if int(index) < 5:
             return 'winter18/' + str(index + 1) + '.md'
         if int(index) < 9:
@@ -81,7 +88,7 @@ class Buildmd(object):
         self.request_list = [
             re.split(r'/|=', index.text)[-1] for index in content]
 
-    def build_md(self):
+    def build_md(self, load_img=False):
         """
         build md
         """
@@ -97,17 +104,19 @@ class Buildmd(object):
             work.start()
         for work in threadings:
             work.join()
-        # img_map = {k: self.img_map[k] for k in sorted(self.img_map.keys())}
-        # img_threadings = []
-        # for index in img_map.keys():
-        #     for img_id, img_url in enumerate(img_map[index]):
-        #         work = threading.Thread(
-        #             target=self.load_img, args=(index, img_id, img_url,))
-        #         img_threadings.append(work)
-        # for work in img_threadings:
-        #     work.start()
-        # for work in img_threadings:
-        #     work.join()
+        if not load_img:
+            return
+        img_map = {k: self.img_map[k] for k in sorted(self.img_map.keys())}
+        img_threadings = []
+        for index in img_map.keys():
+            for img_id, img_url in enumerate(img_map[index]):
+                work = threading.Thread(
+                    target=self.load_img, args=(index, img_id, img_url,))
+                img_threadings.append(work)
+        for work in img_threadings:
+            work.start()
+        for work in img_threadings:
+            work.join()
 
         end_time(version)
 
@@ -173,6 +182,9 @@ class Buildmd(object):
         load goods
         """
         version = begin_time()
+        if not os.path.exists('buildmd/data/cookie'):
+            print('Youdao Note cookie not exist!!!')
+            return
         with open('buildmd/data/cookie', 'r') as f:
             cookie = f.readline()
         changeCookie(cookie[:-1])
@@ -336,6 +348,9 @@ class Buildmd(object):
         load collect
         """
         version = begin_time()
+        if not os.path.exists('buildmd/data/cookie_collect'):
+            print('TB cookie not exist!!!')
+            return
         with open('buildmd/data/cookie_collect', 'r') as f:
             cookie = f.readline()
         changeCookie(cookie[:-1])
@@ -411,6 +426,10 @@ class Buildmd(object):
             'Origin': 'https://note.youdao.com',
             'Referer': 'https://note.youdao.com/web'
         }
+        if not os.path.exists('buildmd/data/cookie'):
+            print('Youdao Note cookie not exist!!!')
+            return
+
         with open('buildmd/data/cookie', 'r') as f:
             cookie = f.readline()
         headers['cookie'] = cookie[:-1]
@@ -452,7 +471,9 @@ class Buildmd(object):
         """
 
         version = begin_time()
-
+        if not os.path.exists('buildmd/data/collect_wyy'):
+            print('Collect File not exist!!!')
+            return
         with open('buildmd/data/collect_wyy', 'r') as f:
             goods = f.readlines()
         self.goods_candidate = [index.split('||')[0] for index in goods]
@@ -467,11 +488,13 @@ class Buildmd(object):
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             "Accept-Encoding": "",
             "Accept-Language": "zh-CN,zh;q=0.9",
-            # :todo: change user-agent
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
             'Origin': 'http://pub.alimama.com',
             'Referer': 'http://pub.alimama.com/promo/search/index.htm?q=%E7%AC%AC%E5%9B%9B%E5%8D%81%E4%B9%9D%E5%A4%A9%2019%E6%98%A5%E5%AD%A3&_t=1550891362391'
         }
+        if not os.path.exists('buildmd/data/cookie_alimama'):
+            print('alimama cookie not exist!!!')
+            return
         with open('buildmd/data/cookie_alimama', 'r') as f:
             cookie = f.readlines()
         url_list = [
@@ -515,6 +538,9 @@ class Buildmd(object):
         """
 
         url = 'http://pub.alimama.com/favorites/item/batchAdd.json'
+        if not os.path.exists('buildmd/data/cookie_alimama'):
+            print('alimama cookie not exist!!!')
+            return
         with open('buildmd/data/cookie_alimama', 'r') as f:
             cookie = f.readlines()
 
@@ -552,11 +578,17 @@ class Buildmd(object):
         version = begin_time()
         changeHtmlTimeout(30)
         block_size = 10
+        if not os.path.exists('buildmd/data/goods'):
+            print('goods file not exist!!!')
+            return
         with open('buildmd/data/goods', 'r') as f:
             wait_goods = f.readlines()
         goods_url = [re.findall('http.* ', index)[0].strip(
         ).replace('https', 'http') if 'http' in index and not '【' in index else False for index in wait_goods]
 
+        if not os.path.exists('buildmd/data/collect_wyy'):
+            print('collect file not exist!!!')
+            return
         with open('buildmd/data/collect_wyy', 'r') as f:
             collect = f.readlines()
         self.title2map = {
@@ -632,6 +664,9 @@ class Buildmd(object):
 
     def search_goods(self):
         version = begin_time()
+        if not os.path.exists('buildmd/data/wait'):
+            print('wait file not exist!!!')
+            return
         with open('buildmd/data/wait', 'r') as f:
             wait = f.readlines()
         threadings = []
@@ -651,7 +686,9 @@ class Buildmd(object):
         end_time(version)
 
     def search_goods_once(self, goods_name, index):
-
+        if not os.path.exists('buildmd/data/cookie_alimama'):
+            print('alimama cookie not exist!!!')
+            return
         with open('buildmd/data/cookie_alimama', 'r') as f:
             cookie = f.readlines()
         url_list = [

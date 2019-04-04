@@ -6,6 +6,7 @@
 
 import time
 import random
+import os
 
 from proxy.getproxy import GetFreeProxy
 from utils.utils import begin_time, end_time, send_email
@@ -18,6 +19,8 @@ data_path = 'brushclass/data/'
   * www.zhihu.com/api/v4/creator/content_statistics
   * www.jianshu.com/u/
   * blog.csdn.net
+    .data/
+    └── cookie    // elective.pku.edu.cn cookie
 """
 
 
@@ -44,26 +47,27 @@ class Brush(object):
                 send_email('大数据专题', '大数据专题 有名额啦 有名额啦')
                 have_places = True
             time.sleep(random.randint(10, 20))
-        end_time = ()
+        end_time(version)
 
     def have_places_once(self):
         """
         have places
         """
         url = 'http://elective.pku.edu.cn/elective2008/edu/pku/stu/elective/controller/supplement/refreshLimit.do'
-        with open(data_path + 'cookie', 'r') as f:
+        if not os.path.exists('%scookie' % data_path):
+            print('Brush Cookie not exist!!!')
+            return
+        with open('%scookie' % data_path, 'r') as f:
             cookie = f.readlines()
         headers = {
             'pragma': 'no-cache',
             'X-Requested-With': 'XMLHttpRequest',
             'cache-control': 'no-cache',
             'Cookie': '',
-            # 'Upgrade-Insecure-Requests': '1',
             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             "Accept-Encoding": "",
             "Accept-Language": "zh-CN,zh;q=0.9",
-            # :todo: change user-agent
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
             "Origin": "http://elective.pku.edu.cn",
             "Referer": "http://elective.pku.edu.cn/elective2008/edu/pku/stu/elective/controller/supplement/SupplyCancel.do",

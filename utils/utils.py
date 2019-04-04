@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2018-10-19 15:33:46
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-03-30 00:59:48
+@Last Modified time: 2019-04-05 01:57:48
 '''
 
 import os
@@ -39,7 +39,7 @@ spendList = []
 failured_map = {}
 
 
-def basic_req(url, types, proxies=None, data=None, header=None):
+def basic_req(url: str, types: int, proxies=None, data=None, header=None):
     """
     requests
     @types XY: X=0.->get;   =1.->post;
@@ -62,7 +62,7 @@ def basic_req(url, types, proxies=None, data=None, header=None):
     return result
 
 
-def req_set(url):
+def req_set(url: str):
     """
     req set
     """
@@ -72,7 +72,7 @@ def req_set(url):
     headers['User-Agent'] = agent_lists[index]
 
 
-def get_html(url, proxies=None, header=None):
+def get_html(url: str, proxies=None, header=None):
     """
     get html
     @url requests.url
@@ -94,13 +94,13 @@ def get_html(url, proxies=None, header=None):
         if html.apparent_encoding == 'utf-8' or 'gbk' in html.apparent_encoding:
             html.encoding = html.apparent_encoding
         html = html.text
-    except Exception as e:
+    except:
         # print('Error')
         html = '<html></html>'
     return BeautifulSoup(html, 'html.parser')
 
 
-def get_json(url, proxies=None, header=None):
+def get_json(url: str, proxies=None, header=None):
     """
     get json
     @url requests.url
@@ -112,11 +112,11 @@ def get_json(url, proxies=None, header=None):
     try:
         return requests.get(url, headers=header, verify=False,
                             timeout=json_timeout, proxies=proxies).json()
-    except Exception as e:
+    except:
         return
 
 
-def post_json(url, proxies=None, data=None, header=None):
+def post_json(url: str, proxies=None, data=None, header=None):
     """
     post json
     @url requests.url
@@ -129,11 +129,11 @@ def post_json(url, proxies=None, data=None, header=None):
     try:
         return requests.post(url, headers=header, verify=False, data=data,
                              timeout=json_timeout, proxies=proxies).json()
-    except Exception as e:
+    except:
         return
 
 
-def post_basic(url, proxies=None, data=None, header=None):
+def post_basic(url: str, proxies=None, data=None, header=None):
     """
     post json
     @url requests.url
@@ -146,11 +146,11 @@ def post_basic(url, proxies=None, data=None, header=None):
     try:
         return requests.post(url, headers=header, verify=False, data=data,
                              timeout=json_timeout, proxies=proxies)
-    except Exception as e:
+    except:
         return
 
 
-def get_basic(url, proxies=None, header=None):
+def get_basic(url: str, proxies=None, header=None):
     """
     get img
     @url requests.url
@@ -162,11 +162,11 @@ def get_basic(url, proxies=None, header=None):
     try:
         return requests.get(url, headers=header, verify=False,
                             timeout=html_timeout, proxies=proxies)
-    except Exception as e:
+    except:
         return
 
 
-def changeCookie(cookie):
+def changeCookie(cookie: str):
     """
     change cookie
     """
@@ -174,7 +174,7 @@ def changeCookie(cookie):
     headers['Cookie'] = cookie
 
 
-def changeHeaders(header):
+def changeHeaders(header: dict):
     """
     change Headers
     """
@@ -182,7 +182,7 @@ def changeHeaders(header):
     headers = {**headers, **header}
 
 
-def changeHtmlTimeout(timeout):
+def changeHtmlTimeout(timeout: int):
     """
     change html timeout
     """
@@ -190,7 +190,7 @@ def changeHtmlTimeout(timeout):
     html_timeout = timeout
 
 
-def changeJsonTimeout(timeout):
+def changeJsonTimeout(timeout: int):
     """
     change json timeout
     """
@@ -198,7 +198,7 @@ def changeJsonTimeout(timeout):
     json_timeout = timeout
 
 
-def begin_time():
+def begin_time() -> int:
     """
     multi-version time manage
     """
@@ -207,27 +207,28 @@ def begin_time():
     return len(start) - 1
 
 
-def end_time_avage(version):
+def end_time_avage(version: int):
     termSpend = time.time() - start[version]
     spendList.append(termSpend)
     print(str(termSpend)[0:5] + ' ' +
           str(sum(spendList) / len(spendList))[0:5])
 
 
-def end_time(version):
+def end_time(version: int):
     termSpend = time.time() - start[version]
     print(str(termSpend)[0:5])
 
 
-def spend_time(version):
+def spend_time(version: int):
     return str(time.time() - start[version])[0:5]
 
 
 def empty():
+    global spendList
     spendList = []
 
 
-def can_retry(url, index=None):
+def can_retry(url: str, index=None) -> bool:
     """
     judge can retry once
     """
@@ -245,13 +246,16 @@ def can_retry(url, index=None):
         return False
 
 
-def send_email(context, subject):
+def send_email(context: str, subject: str) -> bool:
     """
     send email
     """
     data_path = 'utils/data/'
 
-    with open(data_path + 'emailSend', 'r') as f:
+    if not os.path.exists('%semailSend' % data_path) or os.path.exists('%semailRec' % data_path):
+        print('email send/Rec list not exist!!!')
+        return
+    with open('%semailSend' % data_path, 'r') as f:
         email_send = [ii.strip().split(',') for ii in f.readlines()]
     with open(data_path + 'emailRec', 'r') as f:
         origin_file = f.readlines()
@@ -287,7 +291,7 @@ def send_email(context, subject):
         return False
 
 
-def dump_bigger(data, output_file):
+def dump_bigger(data, output_file: str):
     """
     pickle.dump big file which size more than 4GB
     """
@@ -298,7 +302,7 @@ def dump_bigger(data, output_file):
             f_out.write(bytes_out[idx:idx + max_bytes])
 
 
-def load_bigger(input_file):
+def load_bigger(input_file: str):
     """
     pickle.load big file which size more than 4GB
     """

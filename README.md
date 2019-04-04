@@ -7,16 +7,8 @@
 [![GitHub tag](https://img.shields.io/github/tag/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider/releases)
 [![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider)
 
-<div align="center"><strong>Some Spider Application base on proxy pool</strong></div>
-
-## keyword
-
-- Big data store
-- High concurrency requests
-- Support Websocket
-- method for font cheat
-- method for js compile
-- Some Application
+<div align="center"><strong>高可用代理IP池 高并发爬虫 不均匀的压力分发系统 一些带爬虫技巧的应用</strong></div>
+<div align="center"><strong>Highly Available Proxy IP Pool, Highly Concurrent Spider, Uneven Pressure Distribution System, Some Application with spider skill</strong></div>
 
 - [keyword](#keyword)
 - [Proxy pool](#proxy-pool)
@@ -46,6 +38,15 @@
     - [Trouble Shooting](#trouble-shooting-1)
       - [error: unpack requires a buffer of 20 bytes](#error-unpack-requires-a-buffer-of-20-bytes)
       - [How to analysis font](#how-to-analysis-font)
+
+## keyword
+
+- Big data store
+- High concurrency requests
+- Support Websocket
+- method for font cheat
+- method for js compile
+- Some Application
 
 ## Proxy pool
 
@@ -250,8 +251,8 @@ yarn install add jsdom # npm install jsdom PS: not global
 
 ##### Can't get true html
 
-> Wait time must be 5.5s.
-> So you can use `threading` or `await asyncio.gather` to request image
+- Wait time must be 5.5s.
+- So you can use `threading` or `await asyncio.gather` to request image
 
 - [Coroutines and Tasks](https://docs.python.org/3/library/asyncio-task.html)
 
@@ -285,12 +286,13 @@ parent_tree.find_all(re.compile('''))
 
 ##### error: unpack requires a buffer of 20 bytes
 
-> requests.text -> str, requests.content -> byte
+- requests.text -> str,
+- requests.content -> byte
 
 - [Struct.error: unpack requires a buffer of 16 bytes](https://stackoverflow.com/questions/51110525/struct-error-unpack-requires-a-buffer-of-16-bytes)
 
 ##### How to analysis font
 
-> use fonttools
-> get TTFont().getBestCamp()
-> contrast with base
+- use fonttools
+- get TTFont().getBestCamp()
+- contrast with base

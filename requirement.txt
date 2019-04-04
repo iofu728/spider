@@ -9,3 +9,7 @@ asyncio
 aiohttp
 apscheduler
 pickle
+PyExecJS
+numpy
+pandas
+fonttools

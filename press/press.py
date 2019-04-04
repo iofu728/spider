@@ -2,14 +2,15 @@
 # @Author: gunjianpan
 # @Date:   2018-11-10 11:17:16
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-02-11 12:48:22
-import codecs
+# @Last Modified time: 2019-03-25 21:18:30
 import threading
 import time
 
 from proxy.getproxy import GetFreeProxy
 from utils.db import Db
-from utils.utils import begin_time, get_html, end_time, get_json
+from utils.utils import begin_time, end_time, basic_req
+
+get_request_proxy = GetFreeProxy().get_request_proxy
 
 
 class Press_test():
@@ -17,18 +18,15 @@ class Press_test():
     give press in short time
     """
 
-    def __init__(self):
-        self.proxyclass = GetFreeProxy()
-
     def basic_press(self, url, times, types):
         """
         press have no data input
         """
         url = url + str(int(round(time.time() * 1000)))
         if types == 1:
-            html = self.proxyclass.get_request_proxy(url, 1)
+            html = get_request_proxy(url, 1)
         else:
-            html = get_json(url, {})
+            html = basic_req(url, 1)
 
         if html == False and times < 5:
             self.basic_press(url, times + 1, types)

@@ -2,20 +2,30 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-12 20:22:57
+# @Last Modified time: 2019-03-28 21:09:01
 
 import argparse
-import codecs
 import datetime
-import threading
-import time
 import re
+import os
 
 from bs4 import BeautifulSoup
-from datetime import datetime
 from proxy.getproxy import GetFreeProxy
 from utils.db import Db
-from utils.utils import begin_time, get_html, end_time, changeCookie, get_json
+from utils.utils import begin_time, end_time, changeCookie, basic_req, can_retry, changeHtmlTimeout
+
+"""
+  * blog @http
+  * www.zhihu.com/api/v4/creator/content_statistics
+  * www.jianshu.com/u/
+  * blog.csdn.net
+    .data/
+    ├── cookie   // zhihu cookie
+    ├── google   // google analysis data
+    ├── slug     // blog title slug
+    └── title    // blog title list
+"""
+get_request_proxy = GetFreeProxy().get_request_proxy
 
 
 class TitleViews(object):
@@ -25,7 +35,6 @@ class TitleViews(object):
 
     def __init__(self):
         self.Db = Db("blog")
-        self.requests = GetFreeProxy()
         self.local_views = {}
         self.title_map = {}
         self.title2slug = {}
@@ -46,6 +55,8 @@ class TitleViews(object):
         """
         load local view
         """
+        if not os.path.exists("blog/data/google"):
+            return
         with open("blog/data/google", 'r') as f:
             test = f.readlines()
         test = test[7:]
@@ -64,10 +75,16 @@ class TitleViews(object):
         """
         get title map
         """
-        with open('blog/data/slug', 'r') as f:
-            slug = f.readlines()
-        with open('blog/data/title', 'r') as f:
-            title = f.readlines()
+        if os.path.exists('blog/data/slug'):
+            with open('blog/data/slug', 'r') as f:
+                slug = f.readlines()
+        else:
+            slug = []
+        if os.path.exists('blog/data/title'):
+            with open('blog/data/title', 'r') as f:
+                title = f.readlines()
+        else:
+            title = []
         self.title_map = {tempslug.split(
             '"')[1]: title[num].split('"')[1] for num, tempslug in enumerate(slug)}
         title2slug = {
@@ -84,13 +101,16 @@ class TitleViews(object):
         return None if arr is None else arr.group(1)
 
     def getZhihuView(self):
-        with open('blog/data/cookie', 'r') as f:
-            cookie = f.readline()
+        if os.path.exists('blog/data/cookie'):
+            with open('blog/data/cookie', 'r') as f:
+                cookie = f.readline()
+        else:
+            cookie = ' '
         changeCookie(cookie[:-1])
         url_basic = [
             'https://www.zhihu.com/api/v4/creator/content_statistics/',
             'articles?order_field=object_created&order_sort=descend&begin_date=2018-09-01&end_date=',
-            datetime.now().strftime("%Y-%m-%d"),
+            datetime.datetime.now().strftime("%Y-%m-%d"),
             '&page_no='
         ]
         url = "".join(url_basic)
@@ -136,54 +156,53 @@ class TitleViews(object):
 
     def get_request(self, url, types):
 
-        result = get_json(url, {})
+        result = basic_req(url, 1)
 
         if not result:
-            if self.can_retry(url):
+            if can_retry(url):
                 self.get_request(url, types)
             return
         return result
 
-    def get_request_v2(self, url, types):
+    def get_request_v2(self, url, types, header):
 
-        result = get_html(url, {})
+        result = get_request_proxy(url, 0, header=header)
 
         if not result or not len(result.find_all('div', class_='content')):
-            if self.can_retry(url):
-                self.get_request(url, types)
+            if can_retry(url):
+                self.get_request_v2(url, types, header)
             return
         return result
 
     def get_request_v3(self, url, types):
 
-        result = get_html(url, {})
+        result = basic_req(url, 0)
 
         if result is None or not result or not len(result.find_all('p', class_='content')):
-            if self.can_retry(url):
-                self.get_request(url, types)
+            if can_retry(url):
+                self.get_request_v3(url, types)
             return
         return result
-
-    def can_retry(self, url):
-        """
-        judge can retry once
-        """
-        if url not in self.failured_map:
-            self.failured_map[url] = 0
-            return True
-        elif self.failured_map[url] < 2:
-            self.failured_map[url] += 1
-            return True
-        else:
-            print("Failured " + url)
-            self.requests.log_write(url)
-            self.failured_map[url] = 0
-            return False
 
     def getJianshuViews(self):
         """
         get jianshu views
         """
+        header = {
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            'accept-encoding': 'gzip, deflate, br',
+            'accept-language': 'zh-CN,zh;q=0.9',
+            'cache-control': 'no-cache',
+            'pragma': 'no-cache',
+            'sec-ch-ua': 'Google Chrome 75',
+            'sec-fetch-dest': 'document',
+            'sec-fetch-mode': 'navigate',
+            'sec-fetch-site': 'cross-site',
+            'sec-fetch-user': '?F',
+            'sec-origin-policy': '0',
+            'upgrade-insecure-requests': '1',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3736.0 Safari/537.36'
+        }
 
         basic_url = 'https://www.jianshu.com/u/2e0f69e4a4f0'
 
@@ -191,7 +210,7 @@ class TitleViews(object):
             url = basic_url if rounds == 1 else basic_url + \
                 '?order_by=shared_at&page=' + str(rounds)
             print(url)
-            html = self.get_request_v2(url, 0)
+            html = self.get_request_v2(url, 0, header)
             if html is None:
                 print('None')
                 return
@@ -293,6 +312,7 @@ class TitleViews(object):
                     '%Y-%m-%d %H:%M:%S')
 
     def update_view(self):
+        changeHtmlTimeout(10)
         wait_map = {}
         self.select_all()
         self.getZhihuView()
@@ -331,6 +351,9 @@ class TitleViews(object):
     def new_day(self):
         day_data = self.Db.select_db(
             "SELECT `today_views`, `existed_views` from page_views order by `id` desc limit 1")
+        if not os.path.exists('../blog/log/basic'):
+            print('File not exist!!!')
+            return
         with open("../blog/log/basic", 'r') as f:
             existed_spider = int(f.readlines()[1])
         today_date = datetime.datetime.now().strftime('%Y-%m-%d')

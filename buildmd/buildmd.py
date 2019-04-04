@@ -2,20 +2,36 @@
 # @Author: gunjianpan
 # @Date:   2019-01-31 17:08:32
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-12 16:09:26
+# @Last Modified time: 2019-03-27 23:47:55
 
-import codecs
 import threading
 import time
-import pandas as pd
+import os
 import re
-import requests
 import random
 
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, get_html, end_time, changeCookie, changeHeaders, changeHtmlTimeout
+from utils.utils import begin_time, end_time, changeCookie, changeHtmlTimeout, basic_req, can_retry
 from urllib.request import urlopen
+
+get_request_proxy = GetFreeProxy().get_request_proxy
+
+"""
+  * youdao & alimama & taobao @http
+  * note.youdao.com/yws/public/note/
+  * shoucang.taobao.com/item_collect_n.htm?t={}
+  * note.youdao.com/yws/api/personal/sync?method=push&keyfrom=web&cstk=E3CF_lx8
+  * pub.alimama.com/favorites/item/batchAdd.json
+  * pub.alimama.com/favorites/group/newList.json?toPage=1&perPageSize=40&keyword=&t=
+  * note.youdao.com/yws/api/personal/file?method=listRecent&offset=0&limit=30&keyfrom=web&cstk=E3CF_lx8
+  * pub.alimama.com/items/search.json?auctionTag=&perPageSize=50&shopTag=&_tb_token_={}
+    .data/
+    ├── collect        // tb collect file
+    ├── cookie         // youdao note cookie
+    ├── cookie_alimama // alimama cookie
+    └── cookie_collect // tb cookie
+"""
 
 
 class Buildmd(object):
@@ -23,9 +39,8 @@ class Buildmd(object):
 
     def __init__(self, ):
         self.request_list = []
-        self.proxyclass = GetFreeProxy()
         self.failured_map = {}
-        self.get_lists()
+        # self.get_lists()
         self.img_map = {}
         self.goods = {}
         self.collect = {}
@@ -46,7 +61,7 @@ class Buildmd(object):
         """
         return 'http://note.youdao.com/yws/public/note/' + str(tid) + '?editorType=0&cstk=S0RcfVHi'
 
-    def find_title(self, index):
+    def find_title(self, index: int):
         if int(index) < 5:
             return 'winter18/' + str(index + 1) + '.md'
         if int(index) < 9:
@@ -63,9 +78,9 @@ class Buildmd(object):
         get title lists
         """
         url = self.joint_url('3bb0c25eca85e764b6d55a281faf7195')
-        title_json = self.proxyclass.get_request_proxy(url, 1)
+        title_json = get_request_proxy(url, 1)
         if not title_json:
-            if self.can_retry(url):
+            if can_retry(url):
                 self.get_lists()
             return
         content = BeautifulSoup(
@@ -73,7 +88,7 @@ class Buildmd(object):
         self.request_list = [
             re.split(r'/|=', index.text)[-1] for index in content]
 
-    def build_md(self):
+    def build_md(self, load_img=False):
         """
         build md
         """
@@ -89,17 +104,19 @@ class Buildmd(object):
             work.start()
         for work in threadings:
             work.join()
-        # img_map = {k: self.img_map[k] for k in sorted(self.img_map.keys())}
-        # img_threadings = []
-        # for index in img_map.keys():
-        #     for img_id, img_url in enumerate(img_map[index]):
-        #         work = threading.Thread(
-        #             target=self.load_img, args=(index, img_id, img_url,))
-        #         img_threadings.append(work)
-        # for work in img_threadings:
-        #     work.start()
-        # for work in img_threadings:
-        #     work.join()
+        if not load_img:
+            return
+        img_map = {k: self.img_map[k] for k in sorted(self.img_map.keys())}
+        img_threadings = []
+        for index in img_map.keys():
+            for img_id, img_url in enumerate(img_map[index]):
+                work = threading.Thread(
+                    target=self.load_img, args=(index, img_id, img_url,))
+                img_threadings.append(work)
+        for work in img_threadings:
+            work.start()
+        for work in img_threadings:
+            work.join()
 
         end_time(version)
 
@@ -108,9 +125,9 @@ class Buildmd(object):
         build md in one
         """
         url = self.joint_url(tid)
-        title_json = self.proxyclass.get_request_proxy(url, 1)
+        title_json = get_request_proxy(url, 1)
         if not title_json:
-            if self.can_retry(url, index):
+            if can_retry(url, index):
                 self.build_md_once(index, tid)
             return
         content = BeautifulSoup(
@@ -152,40 +169,22 @@ class Buildmd(object):
         """
         load img
         """
-        img = self.proxyclass.get_request_proxy(img_url, 2)
+        img = get_request_proxy(img_url, 2)
         if img == True or img == False:
-            if self.can_retry(img_url):
+            if can_retry(img_url):
                 self.load_img(index, img_id, img_url)
             return
         with open('buildmd/' + self.find_title(index).split('/')[0] + '/img/' + self.find_title(index).split('/')[1][:-3] + str(img_id + 1) + '.jpg', 'wb') as f:
             f.write(img.content)
-
-    def can_retry(self, url, index=None):
-        """
-        judge can retry once
-        """
-
-        if url not in self.failured_map:
-            self.failured_map[url] = 0
-            # print("Retry " + str(self.failured_map[url]) + ' ' + url)
-            return True
-        elif self.failured_map[url] < 2:
-            self.failured_map[url] += 1
-            # print("Retry " + str(self.failured_map[url]) + ' ' + url)
-            return True
-        else:
-            if index is not None:
-                index = str(index)
-            print("Failured " + url)
-            self.proxyclass.log_write(url)
-            self.failured_map[url] = 0
-            return False
 
     def load_goods(self):
         """
         load goods
         """
         version = begin_time()
+        if not os.path.exists('buildmd/data/cookie'):
+            print('Youdao Note cookie not exist!!!')
+            return
         with open('buildmd/data/cookie', 'r') as f:
             cookie = f.readline()
         changeCookie(cookie[:-1])
@@ -212,9 +211,9 @@ class Buildmd(object):
         build md in one
         """
         url = self.joint_url(tid)
-        title_json = self.proxyclass.get_request_proxy(url, 1)
+        title_json = get_request_proxy(url, 1)
         if not title_json:
-            if self.can_retry(url, index):
+            if can_retry(url, index):
                 self.load_goods_once(index, tid)
             return
         content = BeautifulSoup(
@@ -222,7 +221,7 @@ class Buildmd(object):
         # return content
         content = content.find_all('div')
         if not len(content):
-            if self.can_retry(url, index):
+            if can_retry(url, index):
                 self.load_goods_once(index, tid)
             return
         # print(len(content))
@@ -349,6 +348,9 @@ class Buildmd(object):
         load collect
         """
         version = begin_time()
+        if not os.path.exists('buildmd/data/cookie_collect'):
+            print('TB cookie not exist!!!')
+            return
         with open('buildmd/data/cookie_collect', 'r') as f:
             cookie = f.readline()
         changeCookie(cookie[:-1])
@@ -368,7 +370,7 @@ class Buildmd(object):
 
         collect = [self.collect[k] for k in sorted(self.collect.keys())]
         collect = sum(collect, [])
-        with open('buildmd/data/collect_iofu728', 'w') as f:
+        with open('buildmd/data/collect_wyy', 'w') as f:
             f.write("\n".join(collect))
         end_time(version)
 
@@ -382,13 +384,13 @@ class Buildmd(object):
             url += 'ifAllTag=0&tab=0&tagId=&categoryCount=0&type=0&tagName=&categoryName=&needNav=false&startRow=' + \
                 str(30 * index)
 
-        collect_html = get_html(url, {})
+        collect_html = basic_req(url, 0)
         if collect_html != True and collect_html != False:
             collect_list = collect_html.find_all('li', class_=["J_FavListItem g-i-item fav-item ", "J_FavListItem g-i-item fav-item isinvalid",
                                                                "J_FavListItem g-i-item fav-item istmall ", "J_FavListItem g-i-item fav-item istmall isinvalid"])
             print(len(collect_list))
         if collect_html == True or collect_html == False or not len(collect_list):
-            if self.can_retry(baseurl + str(index), index):
+            if can_retry(baseurl + str(index), index):
                 self.load_collect_once(index)
             return
         text = []
@@ -414,24 +416,20 @@ class Buildmd(object):
         url = 'https://note.youdao.com/yws/api/personal/sync?method=push&keyfrom=web&cstk=E3CF_lx8'
         headers = {
             'pragma': 'no-cache',
-            # 'sec-fetch-dest': 'empty',
-            # 'sec-fetch-site': 'same-origin',
-            # 'sec-fetch-user': '?F',
-            # 'sec-origin-policy': '0',
-            # 'upgrade-insecure-requests': '1',
-            # 'X-Requested-With': 'XMLHttpRequest',
             'cache-control': 'no-cache',
             'Cookie': '',
-            # 'Upgrade-Insecure-Requests': '1',
             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
             'Accept': 'application/json, text/plain, */*',
             "Accept-Encoding": "",
             "Accept-Language": "zh-CN,zh;q=0.9",
-            # :todo: change user-agent
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
             'Origin': 'https://note.youdao.com',
             'Referer': 'https://note.youdao.com/web'
         }
+        if not os.path.exists('buildmd/data/cookie'):
+            print('Youdao Note cookie not exist!!!')
+            return
+
         with open('buildmd/data/cookie', 'r') as f:
             cookie = f.readline()
         headers['cookie'] = cookie[:-1]
@@ -441,8 +439,7 @@ class Buildmd(object):
         file_data = {
             'cstk': 'E3CF_lx8'
         }
-        ca = requests.post(file_list_url, data=file_data,
-                           headers=headers, verify=False).json()
+        ca = basic_req(file_list_url, 11, data=file_data, header=headers)
         if not len(ca):
             print('List Error')
             return
@@ -465,8 +462,7 @@ class Buildmd(object):
             'cstk': 'E3CF_lx8'
         }
         print(change_data)
-        cb = requests.post(url, data=change_data,
-                           headers=headers, verify=False)
+        cb = basic_req(url, 12, data=change_data, header=headers)
         return cb
 
     def bulk_import_alimama(self):
@@ -475,32 +471,30 @@ class Buildmd(object):
         """
 
         version = begin_time()
-
-        with open('buildmd/data/collect_iofu728', 'r') as f:
+        if not os.path.exists('buildmd/data/collect_wyy'):
+            print('Collect File not exist!!!')
+            return
+        with open('buildmd/data/collect_wyy', 'r') as f:
             goods = f.readlines()
         self.goods_candidate = [index.split('||')[0] for index in goods]
         goods_len = len(self.goods_candidate)
 
         self.headers = {
             'pragma': 'no-cache',
-            # 'sec-fetch-dest': 'empty',
-            # 'sec-fetch-site': 'same-origin',
-            # 'sec-fetch-user': '?F',
-            # 'sec-origin-policy': '0',
-            # 'upgrade-insecure-requests': '1',
             'X-Requested-With': 'XMLHttpRequest',
             'cache-control': 'no-cache',
             'Cookie': '',
-            # 'Upgrade-Insecure-Requests': '1',
             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             "Accept-Encoding": "",
             "Accept-Language": "zh-CN,zh;q=0.9",
-            # :todo: change user-agent
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
             'Origin': 'http://pub.alimama.com',
             'Referer': 'http://pub.alimama.com/promo/search/index.htm?q=%E7%AC%AC%E5%9B%9B%E5%8D%81%E4%B9%9D%E5%A4%A9%2019%E6%98%A5%E5%AD%A3&_t=1550891362391'
         }
+        if not os.path.exists('buildmd/data/cookie_alimama'):
+            print('alimama cookie not exist!!!')
+            return
         with open('buildmd/data/cookie_alimama', 'r') as f:
             cookie = f.readlines()
         url_list = [
@@ -515,7 +509,8 @@ class Buildmd(object):
         self.headers['Cookie'] = cookie[0][:-1]
         self.headers['Host'] = url.split('/')[2]
 
-        group_list = requests.get(url, headers=self.headers, verify=False)
+        group_list = basic_req(url, 2, header=headers)
+
         if group_list.status_code != 200 or group_list.json()['info']['message'] == 'nologin':
             print('group_list error')
             return
@@ -543,6 +538,9 @@ class Buildmd(object):
         """
 
         url = 'http://pub.alimama.com/favorites/item/batchAdd.json'
+        if not os.path.exists('buildmd/data/cookie_alimama'):
+            print('alimama cookie not exist!!!')
+            return
         with open('buildmd/data/cookie_alimama', 'r') as f:
             cookie = f.readlines()
 
@@ -559,8 +557,7 @@ class Buildmd(object):
             'pvid': cookie[2][:-1]
         }
         print(update_data)
-        cb = requests.post(url, data=update_data,
-                           headers=self.headers, verify=False)
+        cb = basic_req(url, 12, data=update_data, header=headers)
         if cb.status_code == 200 and cb.json()['info']['message'] != 'nologin':
             print(cb.json()['data'])
 
@@ -568,31 +565,30 @@ class Buildmd(object):
 
         self.headers = {
             'pragma': 'no-cache',
-            # 'sec-fetch-dest': 'empty',
-            # 'sec-fetch-site': 'same-origin',
-            # 'sec-fetch-user': '?F',
-            # 'sec-origin-policy': '0',
-            # 'upgrade-insecure-requests': '1',
             'X-Requested-With': 'XMLHttpRequest',
             'cache-control': 'no-cache',
             'Cookie': '',
-            # 'Upgrade-Insecure-Requests': '1',
             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             "Accept-Encoding": "",
             "Accept-Language": "zh-CN,zh;q=0.9",
-            # :todo: change user-agent
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
         }
 
         version = begin_time()
         changeHtmlTimeout(30)
         block_size = 10
+        if not os.path.exists('buildmd/data/goods'):
+            print('goods file not exist!!!')
+            return
         with open('buildmd/data/goods', 'r') as f:
             wait_goods = f.readlines()
         goods_url = [re.findall('http.* ', index)[0].strip(
         ).replace('https', 'http') if 'http' in index and not '【' in index else False for index in wait_goods]
 
+        if not os.path.exists('buildmd/data/collect_wyy'):
+            print('collect file not exist!!!')
+            return
         with open('buildmd/data/collect_wyy', 'r') as f:
             collect = f.readlines()
         self.title2map = {
@@ -630,13 +626,11 @@ class Buildmd(object):
         """
 
         origin_url = origin_url.replace('https', 'http')
-        # first_result = self.proxyclass.get_request_proxy(origin_url, 0)
-
-        first_html = requests.get(origin_url, headers=self.headers)
-        first_result = BeautifulSoup(first_html.text, 'html.parser')
+        # first_result = get_request_proxy(origin_url, 0)
+        first_result = basic_req(origin_url, 0, header=self.headers)
 
         if not first_result or len(first_result.find_all('script')) < 2:
-            if self.can_retry(origin_url):
+            if can_retry(origin_url):
                 self.get_goods_id_first(origin_url, index)
             return
 
@@ -657,12 +651,11 @@ class Buildmd(object):
 
     def get_goods_second(self, url, index):
 
-        second_html = requests.get(url, headers=self.headers)
-        second_result = BeautifulSoup(second_html.text, 'html.parser')
-        # second_result = self.proxyclass.get_request_proxy(url, 0)
+        second_result = basic_req(url, 0, header=self.headers)
+        # second_result = get_request_proxy(url, 0)
 
         if not second_result or not len(second_result.find_all('input')):
-            if self.can_retry(url):
+            if can_retry(url):
                 self.get_goods_second(url, index)
             return
         goods_id = second_result.find_all('input')[6]['value']
@@ -671,6 +664,9 @@ class Buildmd(object):
 
     def search_goods(self):
         version = begin_time()
+        if not os.path.exists('buildmd/data/wait'):
+            print('wait file not exist!!!')
+            return
         with open('buildmd/data/wait', 'r') as f:
             wait = f.readlines()
         threadings = []
@@ -690,7 +686,9 @@ class Buildmd(object):
         end_time(version)
 
     def search_goods_once(self, goods_name, index):
-
+        if not os.path.exists('buildmd/data/cookie_alimama'):
+            print('alimama cookie not exist!!!')
+            return
         with open('buildmd/data/cookie_alimama', 'r') as f:
             cookie = f.readlines()
         url_list = [
@@ -707,26 +705,19 @@ class Buildmd(object):
         ]
         headers = {
             'pragma': 'no-cache',
-            # 'sec-fetch-dest': 'empty',
-            # 'sec-fetch-site': 'same-origin',
-            # 'sec-fetch-user': '?F',
-            # 'sec-origin-policy': '0',
-            # 'upgrade-insecure-requests': '1',
             'X-Requested-With': 'XMLHttpRequest',
             'cache-control': 'no-cache',
             'Cookie': '',
-            # 'Upgrade-Insecure-Requests': '1',
             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             "Accept-Encoding": "",
             "Accept-Language": "zh-CN,zh;q=0.9",
-            # :todo: change user-agent
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
         }
         headers['Cookie'] = cookie[0][:-1]
-        ca = requests.get(''.join(url_list), headers=headers)
+        ca = basic_req(''.join(url_list), 2, header=headers)
         if ca.status_code != 200 or not 'data' in ca.json():
-            if self.can_retry(url + goods_name):
+            if can_retry(url + goods_name):
                 self.search_goods_once(goods_name, index)
             return
         page_list = ca.json()['data']['pageList']
@@ -734,119 +725,3 @@ class Buildmd(object):
             index['zkPrice'])]) for index in page_list][0]
         self.goods_name[index] = title
         print(title)
-
-
-# text = []
-# ttid = 0
-# title_list = ['衣服', '下装', '包包', '配饰', '鞋子', '鞋', '鞋子：',
-#               '包', '鞋包', '鞋包：', '配饰：', '衣服：', '下装：', '包包：', '袜子：', '饰品：']
-# special_list = ['620买长款双面羊绒大衣已经很划算了。',
-#                 '\xa0\xa0\xa0\xa0版型好看又百搭', '\xa0质量很好', '\xa0\xa0fromlala瘦竹竿', '\xa0mylittlebanana']
-# good_text = []
-# describe = []
-# title = ''
-# url = ''
-# tpud = ''
-# for word in content:
-#     temp_text = ''
-#     temp_text = word.text
-#     if not len(temp_text):
-#         continue
-#     if len(temp_text) and temp_text not in special_list and not '€' in temp_text and ((temp_text[0].isdigit() and (not '【' in temp_text or '【已下架】'in temp_text)) or (temp_text[0] == '\xa0' and not 'http' in temp_text and not '￥' in temp_text and not '微信' in temp_text and not '(' in temp_text) or (word.span and len(word.span.text.replace('\xa0', '')) and (word.span['style'] == 'font-size:16px;color:#fc9db1;font-weight:bold;' or word.span['style'] == 'font-size:16px;color:#1e6792;background-color:#ffffff;font-weight:bold;'))):
-#         temp_text = temp_text.replace('\xa0', ' ').replace('|', '')
-#         temp_text = temp_text.replace('//', '').replace('￥', '').strip()
-#         if not re.search(r'\d\.\d', temp_text):
-#             temp_text = temp_text.replace('.', ' ')
-#         elif temp_text.count('.') > 1:
-#             temp_text = temp_text.replace('.', ' ', 1)
-#         temp_list = temp_text.split()
-#         print(temp_list)
-#         if not len(temp_list):
-#             continue
-#         if ttid:
-#             text.append(' '.join([*good_text, *[url, tpud]]))
-#         url = ''
-#         tpud = ''
-#         ttid += 1
-#         describe = []
-#         good_text = []
-#         if len(title):
-#             text.append(title)
-#             title = ''
-#         if temp_list[0].isdigit():
-#             good_text.append(str(int(temp_list[0])))
-#         else:
-#             good_text.append(str(ttid))
-#             good_text.append(temp_list[0])
-#         if len(temp_list) == 1:
-#             continue
-#         if len(good_text) == 1:
-#             good_text.append(temp_list[1])
-#         elif temp_list[1].isdigit():
-#             good_text.append(str(int(temp_list[1])))
-#             if len(temp_list) > 2:
-#                 describe = temp_list[2:]
-#         if len(temp_list) > 2 and temp_list[2].isdigit():
-#             good_text.append(str(int(temp_list[2])))
-#         elif len(temp_list) > 3 and temp_list[3].isdigit():
-#             good_text.append(str(int(temp_list[3])))
-#             describe = temp_list[2]
-#             if len(temp_list) > 4:
-#                 describe = [*describe, *temp_list[4:]]
-#         elif len(temp_list) > 3 and len(temp_list[2]) > 3 and temp_list[2][2:].isdigit():
-#             if len(temp_list[3]) > 3 and temp_list[3][2:].isdigit():
-#                 good_text.append(temp_list[2] + '/' + temp_list[3])
-#             else:
-#                 good_text.append(str(int(temp_list[2][2:])))
-#             continue
-#         elif len(temp_list) > 2 and re.search(r'\d', temp_list[2]):
-#             digit_list = re.findall(r"\d+\.?\d*", temp_list[2])
-#             good_text.append(digit_list[0])
-#             if len(temp_list) > 3:
-#                 describe = [*describe, *temp_list[3:]]
-#         elif len(temp_list) > 2:
-#             describe.append(temp_list[2])
-#         if len(temp_list) > 3:
-#             describe = temp_list[3:]
-#     elif 'http' in temp_text:
-#         temp_text = temp_text.replace('\xa0', '').strip()
-#         print('http', temp_text)
-#         url = temp_text
-#     elif temp_text.count('€') == 2 or temp_text.count('￥') == 2:
-#         temp_text = temp_text.replace('\xa0', '').strip()
-#         print('￥', temp_text)
-#         tpud = temp_text
-#     elif '【店铺链接】' in temp_text:
-#         temp_text = temp_text.replace('\xa0', '').strip()
-#         print('【店铺链接】', temp_text)
-#         url += temp_text
-#     elif temp_text in title_list:
-#         print(2, temp_text)
-#         temp_text = temp_text.replace('\xa0', '')
-#         title = temp_text
-#     elif len(good_text) == 1:
-#         temp_text = temp_text.replace('\xa0', ' ').replace(
-#             '.', ' ').replace('￥', '').replace('|', '')
-#         temp_list = temp_text.split()
-#         print(3, temp_list)
-#         if not len(temp_list):
-#             continue
-#         elif len(temp_list) > 1 and temp_list[1].isdigit():
-#             good_text.append(temp_list[0])
-#             good_text.append(str(int(temp_list[1])))
-#             describe = temp_list[2:]
-#         else:
-#             describe.append(temp_text)
-#     elif temp_text.count('￥') == 1:
-#         temp_text = temp_text.replace('￥', '').replace(
-#             '\xa0', '').replace('|', '').strip()
-#         digit_list = re.findall(r"\d+\.?\d*", temp_text)
-#         print('$', digit_list)
-#         if len(digit_list):
-#             good_text.append(digit_list[0])
-#     else:
-#         temp_text = temp_text.replace('\xa0', '')
-#         print(4, temp_text)
-#         describe.append(temp_text)
-# if len(good_text):
-#     text.append(' '.join([*good_text, *[url, tpud]]))

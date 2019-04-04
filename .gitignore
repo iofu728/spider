@@ -19,11 +19,15 @@ log
 # song_detail
 song_detail
 
-# idea
+# ide
 .idea
+.vscode
 
 # data
 data
+yybzz
+
+.DS_Store
 
 *.csv
 *.txt

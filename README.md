@@ -7,8 +7,8 @@
 [![GitHub tag](https://img.shields.io/github/tag/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider/releases)
 [![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider)
 
-<div align="center"><strong>高可用代理IP池 高并发爬虫 不均匀的压力分发系统 一些带爬虫技巧的应用</strong></div>
-<div align="center"><strong>Highly Available Proxy IP Pool, Highly Concurrent Spider, Uneven Pressure Distribution System, Some Application with spider skill</strong></div>
+<div align="center"><strong>高可用代理IP池 高并发爬虫 一些带爬虫技巧的应用</strong></div>
+<div align="center"><strong>Highly Available Proxy IP Pool, Highly Concurrent Spider, Some Application with spider skill</strong></div>
 
 - [keyword](#keyword)
 - [Proxy pool](#proxy-pool)
@@ -72,7 +72,7 @@
 
 ### `Netease`
 
-<u>`Netease Music song playlist crawl`</u> - <u>`netease/netease_music_db.py`</u>
+1. <u>`Netease Music song playlist crawl`</u> - <u>`netease/netease_music_db.py`</u>
 
 - problem: `big data store`
 - classify -> playlist id -> song_detail
@@ -83,7 +83,7 @@
 
 #### `Press Test System`
 
-<u>`Press Test System`</u> - <u>`press/press.py`</u>
+2. <u>`Press Test System`</u> - <u>`press/press.py`</u>
 
 - problem: `high concurrency requests`
 - By highly available proxy IP pool to pretend user.
@@ -92,7 +92,7 @@
 
 #### `News`
 
-<u>`google & baidu info crawl`</u> - <u>`news/news.py`</u>
+3. <u>`google & baidu info crawl`</u> - <u>`news/news.py`</u>
 
 - get news from search engine by Proxy Engine
 - one model: careful analysis `DOM`
@@ -100,24 +100,24 @@
 
 ### `Youdao Note`
 
-<u>`Youdao Note documents crawl`</u> -`buildmd/buildmd.py`
+4. <u>`Youdao Note documents crawl`</u> -`buildmd/buildmd.py`
 
 - load data from `youdaoyun`
 - by series of rules to deal data to .md
 
 #### `blog`
 
-<u>`csdn && zhihu && jianshu view info crawl`</u> - <u>`blog/titleview.py`</u>
+5. <u>`csdn && zhihu && jianshu view info crawl`</u> - <u>`blog/titleview.py`</u>
 
 #### `Brush Class`
 
-<u>`PKU Class brush`</u> - <u>`brushclass/brushclass.py`</u>
+6. <u>`PKU Class brush`</u> - <u>`brushclass/brushclass.py`</u>
 
 - when your expected class have places, It will send you some email.
 
 #### `zimuzu`
 
-<u>`ZiMuZu download list crawl`</u> - <u>`zimuzu/zimuzu.py`</u>
+7. <u>`ZiMuZu download list crawl`</u> - <u>`zimuzu/zimuzu.py`</u>
 
 - when you want to download lots of show like Season 22, Season 21.
 - If click one by one, It is very boring, so zimuzu.py is all you need.
@@ -127,30 +127,30 @@
 
 #### `Bilibili`
 
-<u>`Get av data by http`</u> - <u>`bilibili/bilibili.py`</u>
+8. <u>`Get av data by http`</u> - <u>`bilibili/bilibili.py`</u>
 
 - `homepage rank` -> check `tids` -> to check data every 2min(during on rank + one day)
 - monitor every rank av -> star num & basic data
 
-<u>`Get av data by websocket`</u> - <u>`bilibili/bsocket.py`</u>
+9. <u>`Get av data by websocket`</u> - <u>`bilibili/bsocket.py`</u>
 
 - base on websocket
 - byte analysis
 - heart beat
 
-<u>`Get comment data by http`</u> - <u>`bilibili/bilibili.py`</u>
+10. <u>`Get comment data by http`</u> - <u>`bilibili/bilibili.py`</u>
 
 - load comment from `/x/v2/reply`
 
 #### `shaoq`
 
-<u>`Get text data by compiling javascript`</u> - <u>`exam/shaoq.py`</u>
+11. <u>`Get text data by compiling javascript`</u> - <u>`exam/shaoq.py`</u>
 
 [more detail](#examshaoq)
 
 #### `eastmoney`
 
-<u>`Get stock info by analysis font`</u> - <u>`eastmoney/eastmoney.py`</u>
+12. <u>`Get stock info by analysis font`</u> - <u>`eastmoney/eastmoney.py`</u>
 
 - font analysis
 

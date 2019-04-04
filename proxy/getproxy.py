@@ -7,6 +7,7 @@
 
 import argparse
 import functools
+import os
 import random
 import threading
 import time
@@ -25,6 +26,9 @@ from utils.utils import begin_time, end_time, changeJsonTimeout, changeHtmlTimeo
     data5u.com
     66ip.com
     kuaidaili.com
+    .data/
+    ├── gatherproxy  // gather proxy list
+    └── passage      // gather passage
 """
 
 data_path = 'proxy/data/'
@@ -32,7 +36,7 @@ MAXN = 0x3fffffff
 type_map = {1: 'https', 0: 'http'}
 
 
-class GetFreeProxy(object):
+class GetFreeProxy:
     """
     proxy pool
     """
@@ -50,7 +54,7 @@ class GetFreeProxy(object):
         self.failuredtime = {}
         self.initproxy()
 
-    def get_request_proxy(self, url, types, data=None, test_func=None, header=None):
+    def get_request_proxy(self, url:str, types:int, data=None, test_func=None, header=None):
         """
         use proxy to send requests, and record the proxy cann't use
         @types S0XY: X=0.->get;   =1.->post;
@@ -357,7 +361,10 @@ class GetFreeProxy(object):
         http://www.gatherproxy.com/zh/proxylist/country/?c=China
         """
         version = begin_time()
-        with open(data_path + 'gatherproxy', 'r') as f:
+        if not os.path.exists('%sgatherproxy'%data_path):
+            print('Gather file not exist!!!')
+            return
+        with open('%sgatherproxy'%data_path, 'r') as f:
             file_d = f.readlines()
         if not types:
             waitjudge = ['http://' + ii[:-1] for ii in file_d]
@@ -373,6 +380,7 @@ class GetFreeProxy(object):
         # end_time(version)
         # if types == 2:
         #     self.testdb(2)
+        end_time(version)
 
 
     def goubanjia(self):
@@ -546,7 +554,10 @@ class GetFreeProxy(object):
         if error:
             print('Error', operation)
             # return False
-        with open(data_path+ 'passage', 'r') as f:
+        if not os.path.exists('%spassage'%data_path):
+            print('gather passage not exist!!!')
+            return
+        with open('%spassage'%data_path, 'r') as f:
             passage = [index[:-1] for index in f.readlines()]
         data = {'Username': passage[0], 'Password': passage[1], 'Captcha': str(verify_code)}
         time.sleep(2.163)

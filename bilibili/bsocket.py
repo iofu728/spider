@@ -1,25 +1,31 @@
-# -*- coding: utf-8 -*-
-# @Author: gunjianpan
-# @Date:   2019-03-26 10:21:05
-# @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-27 23:41:36
+'''
+@Author: gunjianpan
+@Date:   2019-03-26 10:21:05
+@Last Modified by:   gunjianpan
+@Last Modified time: 2019-04-05 22:11:23
+'''
+
 import asyncio
 import aiohttp
 import json
 import logging
+import os
+import shutil
 import struct
 import time
 
 from collections import namedtuple
+from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
 from proxy.getproxy import GetFreeProxy
-from utils.utils import can_retry
+from utils.utils import can_retry, basic_req
 
 logger = logging.getLogger(__name__)
 get_request_proxy = GetFreeProxy().get_request_proxy
-data_path = 'bilibili/data/'
-yybzz_path = 'bilibili/yybzz/'
+data_dir = 'bilibili/data/'
+websocket_dir = '%swebsocket/' % data_dir
+assign_path = 'bilibili/assign_up.ini'
 one_day = 86400
 
 """
@@ -28,18 +34,18 @@ one_day = 86400
   * wss://broadcast.chat.bilibili.com:7823/sub
 """
 
+
 class Operation(IntEnum):
     SEND_HEARTBEAT = 2
     ONLINE = 3
     COMMAND = 5
     AUTH = 7
     RECV = 8
+    DANMAKU = 9
 
 
 class BWebsocketClient:
-    """
-    bilibili websocket client
-    """
+    ''' bilibili websocket client '''
     ROOM_INIT_URL = 'https://www.bilibili.com/video/av%d'
     WEBSOCKET_URL = 'wss://broadcast.chat.bilibili.com:7823/sub'
     HEARTBEAT_BODY = '[object Object]'
@@ -48,72 +54,42 @@ class BWebsocketClient:
     HeaderTuple = namedtuple(
         'HeaderTuple', ('total_len', 'header_len', 'proto_ver', 'operation', 'time', 'zero'))
     _COMMAND_HANDLERS = {
-        'DM': lambda client, command: client._on_get_danmaku(
-            command['info'][1], command['info'][0]
-        )
+        'DM': lambda client, command: client._on_get_danmaku(command['info'][1], command['info'][0])
     }
 
-    def __init__(self, av_id, types=0, ssl=True, loop=None, session: aiohttp.ClientSession=None):
-        """
-        :param room_id: av -> room_id get from html
-        :param ssl: SSL Test
-        :param loop: loop or not
-        :param session: cookie
-        """
+    def __init__(self, av_id: int, types=0):
+        ''' init class '''
         self._av_id = av_id
         self._room_id = None
-        self.count = 1
-        self.types = types
-        self.begin_time = int(time.time())
-
-        if loop is not None:
-            self._loop = loop
-        elif session is not None:
-            self._loop = session.loop
-        else:
-            self._loop = asyncio.get_event_loop()
+        self._count = 1
+        self._types = types
+        self._begin_time = int(time.time())
+        self._loop = asyncio.get_event_loop()
+        self._session = aiohttp.ClientSession(loop=self._loop)
         self._is_running = False
-
-        if session is None:
-            self._session = aiohttp.ClientSession(loop=self._loop)
-            self._own_session = True
-        else:
-            self._session = session
-            self._own_session = False
-            if self._session.loop is not self._loop:
-                raise RuntimeError(
-                    'BLiveClient and session has to use same event loop')
-        self._ssl = ssl if ssl else _create_unverified_context()
         self._websocket = None
-        self._get_room_id()
-
-    @property
-    def is_running(self):
-        return self._is_running
+        self._getroom_id()
 
     async def close(self):
-        """
-        close session when session is owner
-        """
-        if self._own_session:
-            await self._session.close()
+        await self._session.close()
 
     def run(self):
-        """
-        Create Thread
-        """
+        ''' Create Thread '''
         if self._is_running:
             raise RuntimeError('This client is already running')
         self._is_running = True
         return asyncio.ensure_future(self._message_loop(), loop=self._loop)
 
-    def _get_room_id(self, next_to=True):
+    def _getroom_id(self, next_to=True, proxy=True):
+        ''' get av room id '''
         url = self.ROOM_INIT_URL % self._av_id
-        html = get_request_proxy(url, 0)
+        html = get_request_proxy(url, 0) if proxy else basic_req(url, 0)
         head = html.find_all('head')
         if not len(head) or len(head[0].find_all('script')) < 4 or not '{' in head[0].find_all('script')[3].text:
             if can_retry(url):
-                self._get_room_id()
+                self._getroom_id(proxy=proxy)
+            else:
+                self._getroom_id(proxy=False)
             next_to = False
         if next_to:
             script_list = head[0].find_all('script')[3].text
@@ -124,7 +100,8 @@ class BWebsocketClient:
             self._room_id = json_data['videoData']['cid']
             print('Room_id:', self._room_id)
 
-    def _make_packet(self, data, operation):
+    def parse_struct(self, data: dict, operation: int):
+        ''' parse struct '''
         if operation == 7:
             body = json.dumps(data).replace(" ", '').encode('utf-8')
         else:
@@ -134,38 +111,37 @@ class BWebsocketClient:
             self.HEADER_STRUCT.size,
             1,
             operation,
-            self.count,
+            self._count,
             0
         )
-        self.count += 1
-        # print(header + body)
+        self._count += 1
         return header + body
 
     async def _send_auth(self):
+        ''' send auth '''
         auth_params = {
             'room_id': 'video://%d/%d' % (self._av_id, self._room_id),
             "platform": "web",
             "accepts": [1000]
         }
-        await self._websocket.send_bytes(self._make_packet(auth_params, Operation.AUTH))
+        await self._websocket.send_bytes(self.parse_struct(auth_params, Operation.AUTH))
 
     async def _message_loop(self):
+        ''' loop sent message '''
 
         if self._room_id is None:
-            self._get_room_id()
+            self._getroom_id()
 
         while True:
-            heartbeat_future = None
+            heartbeat_con = None
             try:
-                async with self._session.ws_connect(self.WEBSOCKET_URL,
-                                                    ssl=self._ssl) as websocket:
+                async with self._session.ws_connect(self.WEBSOCKET_URL) as websocket:
                     self._websocket = websocket
                     await self._send_auth()
-                    heartbeat_future = asyncio.ensure_future(
+                    heartbeat_con = asyncio.ensure_future(
                         self._heartbeat_loop(), loop=self._loop)
 
-                    async for message in websocket:  # type: aiohttp.WSMessage
-                        # print(message.data)
+                    async for message in websocket:
                         if message.type == aiohttp.WSMsgType.BINARY:
                             await self._handle_message(message.data)
                         else:
@@ -175,17 +151,16 @@ class BWebsocketClient:
             except asyncio.CancelledError:
                 break
             except aiohttp.ClientConnectorError:
-                # retry
                 logger.warning('Retrying */*/*/*/---')
                 try:
                     await asyncio.sleep(5)
                 except asyncio.CancelledError:
                     break
             finally:
-                if heartbeat_future is not None:
-                    heartbeat_future.cancel()
+                if heartbeat_con is not None:
+                    heartbeat_con.cancel()
                     try:
-                        await heartbeat_future
+                        await heartbeat_con
                     except asyncio.CancelledError:
                         break
                 self._websocket = None
@@ -193,31 +168,23 @@ class BWebsocketClient:
         self._is_running = False
 
     async def _heartbeat_loop(self):
-        """
-        heart beat
-        """
-        if self.types and int(time.time()) > self.begin_time + one_day:
+        ''' heart beat every 30s '''
+        if self._types and int(time.time()) > self._begin_time + one_day:
             self.close()
         while True:
             try:
-                await self._websocket.send_bytes(self._make_packet({}, Operation.SEND_HEARTBEAT))
+                await self._websocket.send_bytes(self.parse_struct({}, Operation.SEND_HEARTBEAT))
                 await asyncio.sleep(30)
-
             except (asyncio.CancelledError, aiohttp.ClientConnectorError):
                 break
 
-    async def _handle_message(self, message):
-        offset = 0
-        while offset < len(message):
-            try:
-                header = self.HeaderTuple(
-                    *self.HEADER_STRUCT.unpack_from(message, offset))
-            except struct.error:
-                break
-
+    async def _handle_message(self, message: str):
+        ''' handle message'''
+        try:
+            header = self.HeaderTuple(
+                *self.HEADER_STRUCT.unpack_from(message, 0))
             if header.operation == Operation.ONLINE or header.operation == Operation.COMMAND:
-                body = message[offset +
-                               self.HEADER_STRUCT.size: offset + header.total_len]
+                body = message[self.HEADER_STRUCT.size: header.total_len]
                 body = json.loads(body.decode('utf-8'))
                 if header.operation == Operation.ONLINE:
                     await self._on_get_online(body)
@@ -225,13 +192,17 @@ class BWebsocketClient:
                     await self._handle_command(body)
             elif header.operation == Operation.RECV:
                 print('Connect Build!!!')
+            elif header.operation == Operation.DANMAKU:
+                body = message[self.HEADER_STRUCT.size * 2: header.total_len]
+                body = json.loads(body.decode('utf-8'))
+                print(body)
+                print('>>>>DANMAKU tail socket>>>>')
             else:
-                body = message[offset +
-                               self.HEADER_STRUCT.size: offset + header.total_len]
-                logger.warning('Unknow operation = %d %s %s',
+                body = message[self.HEADER_STRUCT.size: header.total_len]
+                logger.warning('Unknown operation = %d %s %s',
                                header.operation, header, body)
-
-            offset += header.total_len
+        except struct.error:
+            pass
 
     async def _handle_command(self, command):
         if isinstance(command, list):
@@ -245,37 +216,27 @@ class BWebsocketClient:
             if handler is not None:
                 await handler(self, command)
         else:
-            logger.warning('Unknow Command = %s %s', cmd, command)
+            logger.warning('Unknown Command = %s %s', cmd, command)
 
     async def _on_get_online(self, online):
-        """
-        get online num
-        @param online
-        @param av_id
-        """
+        ''' get online num '''
         pass
 
     async def _on_get_danmaku(self, content, user_name):
-        """
-        get danmaku
-        @param content
-        @param user_name
-        """
+        ''' get danmaku '''
         pass
 
 
 class OneBWebsocketClient(BWebsocketClient):
-    """
-    get one bilibili websocket client
-    """
+    ''' get one bilibili websocket client '''
 
     async def _on_get_online(self, online):
         online = online['data']['room']['online']
         data = [time.strftime("%Y-%m-%d %H:%M:%S",
                               time.localtime(time.time())), online]
         path = '%s%d_online.csv' % (
-            data_path if self.types else yybzz_path, self._av_id)
-        # print(path, self.types, yybzz_path, data_path)
+            data_dir if self._types else websocket_dir, self._av_id)
+        # print(path, self._types, websocket_dir, data_dir)
         with open(path, 'a') as f:
             f.write(",".join([str(ii) for ii in data]) + '\n')
         print(f'Online: {online}')
@@ -284,14 +245,14 @@ class OneBWebsocketClient(BWebsocketClient):
         data = [time.strftime("%Y-%m-%d %H:%M:%S",
                               time.localtime(time.time())), content, user_name]
         path = '%s%d_danmaku.csv' % (
-            data_path if self.types else yybzz_path, self._av_id)
+            data_dir if self._types else websocket_dir, self._av_id)
         with open(path, 'a') as f:
             f.write(",".join([str(ii) for ii in data]) + '\n')
         print(f'{content}：{user_name}')
 
 
-async def async_main(av_id):
-    client = OneBWebsocketClient(av_id, ssl=True)
+async def async_main(av_id: int):
+    client = OneBWebsocketClient(av_id)
     future = client.run()
     try:
         await future
@@ -299,7 +260,8 @@ async def async_main(av_id):
         await client.close()
 
 
-def BSocket(av_id):
+def BSocket(av_id: int):
+    ''' build a loop websocket connect'''
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(async_main(av_id))
@@ -308,5 +270,15 @@ def BSocket(av_id):
 
 
 if __name__ == '__main__':
-    BSocket(47045876)
-    BSocket(46412322)
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    if not os.path.exists(websocket_dir):
+        os.makedirs(websocket_dir)
+    if not os.path.exists(assign_path):
+        shutil.copy(assign_path + '.tmp', assign_path)
+    ''' Test for San Diego demon '''
+    ''' PS: the thread of BSocket have to be currentThread in its processing. '''
+    cfg = ConfigParser()
+    cfg.read(assign_path)
+    av_id = cfg.getint('basic', 'basic_av_id')
+    BSocket(av_id)

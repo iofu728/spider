@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-26 10:21:05
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-06 01:06:36
+@Last Modified time: 2019-04-06 01:15:39
 '''
 
 import asyncio
@@ -24,7 +24,7 @@ from utils.utils import can_retry, basic_req
 logger = logging.getLogger(__name__)
 get_request_proxy = GetFreeProxy().get_request_proxy
 data_dir = 'bilibili/data/'
-websocket_dir = 'bilibili/yybzz/'
+websocket_dir = '%swebsocket/' % data_dir
 assign_path = 'bilibili/assign_up.ini'
 one_day = 86400
 
@@ -255,8 +255,8 @@ class OneBWebsocketClient(BWebsocketClient):
         return '%s%d_%s%s.csv' % (websocket_dir, self._av_id, types, p_path)
 
 
-async def async_main(av_id: int, p):
-    client = OneBWebsocketClient(av_id, p=p)
+async def async_main(av_id: int, types: int, p: int):
+    client = OneBWebsocketClient(av_id, types, p=p)
     future = client.run()
     try:
         await future
@@ -264,11 +264,11 @@ async def async_main(av_id: int, p):
         await client.close()
 
 
-def BSocket(av_id: int, p: int = -1):
+def BSocket(av_id: int, types: int = 0, p: int = -1):
     ''' build a loop websocket connect'''
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(async_main(av_id, p))
+        loop.run_until_complete(async_main(av_id, types, p))
     finally:
         loop.close()
 
@@ -280,6 +280,7 @@ if __name__ == '__main__':
         os.makedirs(websocket_dir)
     if not os.path.exists(assign_path):
         shutil.copy(assign_path + '.tmp', assign_path)
+
     ''' Test for San Diego demon '''
     ''' PS: the thread of BSocket have to be currentThread in its processing. '''
     cfg = ConfigParser()
@@ -287,4 +288,5 @@ if __name__ == '__main__':
     av_id = cfg.getint('basic', 'basic_av_id')
     p = cfg.getint('basic', 'basic_av_p') if len(
         cfg['basic']['basic_av_p']) else -1
-    BSocket(av_id, p)
+
+    BSocket(av_id, p=p)

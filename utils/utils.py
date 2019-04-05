@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2018-10-19 15:33:46
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-05 01:57:48
+@Last Modified time: 2019-04-05 22:00:36
 '''
 
 import os
@@ -27,10 +27,15 @@ headers = {
     "Accept-Language": "zh-CN,zh;q=0.9",
     'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"}
-
-with open('utils/data/agent', 'r') as f:
-    file = f.readlines()
-agent_lists = [" ".join(index.split()[1:])[1:-1] for index in file]
+data_dir = 'utils/data/'
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
+try:
+    with open('%sagent' % data_dir, 'r') as f:
+        file = f.readlines()
+    agent_lists = [" ".join(index.split()[1:])[1:-1] for index in file]
+except:
+    agent_lists = [headers['User-Agent']]
 agent_len = len(agent_lists) - 1
 html_timeout = 5
 json_timeout = 5
@@ -250,14 +255,13 @@ def send_email(context: str, subject: str) -> bool:
     """
     send email
     """
-    data_path = 'utils/data/'
 
-    if not os.path.exists('%semailSend' % data_path) or os.path.exists('%semailRec' % data_path):
+    if not os.path.exists('%semailSend' % data_dir) or os.path.exists('%semailRec' % data_dir):
         print('email send/Rec list not exist!!!')
         return
-    with open('%semailSend' % data_path, 'r') as f:
+    with open('%semailSend' % data_dir, 'r') as f:
         email_send = [ii.strip().split(',') for ii in f.readlines()]
-    with open(data_path + 'emailRec', 'r') as f:
+    with open(data_dir + 'emailRec', 'r') as f:
         origin_file = f.readlines()
         email_rec = [ii.strip().split(',')[0]
                      for ii in origin_file if ii.strip().split(',')[1] == '0']

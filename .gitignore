@@ -31,6 +31,7 @@ yybzz
 
 *.csv
 *.txt
+*.ini
 
 # utils.agent
 utils/agent

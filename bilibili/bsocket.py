@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-26 10:21:05
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-05 22:11:23
+@Last Modified time: 2019-04-06 01:06:36
 '''
 
 import asyncio
@@ -24,7 +24,7 @@ from utils.utils import can_retry, basic_req
 logger = logging.getLogger(__name__)
 get_request_proxy = GetFreeProxy().get_request_proxy
 data_dir = 'bilibili/data/'
-websocket_dir = '%swebsocket/' % data_dir
+websocket_dir = 'bilibili/yybzz/'
 assign_path = 'bilibili/assign_up.ini'
 one_day = 86400
 
@@ -57,7 +57,7 @@ class BWebsocketClient:
         'DM': lambda client, command: client._on_get_danmaku(command['info'][1], command['info'][0])
     }
 
-    def __init__(self, av_id: int, types=0):
+    def __init__(self, av_id: int, types=0, p: int = -1):
         ''' init class '''
         self._av_id = av_id
         self._room_id = None
@@ -68,6 +68,7 @@ class BWebsocketClient:
         self._session = aiohttp.ClientSession(loop=self._loop)
         self._is_running = False
         self._websocket = None
+        self._p = p
         self._getroom_id()
 
     async def close(self):
@@ -97,7 +98,10 @@ class BWebsocketClient:
             script_end = script_list.index(';')
             script_data = script_list[script_begin:script_end]
             json_data = json.loads(script_data)
-            self._room_id = json_data['videoData']['cid']
+            if self._p == -1 or len(json_data['videoData']['pages']) < self._p:
+                self._room_id = json_data['videoData']['cid']
+            else:
+                self._room_id = json_data['videoData']['pages'][self._p - 1]['cid']
             print('Room_id:', self._room_id)
 
     def parse_struct(self, data: dict, operation: int):
@@ -201,7 +205,7 @@ class BWebsocketClient:
                 body = message[self.HEADER_STRUCT.size: header.total_len]
                 logger.warning('Unknown operation = %d %s %s',
                                header.operation, header, body)
-        except struct.error:
+        except:
             pass
 
     async def _handle_command(self, command):
@@ -232,27 +236,27 @@ class OneBWebsocketClient(BWebsocketClient):
 
     async def _on_get_online(self, online):
         online = online['data']['room']['online']
-        data = [time.strftime("%Y-%m-%d %H:%M:%S",
-                              time.localtime(time.time())), online]
-        path = '%s%d_online.csv' % (
-            data_dir if self._types else websocket_dir, self._av_id)
-        # print(path, self._types, websocket_dir, data_dir)
-        with open(path, 'a') as f:
-            f.write(",".join([str(ii) for ii in data]) + '\n')
+        with open(self.get_path('online'), 'a') as f:
+            f.write(self.get_data([online]))
         print(f'Online: {online}')
 
     async def _on_get_danmaku(self, content, user_name):
-        data = [time.strftime("%Y-%m-%d %H:%M:%S",
-                              time.localtime(time.time())), content, user_name]
-        path = '%s%d_danmaku.csv' % (
-            data_dir if self._types else websocket_dir, self._av_id)
-        with open(path, 'a') as f:
-            f.write(",".join([str(ii) for ii in data]) + '\n')
+        with open(self.get_path('danmaku'), 'a') as f:
+            f.write(self.get_data([content, user_name]))
         print(f'{content}：{user_name}')
 
+    def get_data(self, origin_data: list) -> str:
+        ''' get data '''
+        return ','.join(str(ii) for ii in [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *origin_data]) + '\n'
 
-async def async_main(av_id: int):
-    client = OneBWebsocketClient(av_id)
+    def get_path(self, types: str) -> str:
+        ''' get path '''
+        p_path = '_p%d' % self._p if self._p != -1 else ''
+        return '%s%d_%s%s.csv' % (websocket_dir, self._av_id, types, p_path)
+
+
+async def async_main(av_id: int, p):
+    client = OneBWebsocketClient(av_id, p=p)
     future = client.run()
     try:
         await future
@@ -260,11 +264,11 @@ async def async_main(av_id: int):
         await client.close()
 
 
-def BSocket(av_id: int):
+def BSocket(av_id: int, p: int = -1):
     ''' build a loop websocket connect'''
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(async_main(av_id))
+        loop.run_until_complete(async_main(av_id, p))
     finally:
         loop.close()
 
@@ -281,4 +285,6 @@ if __name__ == '__main__':
     cfg = ConfigParser()
     cfg.read(assign_path)
     av_id = cfg.getint('basic', 'basic_av_id')
-    BSocket(av_id)
+    p = cfg.getint('basic', 'basic_av_p') if len(
+        cfg['basic']['basic_av_p']) else -1
+    BSocket(av_id, p)

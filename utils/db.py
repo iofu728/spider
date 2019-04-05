@@ -14,7 +14,11 @@ class Db(object):
 
     def __init__(self, database):
         # change to your own mysql info
-        self.db = pymysql.connect("localhost", "root", "", database)
+        try:
+            self.db = pymysql.connect("localhost", "root", "", database)
+        except:
+            print('db connect error!!! Please check utils/db.py')
+            self.db = False
 
     def select_db(self, sql):
         """
@@ -26,7 +30,7 @@ class Db(object):
             cursor = self.db.cursor()
             cursor.execute(sql)
             return cursor.fetchall()
-        except Exception as e:
+        except:
             return False
 
     def select_one(self, sql):
@@ -39,7 +43,7 @@ class Db(object):
             cursor = self.db.cursor()
             cursor.execute(sql)
             return cursor.fetchone()
-        except Exception as e:
+        except:
             return False
 
     def insert_db(self, sql):
@@ -52,7 +56,7 @@ class Db(object):
             cursor.execute(sql)
             self.db.commit()
             return True
-        except Exception as e:
+        except:
             self.db.rollback()
             return False
 
@@ -67,6 +71,6 @@ class Db(object):
             cursor.execute(sql)
             self.db.commit()
             return True
-        except Exception as e:
+        except:
             self.db.rollback()
             return False

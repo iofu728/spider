@@ -5,6 +5,7 @@
 # @Last Modified time: 2019-03-28 21:09:01
 
 import argparse
+import codecs
 import datetime
 import re
 import os
@@ -58,7 +59,7 @@ class TitleViews(object):
         """
         if not os.path.exists("%sgoogle" % data_dir):
             return
-        with open("%sgoogle" % data_dir, 'r') as f:
+        with codecs.open("%sgoogle" % data_dir, 'r', encoding='utf-8') as f:
             test = f.readlines()
         test = test[7:]
         for index in test:
@@ -77,12 +78,12 @@ class TitleViews(object):
         get title map
         """
         if os.path.exists('%sslug' % data_dir):
-            with open('%sslug' % data_dir, 'r') as f:
+            with codecs.open('%sslug' % data_dir, 'r', encoding='utf-8') as f:
                 slug = f.readlines()
         else:
             slug = []
         if os.path.exists('%stitle' % data_dir):
-            with open('%stitle' % data_dir, 'r') as f:
+            with codecs.open('%stitle' % data_dir, 'r', encoding='utf-8') as f:
                 title = f.readlines()
         else:
             title = []
@@ -103,7 +104,7 @@ class TitleViews(object):
 
     def getZhihuView(self):
         if os.path.exists('%scookie' % data_dir):
-            with open('%scookie' % data_dir, 'r') as f:
+            with codecs.open('%scookie' % data_dir, 'r', encoding='utf-8') as f:
                 cookie = f.readline()
         else:
             cookie = ' '
@@ -355,7 +356,7 @@ class TitleViews(object):
         if not os.path.exists('../blog/log/basic'):
             print('File not exist!!!')
             return
-        with open("../blog/log/basic", 'r') as f:
+        with codecs.open("../blog/log/basic", 'r', encoding='utf-8') as f:
             existed_spider = int(f.readlines()[1])
         today_date = datetime.datetime.now().strftime('%Y-%m-%d')
         new_day_list = [(today_date, day_data[0][0] +

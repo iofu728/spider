@@ -6,6 +6,7 @@
 # @Last Modified time: 2019-03-26 01:12:06
 
 import argparse
+import codecs
 import functools
 import os
 import random
@@ -129,7 +130,7 @@ class GetFreeProxy:
         """
         failure log
         """
-        with open("proxy.log", 'a') as f:
+        with codecs.open("proxy.log", 'a', encoding='utf-8') as f:
             f.write(time.strftime("%Y-%m-%d %H:%M:%S ",time.localtime()) + url + '\n')
 
     def insertproxy(self, insertlist):
@@ -366,7 +367,7 @@ class GetFreeProxy:
         if not os.path.exists('%sgatherproxy'%data_path):
             print('Gather file not exist!!!')
             return
-        with open('%sgatherproxy'%data_path, 'r') as f:
+        with codecs.open('%sgatherproxy'%data_path, 'r', encoding='utf-8') as f:
             file_d = f.readlines()
         if not types:
             waitjudge = ['http://' + ii[:-1] for ii in file_d]
@@ -559,7 +560,7 @@ class GetFreeProxy:
         if not os.path.exists('%spassage'%data_path):
             print('gather passage not exist!!!')
             return
-        with open('%spassage'%data_path, 'r') as f:
+        with codecs.open('%spassage'%data_path, 'r', encoding='utf-8') as f:
             passage = [index[:-1] for index in f.readlines()]
         data = {'Username': passage[0], 'Password': passage[1], 'Captcha': str(verify_code)}
         time.sleep(2.163)
@@ -599,7 +600,7 @@ class GetFreeProxy:
 
         data = {'ID':sid , 'C': '', 'P': '', 'T': '', 'U': '0'}
         gatherproxy = requests.post(sid_url, headers=headers, data=data,verify=False)
-        with open(data_path + 'gatherproxy', 'w') as f:
+        with codecs.open(data_path + 'gatherproxy', 'w', encoding='utf-8') as f:
             f.write(gatherproxy.text)
 
 if __name__ == '__main__':

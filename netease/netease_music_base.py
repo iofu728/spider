@@ -5,6 +5,7 @@
 # @Last Modified time: 2018-10-21 00:16:26
 # coding:utf-8
 
+import codecs
 import requests
 from bs4 import BeautifulSoup
 import sqlite3
@@ -45,9 +46,10 @@ class Get_list_id():
 
     def get_lists(self, id):
         if "/" in id or "&" in id:
-            f = open(id.split("/" or "&")[0] + '.txt', 'a')
+            f = codecs.open(id.split("/" or "&")
+                            [0] + '.txt', 'a', encoding='utf-8')
         else:
-            f = open(id + '.txt', 'a')
+            f = codecs.open(id + '.txt', 'a', encoding='utf-8')
 
         count = 0
         while True:
@@ -93,20 +95,22 @@ class Get_list_id():
 
     def get_detail(self, category):
         iplist = []
-        ipfile = open('ip', 'r')
+        ipfile = codecs.open('ip', 'r', encoding='utf-8')
         for index in ipfile.readlines():
             iplist.append(index[0:-1])
         print(iplist)
         self.proxieslist = iplist
         threadings = []
         if "/" in category or "&" in category:
-            f = open(category.split("/" or "&")[0] + ".txt", 'r')
+            f = codecs.open(category.split("/" or "&")
+                            [0] + ".txt", 'r', encoding='utf-8')
         else:
-            f = open(category + ".txt", 'r')
+            f = codecs.open(category + ".txt", 'r', encoding='utf-8')
         if "/" in category or "&" in category:
-            file_d = open(category.split("/" or "&")[0] + "data.txt", 'a')
+            file_d = codecs.open(category.split(
+                "/" or "&")[0] + "data.txt", 'a', encoding='utf-8')
         else:
-            file_d = open(category + "data.txt", 'a')
+            file_d = codecs.open(category + "data.txt", 'a', encoding='utf-8')
         for line in f.readlines():
             for id in eval(line.replace('\n', '')):
                 work = threading.Thread(
@@ -128,7 +132,7 @@ class Get_list_id():
         print(self.time)
 
     def ip_spider(self, numpage):
-        file_d = open("ip", 'a')
+        file_d = codecs.open("ip", 'a', encoding='utf-8')
         headers = {"User-Agent": "IP"}
         for index in range(1, numpage + 1):
             url = 'http://www.xicidaili.com/nn/' + str(index)

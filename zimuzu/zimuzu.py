@@ -4,6 +4,7 @@
 # @Last Modified by:   gunjianpan
 # @Last Modified time: 2019-03-28 00:16:05
 
+import codecs
 import re
 
 from proxy.getproxy import GetFreeProxy
@@ -50,5 +51,5 @@ class southPark(object):
             url = [index.find_all('div', class_='copy-link')[1]['data-url']
                    for index in url_list]
             total.append('\n'.join(url) + '\n')
-        with open('zimuzu/data/southPark', 'w') as f:
+        with codecs.open('zimuzu/data/southPark', 'w', encoding='utf-8') as f:
             f.write('\n'.join(total))

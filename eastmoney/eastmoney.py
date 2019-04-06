@@ -4,6 +4,7 @@
 # @Last Modified by:   gunjianpan
 # @Last Modified time: 2019-03-29 12:38:54
 
+import codecs
 import json
 import os
 import pickle
@@ -48,24 +49,25 @@ def analysis_font(font_url: str, mode=None) -> dict:
     suffix = font_url.split('.')[-1]
     font = requests.get(font_url, headers=header, timeout=30)
     font_name = '%sfont.%s' % (data_dir, suffix)
-    with open(font_name, 'wb') as f:
+    with codecs.open(font_name, 'wb') as f:
         f.write(font.content)
     font_map = TTFont(font_name).getBestCmap()
     ''' prepare base '''
     if not mode is None:
-        base_unicode = [int(mode[hex(ii).upper().replace('0X', '&#x') + ';'])
-                        for ii in list(font_map.keys())[1:]]
-        pickle.dump(base_unicode, open(base_pkl, 'wb'))
-        with open(base_font, 'wb') as f:
+        char_list = [hex(ii).upper().replace('0X', '&#x') +
+                     ';' for ii in font_map.keys()]
+        base_unicode = [
+            int(mode[ii]) if ii in mode else '.' for ii in char_list]
+        pickle.dump(base_unicode, codecs.open(base_pkl, 'wb'))
+        with codecs.open(base_font, 'wb') as f:
             f.write(font.content)
         return {}
 
     base_unicode = pickle.load(open(base_pkl, 'rb'))
 
     base_map = TTFont(base_font).getBestCmap()
-    font_dict = {jj: base_unicode[ii] for ii,
-                 jj in enumerate(list(base_map.values())[1:])}
-    font_dict[list(base_map.values())[0]] = '.'
+    font_dict = {jj: base_unicode[ii]
+                 for ii, jj in enumerate(base_map.values())}
     num_dict = {hex(ii).upper().replace('0X', '&#x') + ';': str(font_dict[jj])
                 for ii, jj in font_map.items()}
     return num_dict
@@ -111,7 +113,7 @@ def load_eastmoney():
     ''' store data '''
     now_time = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime(time.time()))
     print(now_time, 'eastmoney data load Success!!!')
-    with open('%seastmony%s.csv' % (data_dir, now_time), 'w') as f:
+    with codecs.open('%seastmony%s.csv' % (data_dir, now_time), 'w', encoding='utf-8') as f:
         f.write('\n'.join(result_data))
 
 

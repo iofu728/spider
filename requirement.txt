@@ -1,15 +1,12 @@
+numpy
+pandas
 pymysql
 requests
 bs4
 apscheduler
-pkuseg
 pandas
-pysimdjson
 asyncio
 aiohttp
 apscheduler
-pickle
 PyExecJS
-numpy
-pandas
 fonttools

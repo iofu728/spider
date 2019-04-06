@@ -2,9 +2,10 @@
 @Author: gunjianpan
 @Date:   2018-10-19 15:33:46
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-05 22:00:36
+@Last Modified time: 2019-04-06 21:56:21
 '''
 
+import codecs
 import os
 import pickle
 import random
@@ -31,7 +32,7 @@ data_dir = 'utils/data/'
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
 try:
-    with open('%sagent' % data_dir, 'r') as f:
+    with codecs.open('%sagent' % data_dir, 'r', encoding='utf-8') as f:
         file = f.readlines()
     agent_lists = [" ".join(index.split()[1:])[1:-1] for index in file]
 except:
@@ -259,9 +260,9 @@ def send_email(context: str, subject: str) -> bool:
     if not os.path.exists('%semailSend' % data_dir) or os.path.exists('%semailRec' % data_dir):
         print('email send/Rec list not exist!!!')
         return
-    with open('%semailSend' % data_dir, 'r') as f:
+    with codecs.open('%semailSend' % data_dir, 'r', encoding='utf-8') as f:
         email_send = [ii.strip().split(',') for ii in f.readlines()]
-    with open(data_dir + 'emailRec', 'r') as f:
+    with codecs.open(data_dir + 'emailRec', 'r', encoding='utf-8') as f:
         origin_file = f.readlines()
         email_rec = [ii.strip().split(',')[0]
                      for ii in origin_file if ii.strip().split(',')[1] == '0']
@@ -301,7 +302,7 @@ def dump_bigger(data, output_file: str):
     """
     max_bytes = 2**31 - 1
     bytes_out = pickle.dumps(data, protocol=4)
-    with open(output_file, 'wb') as f_out:
+    with codecs.open(output_file, 'wb') as f_out:
         for idx in range(0, len(bytes_out), max_bytes):
             f_out.write(bytes_out[idx:idx + max_bytes])
 
@@ -313,7 +314,7 @@ def load_bigger(input_file: str):
     max_bytes = 2**31 - 1
     bytes_in = bytearray(0)
     input_size = os.path.getsize(input_file)
-    with open(input_file, 'rb') as f_in:
+    with codecs.open(input_file, 'rb') as f_in:
         for _ in range(0, input_size, max_bytes):
             bytes_in += f_in.read(max_bytes)
     return pickle.loads(bytes_in)

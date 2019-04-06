@@ -4,6 +4,7 @@
 # @Last Modified by:   gunjianpan
 # @Last Modified time: 2019-03-27 23:47:55
 
+import codecs
 import threading
 import time
 import os
@@ -161,7 +162,7 @@ class Buildmd(object):
                 if len(temp_text) and (temp_text[0] == '￥' or temp_text[0] == '€'):
                     temp_text = '<a>' + temp_text + '</a>'
             text.append(temp_text)
-        with open(data_dir + self.find_title(index), 'w') as f:
+        with codecs.open(data_dir + self.find_title(index), 'w', encoding='utf-8') as f:
             f.write('\n'.join(text))
         self.img_map[index] = img_href
         print(index, len(img_href))
@@ -175,7 +176,7 @@ class Buildmd(object):
             if can_retry(img_url):
                 self.load_img(index, img_id, img_url)
             return
-        with open('buildmd/' + self.find_title(index).split('/')[0] + '/img/' + self.find_title(index).split('/')[1][:-3] + str(img_id + 1) + '.jpg', 'wb') as f:
+        with codecs.open('buildmd/' + self.find_title(index).split('/')[0] + '/img/' + self.find_title(index).split('/')[1][:-3] + str(img_id + 1) + '.jpg', 'wb') as f:
             f.write(img.content)
 
     def load_goods(self):
@@ -186,7 +187,7 @@ class Buildmd(object):
         if not os.path.exists('%scookie' % data_dir):
             print('Youdao Note cookie not exist!!!')
             return
-        with open('%scookie' % data_dir, 'r') as f:
+        with codecs.open('%scookie' % data_dir, 'r', encoding='utf-8') as f:
             cookie = f.readline()
         changeCookie(cookie[:-1])
 
@@ -203,7 +204,7 @@ class Buildmd(object):
 
         goods = [self.goods[k] for k in sorted(self.goods.keys())]
         goods = sum(goods, [])
-        with open('%sgoods' % data_dir, 'w') as f:
+        with codecs.open('%sgoods' % data_dir, 'w', encoding='utf-8') as f:
             f.write("\n".join(goods))
         end_time(version)
 
@@ -352,7 +353,7 @@ class Buildmd(object):
         if not os.path.exists('%scookie_collect' % data_dir):
             print('TB cookie not exist!!!')
             return
-        with open('%scookie_collect' % data_dir, 'r') as f:
+        with codecs.open('%scookie_collect' % data_dir, 'r', encoding='utf-8') as f:
             cookie = f.readline()
         changeCookie(cookie[:-1])
         changeHtmlTimeout(30)
@@ -371,7 +372,7 @@ class Buildmd(object):
 
         collect = [self.collect[k] for k in sorted(self.collect.keys())]
         collect = sum(collect, [])
-        with open('%scollect_wyy' % data_dir, 'w') as f:
+        with codecs.open('%scollect_wyy' % data_dir, 'w', encoding='utf-8') as f:
             f.write("\n".join(collect))
         end_time(version)
 
@@ -431,7 +432,7 @@ class Buildmd(object):
             print('Youdao Note cookie not exist!!!')
             return
 
-        with open('%scookie' % data_dir, 'r') as f:
+        with codecs.open('%scookie' % data_dir, 'r', encoding='utf-8') as f:
             cookie = f.readline()
         headers['cookie'] = cookie[:-1]
         headers['Host'] = url.split('/')[2]
@@ -475,7 +476,7 @@ class Buildmd(object):
         if not os.path.exists('%scollect_wyy' % data_dir):
             print('Collect File not exist!!!')
             return
-        with open('%scollect_wyy' % data_dir, 'r') as f:
+        with codecs.open('%scollect_wyy' % data_dir, 'r', encoding='utf-8') as f:
             goods = f.readlines()
         self.goods_candidate = [index.split('||')[0] for index in goods]
         goods_len = len(self.goods_candidate)
@@ -496,7 +497,7 @@ class Buildmd(object):
         if not os.path.exists('%scookie_alimama' % data_dir):
             print('alimama cookie not exist!!!')
             return
-        with open('%scookie_alimama' % data_dir, 'r') as f:
+        with codecs.open('%scookie_alimama' % data_dir, 'r', encoding='utf-8') as f:
             cookie = f.readlines()
         url_list = [
             'https://pub.alimama.com/favorites/group/newList.json?toPage=1&perPageSize=40&keyword=&t=',
@@ -542,7 +543,7 @@ class Buildmd(object):
         if not os.path.exists('%scookie_alimama' % data_dir):
             print('alimama cookie not exist!!!')
             return
-        with open('%scookie_alimama' % data_dir, 'r') as f:
+        with codecs.open('%scookie_alimama' % data_dir, 'r', encoding='utf-8') as f:
             cookie = f.readlines()
 
         goods_len = len(self.goods_candidate)
@@ -582,7 +583,7 @@ class Buildmd(object):
         if not os.path.exists('%sgoods' % data_dir):
             print('goods file not exist!!!')
             return
-        with open('%sgoods' % data_dir, 'r') as f:
+        with codecs.open('%sgoods' % data_dir, 'r', encoding='utf-8') as f:
             wait_goods = f.readlines()
         goods_url = [re.findall('http.* ', index)[0].strip(
         ).replace('https', 'http') if 'http' in index and not '【' in index else False for index in wait_goods]
@@ -590,7 +591,7 @@ class Buildmd(object):
         if not os.path.exists('%scollect_wyy' % data_dir):
             print('collect file not exist!!!')
             return
-        with open('%scollect_wyy' % data_dir, 'r') as f:
+        with codecs.open('%scollect_wyy' % data_dir, 'r', encoding='utf-8') as f:
             collect = f.readlines()
         self.title2map = {
             index.split("||")[1]: index.split("||")[0] for index in collect}
@@ -617,7 +618,7 @@ class Buildmd(object):
 
         write_body = [' '.join([self.goods_map[index], body])
                       if index in self.goods_map else (' '.join([self.url2goods[goods_url[index]], body]) if goods_url[index] in self.url2goods else body) for index, body in enumerate(wait_goods)]
-        with open('%sgoods_one' % data_dir, 'w') as f:
+        with codecs.open('%sgoods_one' % data_dir, 'w', encoding='utf-8') as f:
             f.write(''.join(write_body))
         end_time(version)
 
@@ -668,7 +669,7 @@ class Buildmd(object):
         if not os.path.exists('%swait' % data_dir):
             print('wait file not exist!!!')
             return
-        with open('%swait' % data_dir, 'r') as f:
+        with codecs.open('%swait' % data_dir, 'r', encoding='utf-8') as f:
             wait = f.readlines()
         threadings = []
         for index, goods_name in enumerate(wait):
@@ -682,7 +683,7 @@ class Buildmd(object):
             work.join()
         goods_name = [self.goods_name[k]
                       for k in sorted(self.goods_name.keys())]
-        with open('%swait_goods' % data_dir, 'w') as f:
+        with codecs.open('%swait_goods' % data_dir, 'w', encoding='utf-8') as f:
             f.write('\n'.join(goods_name))
         end_time(version)
 
@@ -690,7 +691,7 @@ class Buildmd(object):
         if not os.path.exists('%scookie_alimama' % data_dir):
             print('alimama cookie not exist!!!')
             return
-        with open('%scookie_alimama' % data_dir, 'r') as f:
+        with codecs.open('%scookie_alimama' % data_dir, 'r', encoding='utf-8') as f:
             cookie = f.readlines()
         url_list = [
             'https://pub.alimama.com/items/search.json?auctionTag=&perPageSize=50&shopTag=&_tb_token_=',

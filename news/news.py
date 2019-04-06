@@ -4,6 +4,7 @@
 # @Last Modified by:   gunjianpan
 # @Last Modified time: 2019-03-27 23:51:45
 
+import codecs
 import threading
 import time
 import pandas as pd
@@ -54,7 +55,7 @@ class Get_baidu_news():
         summarizations = [self.summarizations[k]
                           for k in sorted(self.summarizations.keys())]
         self.summarizations = sum(summarizations, [])
-        with open('news_posion.txt', 'w') as f:
+        with codecs.open('news_posion.txt', 'w', encoding='utf-8') as f:
             f.write('\n'.join(self.summarizations))
         end_time(version)
 
@@ -122,9 +123,9 @@ class Get_google_news():
 
         hrefs = [self.hrefs[k] for k in sorted(self.hrefs.keys())]
         self.hrefs = sum(hrefs, [])
-        with open('google_steal.txt', 'w') as f:
+        with codecs.open('google_steal.txt', 'w', encoding='utf-8') as f:
             f.write('\n'.join(self.summarizations))
-        with open('google_steal_href.txt', 'w') as f:
+        with codecs.open('google_steal_href.txt', 'w', encoding='utf-8') as f:
             f.write('\n'.join(self.hrefs))
         end_time(version)
 
@@ -183,7 +184,8 @@ class find_location(object):
         word = ''
         count = 0
         for file in self.filelists:
-            temp_word_list = open(file, 'r').readlines()
+            temp_word_list = codecs.open(
+                file, 'r', encoding='utf-8').readlines()
             count += len(temp_word_list)
             word += " ".join(temp_word_list)
         # return word
@@ -279,7 +281,8 @@ class find_location(object):
         county_other = {index[3]: int(
             index[1][:2]) for index in county if index[3][-1] == '盟' or index[3][-1] == '岛'}
         # print('芒' in county_other, 'other')
-        county_province = {**county_area_two, **county_area_state, **county_area_other, **county_county_two, **county_county_state, **county_county_other, **county_city, **county_domain, **county_other}
+        county_province = {**county_area_two, **county_area_state, **county_area_other, **county_county_two,
+                           **county_county_state, **county_county_other, **county_city, **county_domain, **county_other}
         county_province = {
             index: self.province_map[county_province[index]] for index in county_province}
         self.city_province = {**self.city_province, **county_province}
@@ -338,7 +341,7 @@ class Get_baidu():
         #             self.text_map[ids] = self.total_map[index][ids]
         # print(sum(self.text_map))
         word = [self.word[k] for k in sorted(self.word.keys())]
-        with open('test', 'w') as f:
+        with codecs.open('test', 'w', encoding='utf-8') as f:
             f.write("\n".join(word))
         end_time(version)
 
@@ -404,7 +407,7 @@ class Get_baidu_bjh():
             work.join()
         href_map = [self.href_map[k] for k in sorted(self.href_map.keys())]
         self.href_map = sum(href_map, [])
-        with open('bjh_href_poison.txt', 'w') as f:
+        with codecs.open('bjh_href_poison.txt', 'w', encoding='utf-8') as f:
             f.write("\n".join(self.href_map))
         end_time(version)
 
@@ -440,7 +443,7 @@ class Get_baidu_bjh():
 
         version = begin_time()
         threadings = []
-        with open('bjh_href_poison.txt', 'r') as f:
+        with codecs.open('bjh_href_poison.txt', 'r', encoding='utf-8') as f:
             href_list = f.readlines()
         for index, url in enumerate(href_list):
             work = threading.Thread(
@@ -453,10 +456,10 @@ class Get_baidu_bjh():
         for work in threadings:
             work.join()
         word_list = [self.word_list[k] for k in sorted(self.word_list.keys())]
-        with open('bjh_detail_poison', 'w') as f:
+        with codecs.open('bjh_detail_poison', 'w', encoding='utf-8') as f:
             f.write("\n".join(word_list))
         self.failuredmap = {}
-        with open('bjh.log', 'w') as f:
+        with codecs.open('bjh.log', 'w', encoding='utf-8') as f:
             f.write('\n'.join(self.fail))
         self.fail = []
         end_time(version)

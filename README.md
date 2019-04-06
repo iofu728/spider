@@ -3,12 +3,12 @@
 <img width="100" src="https://cdn.nlark.com/yuque/0/2018/jpeg/104214/1540358574166-46cbbfd2-69fa-4406-aba9-784bf65efdf9.jpeg" alt="Spider logo"></a></p>
 <h1 align="center">Spider Man</h1>
 
-[![GitHub](https://img.shields.io/github/license/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider/blob/master/LICENSE)
+[![GitHub](https://img.shields.io/github/license/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider/master/LICENSE)
 [![GitHub tag](https://img.shields.io/github/tag/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider/releases)
 [![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider)
 
-<div align="center"><strong>高可用代理IP池 高并发爬虫 一些带爬虫技巧的应用</strong></div>
-<div align="center"><strong>Highly Available Proxy IP Pool, Highly Concurrent Spider, Some Application with spider skill</strong></div>
+<div align="center"><strong>高可用代理IP池 高并发生成器 一些实战经验</strong></div>
+<div align="center"><strong>Highly Available Proxy IP Pool, Highly Concurrent Request Builder, Some Application</strong></div>
 
 - [keyword](#keyword)
 - [Proxy pool](#proxy-pool)
@@ -38,6 +38,7 @@
     - [Trouble Shooting](#trouble-shooting-1)
       - [error: unpack requires a buffer of 20 bytes](#error-unpack-requires-a-buffer-of-20-bytes)
       - [How to analysis font](#how-to-analysis-font)
+      - [configure file](#configure-file)
 
 ## keyword
 
@@ -296,3 +297,7 @@ parent_tree.find_all(re.compile('''))
 - use fonttools
 - get TTFont().getBestCamp()
 - contrast with base
+
+##### configure file
+
+- [13.10read configure file](https://python3-cookbook.readthedocs.io/zh_CN/latest/c13/p10_read_configuration_files.html)

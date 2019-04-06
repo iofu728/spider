@@ -91,5 +91,7 @@ class Brush(object):
 
 
 if __name__ == '__main__':
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
     brush = Brush()
     brush.have_places()

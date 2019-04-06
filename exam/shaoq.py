@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-21 17:34:15
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-05 01:49:16
+@Last Modified time: 2019-04-05 15:41:56
 '''
 
 import execjs
@@ -83,9 +83,6 @@ class Shaoq(object):
             '\xa0'*8, '\n').replace(' ', '').replace('|||', '\n')
         print(result)
 
-        # self.second_req = second_req
-        # self.css_result = css_result
-
     def load_img(self, img_url, headers):
         '''load img for no wait'''
         headers['Accept'] = 'image/webp,image/apng,image/*,*/*;q=0.8'
@@ -93,3 +90,8 @@ class Shaoq(object):
 
     def load_css(self, css_result: str) -> dict:
         return dict(re.findall(r'\.(.+)::before {content: "(.+)";}', css_result))
+
+
+if __name__ == '__main__':
+    es = Shaoq()
+    es.test_req()

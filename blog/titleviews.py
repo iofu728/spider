@@ -26,6 +26,7 @@ from utils.utils import begin_time, end_time, changeCookie, basic_req, can_retry
     └── title    // blog title list
 """
 get_request_proxy = GetFreeProxy().get_request_proxy
+data_dir = 'blog/data/'
 
 
 class TitleViews(object):
@@ -55,9 +56,9 @@ class TitleViews(object):
         """
         load local view
         """
-        if not os.path.exists("blog/data/google"):
+        if not os.path.exists("%sgoogle" % data_dir):
             return
-        with open("blog/data/google", 'r') as f:
+        with open("%sgoogle" % data_dir, 'r') as f:
             test = f.readlines()
         test = test[7:]
         for index in test:
@@ -75,13 +76,13 @@ class TitleViews(object):
         """
         get title map
         """
-        if os.path.exists('blog/data/slug'):
-            with open('blog/data/slug', 'r') as f:
+        if os.path.exists('%sslug' % data_dir):
+            with open('%sslug' % data_dir, 'r') as f:
                 slug = f.readlines()
         else:
             slug = []
-        if os.path.exists('blog/data/title'):
-            with open('blog/data/title', 'r') as f:
+        if os.path.exists('%stitle' % data_dir):
+            with open('%stitle' % data_dir, 'r') as f:
                 title = f.readlines()
         else:
             title = []
@@ -101,8 +102,8 @@ class TitleViews(object):
         return None if arr is None else arr.group(1)
 
     def getZhihuView(self):
-        if os.path.exists('blog/data/cookie'):
-            with open('blog/data/cookie', 'r') as f:
+        if os.path.exists('%scookie' % data_dir):
+            with open('%scookie' % data_dir, 'r') as f:
                 cookie = f.readline()
         else:
             cookie = ' '
@@ -368,6 +369,8 @@ class TitleViews(object):
 
 
 if __name__ == '__main__':
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
     parser = argparse.ArgumentParser(description='gunjianpan blog backup code')
     parser.add_argument('--model', type=int, default=1, metavar='N',
                         help='model update or new day')

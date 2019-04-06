@@ -73,12 +73,13 @@ class GetFreeProxy:
             proxylist = self.proxylists if httptype else self.proxylist
 
         if not len(proxylist):
-            print('Proxy pool empty!!! Please check the db conn & db dataset!!!')
-            return
-
-        index = random.randint(0, len(proxylist) - 1)
-        proxies_url = proxylist[index]
-        proxies = {type_map[httptype]: proxies_url}
+            if self.Db.db:
+                print('Proxy pool empty!!! Please check the db conn & db dataset!!!')
+            proxies = {}
+        else:
+            index = random.randint(0, len(proxylist) - 1)
+            proxies_url = proxylist[index]
+            proxies = {type_map[httptype]: proxies_url}
 
         try:
             result = basic_req(url, types, proxies, data, header)
@@ -95,7 +96,7 @@ class GetFreeProxy:
             else:
                 return result
 
-        except Exception as e:
+        except:
             self.cannotuseip[random.randint(0, MAXN)] = proxies_url
 
             if proxies_url in proxylist:
@@ -227,11 +228,12 @@ class GetFreeProxy:
         """
 
         results = self.Db.select_db(self.select_list)
+        self.proxylist = []
+        self.proxylists = []
+        self.proxylist_ss = []
+        self.proxylists_ss = []
         if results != 0:
-            self.proxylist = []
-            self.proxylists = []
-            self.proxylist_ss = []
-            self.proxylists_ss = []
+
             for index in results:
                 if index[1] == 1:
                     self.proxylists.append(index[0])
@@ -248,7 +250,7 @@ class GetFreeProxy:
             print(len(self.proxylist_ss), ' ss http proxy can use.')
             print(len(self.proxylists_ss), ' ss https proxy can use.')
         else:
-            pass
+            print('>>>Please check db configure!!! The proxy pool cant use!!!>>>')
 
     def judgeurl(self, urls, index, times):
         """
@@ -278,7 +280,7 @@ class GetFreeProxy:
                         self.canuseip[index] = [urls, int(http_type) + 2]
             else:
                 self.cannotuseip[index] = urls
-        except Exception as e:
+        except:
             if not index in self.canuseip:
                 self.cannotuseip[index] = urls
             pass
@@ -525,7 +527,7 @@ class GetFreeProxy:
         }
         login_url = 'http://www.gatherproxy.com/subscribe/login'
 
-        cookie_html = basic_req(login_url, 0,headers=headers)
+        cookie_html = basic_req(login_url, 0,header=headers)
         verify_text = cookie_html.find_all('div', class_='label')[2].span.text
         verify_list = verify_text.replace('= ','').strip().split()
         num_map = {'Zero': 0,'One': 1,'Two': 2, 'Three':3,'Four':4,'Fine':5,'Six':6,'Seven':7,'Eight': 8, 'Nine':9, 'Ten': 10}
@@ -601,6 +603,8 @@ class GetFreeProxy:
             f.write(gatherproxy.text)
 
 if __name__ == '__main__':
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
     parser = argparse.ArgumentParser(description='gunjianpan proxy pool code')
     parser.add_argument('--model', type=int, default=1, metavar='N',
                         help='model of load_gather or test')

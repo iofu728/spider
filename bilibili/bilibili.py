@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-05 01:17:12
+@Last Modified time: 2019-04-05 21:53:20
 '''
 
 import threading
@@ -10,17 +10,20 @@ import time
 import os
 import random
 import re
-import json as js
+import json
 import pickle
+import shutil
 
+from configparser import ConfigParser
 from proxy.getproxy import GetFreeProxy
 from utils.utils import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email
 
-one_day = 86400
-data_path = 'bilibili/data/'
-yybzz_path = 'bilibili/yybzz/'
 get_request_proxy = GetFreeProxy().get_request_proxy
-
+one_day = 86400
+data_dir = 'bilibili/data/'
+history_dir = '%shistory/' % data_dir
+comment_dir = '%scomment/' % data_dir
+assign_path = 'bilibili/assign_up.ini'
 
 """
   * bilibili @http
@@ -37,33 +40,55 @@ get_request_proxy = GetFreeProxy().get_request_proxy
 
 
 class Up():
-    """
-    some development in bilibili
-    """
+    ''' some spider application in bilibili '''
+    BILIBILI_URL = 'https://www.bilibili.com'
+    BASIC_AV_URL = 'http://www.bilibili.com/video/av=%d'
+    CLICK_NOW_URL = 'http://api.bilibili.com/x/report/click/now?jsonp=jsonp'
+    CLICK_WEB_URL = 'http://api.bilibili.com/x/report/click/web/h5'
+    REPORT_HEARTBEAT_URL = 'http://api.bilibili.com/x/report/web/heartbeat'
+    ARCHIVE_STAT_URL = 'http://api.bilibili.com/x/web-interface/archive/stat?aid=%d'
+    VIEW_URL = 'https://api.bilibili.com/x/web-interface/view?aid=%d'
+    RELATION_STAT_URL = 'http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=%d'
+    BASIC_RANKING_URL = 'https://www.bilibili.com/ranking/all/%d/'
+    MEMBER_SUBMIT_URL = 'https://space.bilibili.com/ajax/member/getSubmitVideos?mid=%s&page=1&pagesize=50'
+    REPLY_V2_URL = 'https://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=0'
 
     def __init__(self):
         self.finish = 0
         self.rank = {}
-        self.rank_map = {}
         self.rank_type = {}
         self.public = {}
         self.public_list = []
         self.star = {}
-        self.origin_data_v2 = {}
-        self.have_yybzz = False
+        self.data_v2 = {}
+        self.have_assign = False
         self.last_rank = {}
-        self.exec_map = {}
         self.last_check = {}
         self.last_view = {}
         self.comment = {}
         self.comment_max = {}
         self.begin_timestamp = int(time.time())
+        self.load_configure()
+
+    def load_configure(self):
+        ''' load assign configure '''
+        cfg = ConfigParser()
+        cfg.read(assign_path)
+        self.assign_up_name = cfg.get('basic', 'up_name')
+        self.assign_up_mid = cfg.getint('basic', 'up_mid') if len(
+            cfg['basic']['up_mid']) else -1
+        self.assign_rank_id = cfg.getint('basic', 'rank_id')
+        self.assign_tid = cfg.getint('basic', 'tid')
+        self.basic_av_id = cfg.getint('basic', 'basic_av_id')
+        self.assign_ids = [int(ii)
+                           for ii in cfg.get('assign', 'av_ids').split(',')]
+        self.keyword = cfg.get('comment', 'keyword').split(',')
+        self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
+        self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
 
     def basic_view(self, url: str, times: int, types: int):
-        """
-        press have no data input
-        """
-        url = 'http://www.bilibili.com/video/av46317059'
+        ''' press have no data input '''
+        url = self.AV_URL
         if types == 1:
             html = get_request_proxy(url, 0)
         else:
@@ -72,12 +97,9 @@ class Up():
         if html == False and times < 5:
             self.basic_view(url, times + 1, types)
 
-    def basic_press_bilibili(self, url: str, times: int, types: int):
-        """
-        press have no data input
-        """
-
-        url = 'https://www.bilibili.com/video/av46317059'
+    def one_click_bilibili(self, url: str, times: int, types: int):
+        ''' press have no data input '''
+        url = self.AV_URL
         if types == 1:
             html = get_request_proxy(url, 0)
         else:
@@ -88,11 +110,9 @@ class Up():
                 self.basic_view(url, times + 1, types)
             return
         times = 0
-        url_1 = 'http://api.bilibili.com/x/report/click/now?jsonp=jsonp'
-
+        url_1 = self.CLICK_NOW_URL
         if types == 1:
             json_1 = get_request_proxy(url_1, 1)
-            # json_1 = get_request_proxy(url_1, 1)
         else:
             json_1 = basic_req(url_1, 1)
         if not json_1 is None:
@@ -100,42 +120,40 @@ class Up():
 
         if not self.have_error(json_1, 1):
             if times < 2:
-                self.basic_press_bilibili(url, times + 1, types)
+                self.one_click_bilibili(url, times + 1, types)
             return
         times = 0
-        url = 'http://api.bilibili.com/x/report/click/web/h5'
+        url = self.CLICK_WEB_URL
         data = {
-            'aid': '46317059',
-            'cid': '81149626',
+            'aid': self.basic_av_id,
+            'cid': '',
             'part': '1',
             'mid': str(random.randint(10000000, 19999999)),
             'lv': '2',
-            'ftime': '1539774474',
+            'ftime': '',
             'stime': json_1['data']['now'],
             'jsonp': 'jsonp',
             'type': '3',
             'sub_type': '0'
         }
-        # url = url + str(int(round(time.time() * 1000)))
         if types == 1:
-            json = get_request_proxy(url, 11, data)
-            # json = get_request_proxy(url, 3, data)
+            json_req = get_request_proxy(url, 11, data)
         else:
-            json = basic_req(url, 11, data=data)
-        if not json is None:
-            print(json)
+            json_req = basic_req(url, 11, data=data)
+        if not json_req is None:
+            print(json_req)
 
-        if not self.have_error(json):
+        if not self.have_error(json_req):
             if times < 2:
-                self.basic_press_bilibili(url, times + 1, types)
+                self.one_click_bilibili(url, times + 1, types)
             return
         times = 0
-        url_3 = 'http://api.bilibili.com/x/report/web/heartbeat'
+        url_3 = self.REPORT_HEARTBEAT_URL
         data_3 = {
-            'aid': '46317059',
-            'cid': '81149626',
+            'aid': self.basic_av_id,
+            'cid': '',
             'mid': data['mid'],
-            'csrf': '48a5a9fdd754d5ed21cd360be83b75b5',
+            'csrf': '',
             'played_time': '0',
             'realtime': '0',
             'start_ts': json_1['data']['now'],
@@ -146,59 +164,55 @@ class Up():
 
         if types == 1:
             json_3 = get_request_proxy(url_3, 11, data_3)
-            # json_3 = get_request_proxy(url_3, 11, data_3)
         else:
             json_3 = basic_req(url_3, 11, data=data_3)
         if not json_3 is None:
             print(json_3)
 
         if not self.have_error(json_3) and times < 2:
-            self.basic_press_bilibili(url, times + 1, types)
+            self.one_click_bilibili(url, times + 1, types)
         print('finish.')
-        self.finish = self.finish + 1)
+        self.finish += 1
 
-    def check_rank(self, av_id: int, times = 0):
-        rank_list=self.rank_map[av_id] if av_id in self.rank_map else []
-        changeHeaders(
-            {'Referer': 'https://www.bilibili.com/video/av%d' % (av_id)})
+    def check_rank(self, av_id: int, times=0):
+        rank_list = self.rank_map[av_id] if av_id in self.rank_map else []
+        changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
         if len(rank_list):
-            score=int(rank_list[1])
-            rank=int(rank_list[0])
+            score = int(rank_list[1])
+            rank = int(rank_list[0])
 
-        url='http://api.bilibili.com/x/web-interface/archive/stat?aid=%d' % (
-            av_id)
-        json=get_request_proxy(url, 1)
+        url = self.ARCHIVE_STAT_URL % av_id
+        json_req = get_request_proxy(url, 1)
 
-        if not self.have_error(json):
+        if not self.have_error(json_req):
             if times < 3:
                 self.check_rank(av_id, times + 1)
             return
-        json=json['data']
-        need=['view', 'like', 'coin', 'favorite',
+        json_req = json_req['data']
+        need = ['view', 'like', 'coin', 'favorite',
                 'reply', 'share', 'danmaku']
-        data= [json[index] for index in need]
+        data = [json_req[index] for index in need]
         if not self.check_view(av_id, data[0]):
             if times < 3:
                 self.check_rank(av_id, times + 1)
             return
         if len(rank_list):
-            data= [time.strftime(
+            data = [time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data, *rank_list[:2], *rank_list[3:5]]
         else:
-            data= [time.strftime("%Y-%m-%d %H:%M:%S",
+            data = [time.strftime("%Y-%m-%d %H:%M:%S",
                                   time.localtime(time.time())), *data]
 
-        with open(data_path + '%d.csv' % (av_id), 'a') as f:
+        with open('%s%d.csv' % (history_dir, av_id), 'a') as f:
             f.write(','.join([str(index) for index in data]) + '\n')
-        # print(','.join([str(index) for index in data]))
 
         if self.check_rank_list(av_id, rank_list):
-            av_id_id= int(av_id) * 10 + int(rank_list[-1])
+            av_id_id = int(av_id) * 10 + int(rank_list[-1])
             if av_id_id not in self.rank:
-                self.rank[av_id_id]= [rank_list[0] // 10]
+                self.rank[av_id_id] = [rank_list[0] // 10]
             else:
                 self.rank[av_id_id].append(rank_list[0] // 10)
-            self.last_rank[av_id_id]= rank_list[0]
+            self.last_rank[av_id_id] = rank_list[0]
             send_email('%dday List || Rank: %d Score: %d' % (int(
                 rank_list[-1]), rank, score), '%dday List || Rank: %d Score: %d' % (int(rank_list[-1]), rank, score))
         if av_id in self.last_check and self.last_check[av_id] - int(time.time()) > one_day:
@@ -207,12 +221,10 @@ class Up():
             del self.rank_map[av_id]
 
     def check_view(self, av_id: int, view: int) -> bool:
-        """
-        check view
-        """
+        ''' check view '''
         if not av_id in self.last_view:
             return True
-        last_view= self.last_view[av_id]
+        last_view = self.last_view[av_id]
         if last_view < view:
             return False
         if last_view + 2000 < view:
@@ -220,89 +232,79 @@ class Up():
         return True
 
     def check_rank_list(self, av_id: int, rank_list: list) -> bool:
-        if not len(rank_list) or rank_list[2] != '野原白之助3':
+        ''' check rank list '''
+        if not len(rank_list) or rank_list[2] != self.assign_up_name:
             return False
-        av_id_id= int(av_id) * 10 + int(rank_list[-1])
+        av_id_id = int(av_id) * 10 + int(rank_list[-1])
         if av_id_id not in self.rank:
             return True
-        first_rank= rank_list[0] // 10
+        first_rank = rank_list[0] // 10
         if first_rank not in self.rank[av_id_id] or first_rank == 0 or first_rank == 1:
             if self.last_rank[av_id_id] != rank_list[0]:
                 return True
         return False
 
     def check_rank_v2(self, av_id: int, times=0):
-        vId= str(av_id)
-        rank_list= self.rank_map[av_id] if av_id in self.rank_map else []
-        changeHeaders(
-            {'Referer': 'https://www.bilibili.com/video/av%d' % (av_id)})
-        if len(rank_list):
-            score=rank_list[1]
-            rank=rank_list[0]
+        rank_list = self.rank_map[av_id] if av_id in self.rank_map else []
+        changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
 
-        url='http://api.bilibili.com/x/web-interface/archive/stat?aid=%d' % (
-            av_id)
-        json=get_request_proxy(url, 1)
+        url = self.ARCHIVE_STAT_URL % av_id
+        json_req = get_request_proxy(url, 1)
 
-        if not self.have_error(json):
+        if not self.have_error(json_req):
             if times < 3:
                 self.check_rank_v2(av_id, times + 1)
             return
-        json=json['data']
-        need=['view', 'like', 'coin', 'favorite',
+        json_req = json_req['data']
+        need = ['view', 'like', 'coin', 'favorite',
                 'reply', 'share', 'danmaku']
-        data= [json[index] for index in need]
+        data = [json_req[index] for index in need]
         if len(rank_list):
-            data= [time.strftime(
+            data = [time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data, *rank_list[:2], *rank_list[3:5]]
         else:
-            data= [time.strftime("%Y-%m-%d %H:%M:%S",
+            data = [time.strftime("%Y-%m-%d %H:%M:%S",
                                   time.localtime(time.time())), *data]
-        self.origin_data_v2[av_id]= data
+        self.data_v2[av_id] = data
 
-    def have_error(self, json: dict, types=None) -> bool:
-        '''
-        have error json
-        '''
-        if json is None:
+    def have_error(self, json_req: dict, types=None) -> bool:
+        ''' check json_req'''
+        if json_req is None:
             return False
-        if 'code' not in json or json['code'] != 0:
+        if 'code' not in json_req or json_req['code'] != 0:
             return False
-        if 'message' not in json or json['message'] != '0':
+        if 'message' not in json_req or json_req['message'] != '0':
             return False
-        if 'ttl' not in json or json['ttl'] != 1:
+        if 'ttl' not in json_req or json_req['ttl'] != 1:
             return False
         if not types is None:
-            if 'data' not in json or 'now' not in json['data']:
+            if 'data' not in json_req or 'now' not in json_req['data']:
                 return False
         return True
 
-    def check_type(self, av_id: int) -> bool:
+    def check_type(self, av_id: int):
         ''' check type '''
         if av_id in self.rank_type:
             return self.rank_type[av_id]
         if av_id in self.rank_map and not len(self.rank_map[av_id]):
-            self.rank_type[av_id]= True
+            self.rank_type[av_id] = True
             return True
-        changeHeaders(
-            {'Referer': 'https://www.bilibili.com/video/av%d' % (av_id)})
-        url='https://api.bilibili.com/x/web-interface/view?aid=%d' % (av_id)
+        return 2
 
-        json=get_request_proxy(url, 1)
+    def check_type_req(self, av_id: int):
+        changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
+        url = self.VIEW_URL % av_id
 
-        if json is None:
-            return False
-        if 'data' not in json:
-            return False
-        if 'tid' not in json['data']:
-            return False
-        self.rank_type[av_id]=json['data']['tid'] == 158
-        return json['data']['tid'] == 158
+        json_req = get_request_proxy(url, 1)
+
+        if json_req is None or 'data' not in json_req or 'tid' not in json_req['data']:
+            if can_retry(url):
+                self.check_type_req(av_id)
+            return
+        self.rank_type[av_id] = json_req['data']['tid'] == self.assign_tid
 
     def add_av(self, av_id: int, rank: int, score: int) -> bool:
-        """
-        if or not add av
-        """
+        ''' decide add av '''
         if av_id not in self.rank_map:
             return rank < 95 or score > 5000
         else:
@@ -316,80 +318,68 @@ class Up():
     def public_monitor(self, av_id: int, times: int):
         ''' a monitor '''
         self.public_list.append(av_id)
-        print('Monitor Begin %d' % (av_id))
-        data_time, mid=self.public[av_id]
+        data_time, mid = self.public[av_id]
         self.get_star_num(mid, 0)
         self.check_rank_v2(av_id, 0)
-
         time.sleep(5)
-
-        follower=self.star[mid] if mid in self.star else 0
-        origin_data=self.origin_data_v2[av_id] if av_id in self.origin_data_v2 else [
-        ]
-        sleep_time= data_time + one_day - int(time.time())
+        follower = self.star[mid] if mid in self.star else 0
+        origin_data = self.data_v2[av_id] if av_id in self.data_v2 else []
+        sleep_time = data_time + one_day - int(time.time())
         if sleep_time < 0:
             return
+        print('Monitor Begin %d' % (av_id))
         time.sleep(sleep_time)
         self.get_star_num(mid, 0)
         self.check_rank_v2(av_id, 0)
 
         time.sleep(5)
-        follower_2= self.star[mid] if mid in self.star else 0
-        one_day_data= self.origin_data_v2[av_id] if av_id in self.origin_data_v2 else [
-        ]
+        follower_2 = self.star[mid] if mid in self.star else 0
+        one_day_data = self.data_v2[av_id] if av_id in self.data_v2 else []
 
-        data= [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data_time)),
+        data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data_time)),
                 av_id, follower, follower_2, *origin_data, *one_day_data]
-        with open(data_path + 'public.csv', 'a') as f:
+        with open(data_dir + 'public.csv', 'a') as f:
             f.write(','.join([str(ii) for ii in data]) + '\n')
 
     def public_data(self, av_id: int, times: int):
         ''' get public basic data '''
-        changeHeaders(
-            {'Referer': 'https://www.bilibili.com/video/av%d' % (av_id)})
-        url = 'http://api.bilibili.com/x/web-interface/view?aid=%d' % (av_id)
-        json = get_request_proxy(url, 1)
-        if json is None:
+        changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
+        url = self.VIEW_URL % av_id
+        json_req = get_request_proxy(url, 1)
+        if json_req is None or not 'data' in json_req or not 'pubdate' in json_req['data']:
             if times < 3:
                 self.public_data(av_id, times + 1)
             return
-        data_time = json['data']['pubdate']
-        mid = json['data']['owner']['mid']
+        data_time = json_req['data']['pubdate']
+        mid = json_req['data']['owner']['mid']
         self.get_star_num(mid, 0)
         self.public[av_id] = [data_time, mid]
 
-    def get_star_num(self, mid: int, times:int):
+    def get_star_num(self, mid: int, times: int):
         ''' get star num'''
-        
-        url = 'http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=%d' % (
-            mid)
-        changeHeaders({
-            'Origin': 'https://www.bilibili.com',
-            'Referer': 'https://www.bilibili.com/video/av46317059'
-        })
+        url = self.RELATION_STAT_URL % mid
+        changeHeaders({'Origin': self.BILIBILI_URL, 'Referer': self.AV_URL})
         req = get_request_proxy(url, 2)
         if req is None or req.status_code != 200 or len(req.text) < 8 or not '{' in req.text:
             if times < 3:
                 self.get_star_num(mid, times + 1)
             return
         try:
-            json = js.loads(req.text[7:-1])
-            self.star[mid] = json['data']['follower']
-        except Exception as e:
+            json_req = js.loads(req.text[7:-1])
+            self.star[mid] = json_req['data']['follower']
+        except:
             pass
 
-    def load_rank_index(self, index: int, day_index:int):
+    def load_rank_index(self, index: int, day_index: int):
         ''' load rank '''
-        index = str(index)
-        day_index = str(day_index)
-        changeHeaders(
-            {'Referer': 'https://www.bilibili.com/ranking/all/155/' + index + '/' + day_index})
-        url = 'https://www.bilibili.com/ranking/all/155/' + index + '/' + day_index
+        changeHeaders({'Referer': self.RANKING_URL % (index, day_index)})
+        url = self.RANKING_URL % (index, day_index)
         html = basic_req(url, 0)
         rank_list = html.find_all('li', class_='rank-item')
 
         now_av_id = []
         wait_check_public = []
+        rank_map = {}
 
         for av in rank_list:
             av_href = av.find_all('a')[0]['href']
@@ -402,27 +392,43 @@ class Up():
                         [0].find_all('div')[0].text)
             name = av.find_all('span')[2].text
             if self.add_av(av_id, rank, score):
-                if not av_id in self.public:
-                    wait_check_public.append(av_id)
-                self.last_check[av_id] = int(time.time())
-                self.rank_map[av_id] = [rank, score, name, index, day_index]
-        if os.path.exists(data_path + 'yybzz.csv'):
-            with open(data_path + 'yybzz.csv') as f:
-                yybzz = [int(index.replace('\n', '')) for index in f.readlines()]
-        else:
-            yybzz = []
-        for ii in yybzz:
+                rank_map[av_id] = [rank, score, name, index, day_index]
+
+        ''' check assign av rank '''
+        self.load_configure()
+        for ii in self.assign_ids:
             if not ii in self.public:
                 wait_check_public.append(ii)
-
-        have_yybzz = False
-        for index in yybzz:
-            if index in now_av_id:
-                have_yybzz = True
-        if self.have_yybzz and not have_yybzz:
+            if not ii in self.last_view and not ii in self.rank_map:
+                self.rank_map[ii] = []
+        have_assign = False
+        for ii in self.assign_ids:
+            if ii in now_av_id:
+                have_assign = True
+        if self.have_assign and not have_assign:
             send_email('No rank.....No Rank......No Rank.....',
                        'No rank.....No Rank......No Rank.....')
+        self.have_assign = have_assign
 
+        ''' check tid type '''
+        threading_public = []
+        for ii in rank_map.keys():
+            work = threading.Thread(target=self.check_type_req, args=(ii,))
+            threading_public.append(work)
+        for work in threading_public:
+            work.start()
+        for work in threading_public:
+            work.join()
+
+        for ii, jj in rank_map.items():
+            if self.check_type(ii) != True:
+                continue
+            if not ii in self.public:
+                wait_check_public.append(ii)
+            self.last_check[ii] = int(time.time())
+            self.rank_map[ii] = jj
+
+        ''' load public basic data '''
         threading_public = []
         for ii in wait_check_public:
             work = threading.Thread(target=self.public_data, args=(ii, 0,))
@@ -432,6 +438,7 @@ class Up():
         for work in threading_public:
             work.join()
 
+        ''' begin monitor '''
         threading_list = []
         for ii, jj in self.public.items():
             if not ii in self.public_list and jj[0] + one_day > int(time.time()):
@@ -446,15 +453,14 @@ class Up():
         self.load_rank_index(1, 1)
         self.load_rank_index(1, 3)
 
-        print(self.rank_map)
-        with open(data_path + 'youshang', 'w') as f:
+        print('Rank_map_len:', len(self.rank_map.keys()), 'Empty:',
+              len([1 for ii in self.rank_map.values() if not len(ii)]))
+        with open(data_dir + 'youshang', 'w') as f:
             f.write('\n'.join([str(index) for index in self.rank_map.keys()]))
 
     def load_click(self, num=1000000):
         ''' schedule click '''
-        if os.path.exists(data_path + 'youshang'):
-            with open(data_path + 'youshang', 'r') as f:
-                self.rank_map = {int(index): [] for index in f.readlines()}
+        self.rank_map = {ii: [] for ii in self.assign_ids}
 
         for index in range(num):
             threading_list = []
@@ -477,18 +483,19 @@ class Up():
         now_time = now_hour + now_min / 60
         if now_time > 0.5 and now_time < 8.5:
             return
-        if os.path.exists('%scomment.pkl' % yybzz_path):
-            with open('%scomment.pkl' % yybzz_path, 'rb') as f:
+        if os.path.exists('%scomment.pkl' % comment_dir):
+            with open('%scomment.pkl' % comment_dir, 'rb') as f:
                 self.comment = pickle.load(f)
-
-        url = 'https://space.bilibili.com/ajax/member/getSubmitVideos?mid=282849687&page=1&pagesize=50'
-        json = get_request_proxy(url, 1)
-        if json is None or not 'data' in json or not 'vlist' in json['data']:
+        if self.assign_up_mid == -1:
+            return
+        url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
+        json_req = get_request_proxy(url, 1)
+        if json_req is None or not 'data' in json_req or not 'vlist' in json_req['data']:
             if can_retry(url):
                 self.get_check()
             return
         av_id_list = [[ii['aid'], ii['comment']]
-                      for ii in json['data']['vlist']]
+                      for ii in json_req['data']['vlist']]
 
         threading_list = []
         for (ii, jj) in av_id_list:
@@ -501,9 +508,8 @@ class Up():
             work.start()
         for work in threading_list:
             work.join()
-        with open('%scomment.pkl' % yybzz_path, 'wb') as f:
+        with open('%scomment.pkl' % comment_dir, 'wb') as f:
             pickle.dump(self.comment, f)
-
         return av_id_list
 
     def comment_check_schedule(self, av_id: int, comment: int):
@@ -526,7 +532,6 @@ class Up():
             self.check_comment_once(av_id, pn)
             if av_id in self.comment_max:
                 check_index = self.comment_max[av_id] - 1
-            # time.sleep(random.uniform(5, 10))
         comment = [self.comment[av_id][k]
                    for k in sorted(self.comment[av_id].keys())]
         basic = [','.join([str(jj) for jj in ii['basic']])
@@ -540,28 +545,26 @@ class Up():
             for jj in replies_t:
                 jj[0] = '%s-%s' % (str(parent_floor), str(jj[0]))
                 replies.append(','.join([str(kk) for kk in jj]))
-        with open('%s%d_comment.csv' % (yybzz_path, av_id), 'w') as f:
+        with open('%s%d_comment.csv' % (comment_dir, av_id), 'w') as f:
             f.write('\n'.join(basic) + '\n')
             f.write('\n'.join(replies) + '\n')
 
-    def check_comment_once(self, av_id: int, pn:int):
+    def check_comment_once(self, av_id: int, pn: int):
         ''' check comment once '''
-        url = 'https://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=0' % (
-            pn, av_id)
-        json = get_request_proxy(url, 1)
-        if json is None or not 'data' in json or not 'hots' in json['data']:
+        url = self.REPLY_V2_URL % (pn, av_id)
+        json_req = get_request_proxy(url, 1)
+        if json_req is None or not 'data' in json_req or not 'hots' in json_req['data']:
             if can_retry(url):
                 self.check_comment_once(av_id, pn)
             return
 
-        hots = json['data']['hots']
-        replies = json['data']['replies']
+        hots = json_req['data']['hots']
+        replies = json_req['data']['replies']
         temp_floor = [] if replies is None else [ii['floor'] for ii in replies]
         if replies is None:
             wait_check = [] if hots is None else hots
         else:
             wait_check = replies if hots is None else [*hots, *replies]
-        comment = []
 
         for ii in wait_check:
             info = {'basic': self.get_comment_detail(ii, av_id, pn)}
@@ -578,7 +581,7 @@ class Up():
                     self.comment[av_id][ii] = {}
             self.comment_max[av_id] = min(temp_floor)
 
-    def get_comment_detail(self, comment: dict, av_id: int, pn:int, parent_floor=None):
+    def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_floor=None):
         ''' get comment detail '''
         ctime = time.strftime("%Y-%m-%d %H:%M:%S",
                               time.localtime(comment['ctime']))
@@ -597,17 +600,18 @@ class Up():
         return req_list
 
     def have_bad_comment(self, req_list: list, av_id: int, pn: int, parent_floor=None):
-        ''' check comment and send warining email if error '''
+        ''' check comment and send warning email if error '''
         floor, ctime, like, _, _, uname, sex, content, sign = req_list
-        if not '在售价' in content and not '券后价' in content:
+
+        if not len([0 for ii in self.keyword if ii in content]):
             return True
 
         floor = str(
             floor) if parent_floor is None else '%d-%d' % (parent_floor, floor)
-        url = 'https://www.bilibili.com/video/av%d' % av_id
+        url = self.BASIC_AV_URL % av_id
 
-        email_content = '%s\nUrl: %s Page: %d #%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s' % (
-            ctime, url, pn, floor, uname, sex, content, sign)
+        email_content = '%s\nUrl: %s Page: %d #%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s\nlike: %d' % (
+            ctime, url, pn, floor, uname, sex, content, sign, like)
         email_subject = '(%s)av_id: %s || #%s Comment Warning !!!' % (
             ctime, av_id, floor)
         print(email_content, email_subject)
@@ -619,5 +623,13 @@ class Up():
 
 
 if __name__ == '__main__':
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    if not os.path.exists(comment_dir):
+        os.makedirs(comment_dir)
+    if not os.path.exists(history_dir):
+        os.makedirs(history_dir)
+    if not os.path.exists(assign_path):
+        shutil.copy(assign_path + '.tmp', assign_path)
     bb = Up()
     bb.load_click()

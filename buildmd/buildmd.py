@@ -15,8 +15,6 @@ from proxy.getproxy import GetFreeProxy
 from utils.utils import begin_time, end_time, changeCookie, changeHtmlTimeout, basic_req, can_retry
 from urllib.request import urlopen
 
-get_request_proxy = GetFreeProxy().get_request_proxy
-
 """
   * youdao & alimama & taobao @http
   * note.youdao.com/yws/public/note/
@@ -32,6 +30,9 @@ get_request_proxy = GetFreeProxy().get_request_proxy
     ├── cookie_alimama // alimama cookie
     └── cookie_collect // tb cookie
 """
+
+get_request_proxy = GetFreeProxy().get_request_proxy
+data_dir = 'buildmd/data/'
 
 
 class Buildmd(object):
@@ -160,7 +161,7 @@ class Buildmd(object):
                 if len(temp_text) and (temp_text[0] == '￥' or temp_text[0] == '€'):
                     temp_text = '<a>' + temp_text + '</a>'
             text.append(temp_text)
-        with open('buildmd/data/' + self.find_title(index), 'w') as f:
+        with open(data_dir + self.find_title(index), 'w') as f:
             f.write('\n'.join(text))
         self.img_map[index] = img_href
         print(index, len(img_href))
@@ -182,10 +183,10 @@ class Buildmd(object):
         load goods
         """
         version = begin_time()
-        if not os.path.exists('buildmd/data/cookie'):
+        if not os.path.exists('%scookie' % data_dir):
             print('Youdao Note cookie not exist!!!')
             return
-        with open('buildmd/data/cookie', 'r') as f:
+        with open('%scookie' % data_dir, 'r') as f:
             cookie = f.readline()
         changeCookie(cookie[:-1])
 
@@ -202,7 +203,7 @@ class Buildmd(object):
 
         goods = [self.goods[k] for k in sorted(self.goods.keys())]
         goods = sum(goods, [])
-        with open('buildmd/data/goods', 'w') as f:
+        with open('%sgoods' % data_dir, 'w') as f:
             f.write("\n".join(goods))
         end_time(version)
 
@@ -348,10 +349,10 @@ class Buildmd(object):
         load collect
         """
         version = begin_time()
-        if not os.path.exists('buildmd/data/cookie_collect'):
+        if not os.path.exists('%scookie_collect' % data_dir):
             print('TB cookie not exist!!!')
             return
-        with open('buildmd/data/cookie_collect', 'r') as f:
+        with open('%scookie_collect' % data_dir, 'r') as f:
             cookie = f.readline()
         changeCookie(cookie[:-1])
         changeHtmlTimeout(30)
@@ -370,7 +371,7 @@ class Buildmd(object):
 
         collect = [self.collect[k] for k in sorted(self.collect.keys())]
         collect = sum(collect, [])
-        with open('buildmd/data/collect_wyy', 'w') as f:
+        with open('%scollect_wyy' % data_dir, 'w') as f:
             f.write("\n".join(collect))
         end_time(version)
 
@@ -396,7 +397,7 @@ class Buildmd(object):
         text = []
         for collect in collect_list:
             data_id = collect['data-id']
-            data_ownerid = collect['data-ownerid']
+            # data_ownerid = collect['data-ownerid']
             title = collect.find_all('a', class_='img-item-title-link')[0].text
 
             price = collect.find_all('div', class_='g_price')[0].strong.text if len(
@@ -426,11 +427,11 @@ class Buildmd(object):
             'Origin': 'https://note.youdao.com',
             'Referer': 'https://note.youdao.com/web'
         }
-        if not os.path.exists('buildmd/data/cookie'):
+        if not os.path.exists('%scookie' % data_dir):
             print('Youdao Note cookie not exist!!!')
             return
 
-        with open('buildmd/data/cookie', 'r') as f:
+        with open('%scookie' % data_dir, 'r') as f:
             cookie = f.readline()
         headers['cookie'] = cookie[:-1]
         headers['Host'] = url.split('/')[2]
@@ -471,10 +472,10 @@ class Buildmd(object):
         """
 
         version = begin_time()
-        if not os.path.exists('buildmd/data/collect_wyy'):
+        if not os.path.exists('%scollect_wyy' % data_dir):
             print('Collect File not exist!!!')
             return
-        with open('buildmd/data/collect_wyy', 'r') as f:
+        with open('%scollect_wyy' % data_dir, 'r') as f:
             goods = f.readlines()
         self.goods_candidate = [index.split('||')[0] for index in goods]
         goods_len = len(self.goods_candidate)
@@ -492,10 +493,10 @@ class Buildmd(object):
             'Origin': 'http://pub.alimama.com',
             'Referer': 'http://pub.alimama.com/promo/search/index.htm?q=%E7%AC%AC%E5%9B%9B%E5%8D%81%E4%B9%9D%E5%A4%A9%2019%E6%98%A5%E5%AD%A3&_t=1550891362391'
         }
-        if not os.path.exists('buildmd/data/cookie_alimama'):
+        if not os.path.exists('%scookie_alimama' % data_dir):
             print('alimama cookie not exist!!!')
             return
-        with open('buildmd/data/cookie_alimama', 'r') as f:
+        with open('%scookie_alimama' % data_dir, 'r') as f:
             cookie = f.readlines()
         url_list = [
             'https://pub.alimama.com/favorites/group/newList.json?toPage=1&perPageSize=40&keyword=&t=',
@@ -509,7 +510,7 @@ class Buildmd(object):
         self.headers['Cookie'] = cookie[0][:-1]
         self.headers['Host'] = url.split('/')[2]
 
-        group_list = basic_req(url, 2, header=headers)
+        group_list = basic_req(url, 2, header=self.headers)
 
         if group_list.status_code != 200 or group_list.json()['info']['message'] == 'nologin':
             print('group_list error')
@@ -538,10 +539,10 @@ class Buildmd(object):
         """
 
         url = 'http://pub.alimama.com/favorites/item/batchAdd.json'
-        if not os.path.exists('buildmd/data/cookie_alimama'):
+        if not os.path.exists('%scookie_alimama' % data_dir):
             print('alimama cookie not exist!!!')
             return
-        with open('buildmd/data/cookie_alimama', 'r') as f:
+        with open('%scookie_alimama' % data_dir, 'r') as f:
             cookie = f.readlines()
 
         goods_len = len(self.goods_candidate)
@@ -578,18 +579,18 @@ class Buildmd(object):
         version = begin_time()
         changeHtmlTimeout(30)
         block_size = 10
-        if not os.path.exists('buildmd/data/goods'):
+        if not os.path.exists('%sgoods' % data_dir):
             print('goods file not exist!!!')
             return
-        with open('buildmd/data/goods', 'r') as f:
+        with open('%sgoods' % data_dir, 'r') as f:
             wait_goods = f.readlines()
         goods_url = [re.findall('http.* ', index)[0].strip(
         ).replace('https', 'http') if 'http' in index and not '【' in index else False for index in wait_goods]
 
-        if not os.path.exists('buildmd/data/collect_wyy'):
+        if not os.path.exists('%scollect_wyy' % data_dir):
             print('collect file not exist!!!')
             return
-        with open('buildmd/data/collect_wyy', 'r') as f:
+        with open('%scollect_wyy' % data_dir, 'r') as f:
             collect = f.readlines()
         self.title2map = {
             index.split("||")[1]: index.split("||")[0] for index in collect}
@@ -616,7 +617,7 @@ class Buildmd(object):
 
         write_body = [' '.join([self.goods_map[index], body])
                       if index in self.goods_map else (' '.join([self.url2goods[goods_url[index]], body]) if goods_url[index] in self.url2goods else body) for index, body in enumerate(wait_goods)]
-        with open('buildmd/data/goods_one', 'w') as f:
+        with open('%sgoods_one' % data_dir, 'w') as f:
             f.write(''.join(write_body))
         end_time(version)
 
@@ -664,10 +665,10 @@ class Buildmd(object):
 
     def search_goods(self):
         version = begin_time()
-        if not os.path.exists('buildmd/data/wait'):
+        if not os.path.exists('%swait' % data_dir):
             print('wait file not exist!!!')
             return
-        with open('buildmd/data/wait', 'r') as f:
+        with open('%swait' % data_dir, 'r') as f:
             wait = f.readlines()
         threadings = []
         for index, goods_name in enumerate(wait):
@@ -681,15 +682,15 @@ class Buildmd(object):
             work.join()
         goods_name = [self.goods_name[k]
                       for k in sorted(self.goods_name.keys())]
-        with open('buildmd/data/wait_goods', 'w') as f:
+        with open('%swait_goods' % data_dir, 'w') as f:
             f.write('\n'.join(goods_name))
         end_time(version)
 
     def search_goods_once(self, goods_name, index):
-        if not os.path.exists('buildmd/data/cookie_alimama'):
+        if not os.path.exists('%scookie_alimama' % data_dir):
             print('alimama cookie not exist!!!')
             return
-        with open('buildmd/data/cookie_alimama', 'r') as f:
+        with open('%scookie_alimama' % data_dir, 'r') as f:
             cookie = f.readlines()
         url_list = [
             'https://pub.alimama.com/items/search.json?auctionTag=&perPageSize=50&shopTag=&_tb_token_=',
@@ -717,7 +718,7 @@ class Buildmd(object):
         headers['Cookie'] = cookie[0][:-1]
         ca = basic_req(''.join(url_list), 2, header=headers)
         if ca.status_code != 200 or not 'data' in ca.json():
-            if can_retry(url + goods_name):
+            if can_retry(''.join(url_list)):
                 self.search_goods_once(goods_name, index)
             return
         page_list = ca.json()['data']['pageList']

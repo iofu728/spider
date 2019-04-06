@@ -4,19 +4,26 @@
 # @Last Modified by:   gunjianpan
 # @Last Modified time: 2019-03-29 12:38:54
 
-import requests
 import json
-import time
 import os
+import pickle
+import requests
+import time
 
 from fontTools.ttLib import TTFont
 
 """
   * data.eastmoney.com/bbsj/201806/lrb.html 
     .data/
-    └── base.woff  // base woff load from data.eastmonet.com
+    ├── base.pkl                       // base_unicode list
+    ├── base.woff                      // base font file (autoload)
+    ├── eastmony%Y-%m-%d_%H:%M:%S.csv  // result .csv
+    └── font.woff                      // last time font file
 """
 data_dir = 'eastmoney/data/'
+base_dir = '%sbase.' % data_dir
+base_pkl = '%spkl' % base_dir
+base_font = '%swoff' % base_dir
 url = 'http://data.eastmoney.com/bbsj/201806/lrb.html'
 
 header = {
@@ -32,43 +39,66 @@ header = {
 }
 
 
-req = requests.get(url, headers=header, timeout=30)
-
-
-def analysis_font(font_url: str):
+def analysis_font(font_url: str, mode=None) -> dict:
     ''' analysis font '''
-    if not os.path.exists('%sbase.woff' % data_dir):
-        print('base.woff not exist!!!')
+    if (not os.path.exists(base_font) or not os.path.exists(base_pkl)) and not mode:
+        print('base file not exist!!!')
         return
+
     suffix = font_url.split('.')[-1]
     font = requests.get(font_url, headers=header, timeout=30)
     font_name = '%sfont.%s' % (data_dir, suffix)
-    with open('%sfont.%s' % (data_dir, suffix), 'wb') as f:
+    with open(font_name, 'wb') as f:
         f.write(font.content)
     font_map = TTFont(font_name).getBestCmap()
-    base_map = TTFont('%sbase.woff' % data_dir).getBestCmap()
+    ''' prepare base '''
+    if not mode is None:
+        base_unicode = [int(mode[hex(ii).upper().replace('0X', '&#x') + ';'])
+                        for ii in list(font_map.keys())[1:]]
+        pickle.dump(base_unicode, open(base_pkl, 'wb'))
+        with open(base_font, 'wb') as f:
+            f.write(font.content)
+        return {}
 
-    font_dict = {jj: ii+1 for ii,
+    base_unicode = pickle.load(open(base_pkl, 'rb'))
+
+    base_map = TTFont(base_font).getBestCmap()
+    font_dict = {jj: base_unicode[ii] for ii,
                  jj in enumerate(list(base_map.values())[1:])}
     font_dict[list(base_map.values())[0]] = '.'
-    num_dict = {hex(ii).upper().replace('0x', '&#x'): font_dict[jj]
+    num_dict = {hex(ii).upper().replace('0X', '&#x') + ';': str(font_dict[jj])
                 for ii, jj in font_map.items()}
     return num_dict
 
 
-try:
+def load_eastmoney():
+    ''' load detail from eastmoney '''
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    req = requests.get(url, headers=header, timeout=30)
     origin_str = req.text
+
+    ''' parse json '''
     begin_index = origin_str.index('defjson')
     end_index = origin_str.index(']}},\r\n')
     json_str = origin_str[begin_index + 9:end_index + 3]
     json_str = json_str.replace('data:', '"data":').replace(
         'pages:', '"pages":').replace('font:', '"font":')
     json_req = json.loads(json_str)
-    # font_map = json_req['font']['FontMapping']
     font_url = json_req['font']['WoffUrl']
+
+    ''' prepare base '''
+    if not os.path.exists(base_pkl) or not os.path.exists(base_font):
+        print('Prepare base<<<<<<<')
+        font_map = json_req['font']['FontMapping']
+        font_map = {ii['code']: str(ii['value']) for ii in font_map}
+        analysis_font(font_url, font_map)
+
+    ''' load font '''
     font_map = analysis_font(font_url)
     origin_data = json.dumps(json_req['data'])
-    font_map = {ii['code']: str(ii['value']) for ii in font_map}
+
+    ''' load data '''
     for ii, jj in font_map.items():
         origin_data = origin_data.replace(ii, jj)
     replace_data = json.loads(origin_data)
@@ -77,10 +107,15 @@ try:
     data = [ii[jj] for ii in replace_data for jj in need_info]
     result_data = [','.join(data[ii * 14:(ii + 1) * 14])
                    for ii in range(len(replace_data))]
+
+    ''' store data '''
     now_time = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime(time.time()))
+    print(now_time, 'eastmoney data load Success!!!')
     with open('%seastmony%s.csv' % (data_dir, now_time), 'w') as f:
         f.write('\n'.join(result_data))
 
 
-except Exception as e:
-    raise
+if __name__ == '__main__':
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    load_eastmoney()

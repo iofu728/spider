@@ -49,7 +49,7 @@ def analysis_font(font_url: str, mode=None) -> dict:
     suffix = font_url.split('.')[-1]
     font = requests.get(font_url, headers=header, timeout=30)
     font_name = '%sfont.%s' % (data_dir, suffix)
-    with codecs.open(font_name, 'wb', encoding='utf-8') as f:
+    with codecs.open(font_name, 'wb') as f:
         f.write(font.content)
     font_map = TTFont(font_name).getBestCmap()
     ''' prepare base '''
@@ -58,9 +58,8 @@ def analysis_font(font_url: str, mode=None) -> dict:
                      ';' for ii in font_map.keys()]
         base_unicode = [
             int(mode[ii]) if ii in mode else '.' for ii in char_list]
-        pickle.dump(base_unicode, codecs.open(
-            base_pkl, 'wb', encoding='utf-8'))
-        with codecs.open(base_font, 'wb', encoding='utf-8') as f:
+        pickle.dump(base_unicode, codecs.open(base_pkl, 'wb'))
+        with codecs.open(base_font, 'wb') as f:
             f.write(font.content)
         return {}
 

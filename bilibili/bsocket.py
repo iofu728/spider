@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-26 10:21:05
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-06 01:15:39
+@Last Modified time: 2019-04-06 20:00:37
 '''
 
 import asyncio
@@ -41,7 +41,8 @@ class Operation(IntEnum):
     COMMAND = 5
     AUTH = 7
     RECV = 8
-    DANMAKU = 9
+    NESTED = 9
+    DANMAKU = 1000
 
 
 class BWebsocketClient:
@@ -68,7 +69,7 @@ class BWebsocketClient:
         self._session = aiohttp.ClientSession(loop=self._loop)
         self._is_running = False
         self._websocket = None
-        self._p = p
+        self._p = p if p > 0 else -1
         self._getroom_id()
 
     async def close(self):
@@ -147,7 +148,7 @@ class BWebsocketClient:
 
                     async for message in websocket:
                         if message.type == aiohttp.WSMsgType.BINARY:
-                            await self._handle_message(message.data)
+                            await self._handle_message(message.data, 0)
                         else:
                             logger.warning(
                                 'Unknown Message type = %s %s', message.type, message.data)
@@ -182,31 +183,35 @@ class BWebsocketClient:
             except (asyncio.CancelledError, aiohttp.ClientConnectorError):
                 break
 
-    async def _handle_message(self, message: str):
+    async def _handle_message(self, message: str, offset: int = 0):
         ''' handle message'''
-        try:
-            header = self.HeaderTuple(
-                *self.HEADER_STRUCT.unpack_from(message, 0))
-            if header.operation == Operation.ONLINE or header.operation == Operation.COMMAND:
-                body = message[self.HEADER_STRUCT.size: header.total_len]
-                body = json.loads(body.decode('utf-8'))
-                if header.operation == Operation.ONLINE:
-                    await self._on_get_online(body)
+        while offset < len(message):
+            try:
+                header = self.HeaderTuple(
+                    *self.HEADER_STRUCT.unpack_from(message, offset))
+                body = message[offset +
+                               self.HEADER_STRUCT.size: offset + header.total_len]
+                if header.operation == Operation.ONLINE or header.operation == Operation.COMMAND:
+                    body = json.loads(body.decode('utf-8'))
+                    if header.operation == Operation.ONLINE:
+                        await self._on_get_online(body)
+                    else:
+                        await self._handle_command(body)
+                elif header.operation == Operation.RECV:
+                    print('Connect Build!!!')
+                elif header.operation == Operation.NESTED:
+                    offset += self.HEADER_STRUCT.size
+                    continue
+                elif header.operation == Operation.DANMAKU:
+                    body = json.loads(body.decode('utf-8'))
+                    print(body)
+                    print('>>>>DANMAKU tail socket>>>>')
                 else:
-                    await self._handle_command(body)
-            elif header.operation == Operation.RECV:
-                print('Connect Build!!!')
-            elif header.operation == Operation.DANMAKU:
-                body = message[self.HEADER_STRUCT.size * 2: header.total_len]
-                body = json.loads(body.decode('utf-8'))
-                print(body)
-                print('>>>>DANMAKU tail socket>>>>')
-            else:
-                body = message[self.HEADER_STRUCT.size: header.total_len]
-                logger.warning('Unknown operation = %d %s %s',
-                               header.operation, header, body)
-        except:
-            pass
+                    logger.warning('Unknown operation = %d %s %s',
+                                   header.operation, header, body)
+                offset += header.total_len
+            except:
+                pass
 
     async def _handle_command(self, command):
         if isinstance(command, list):

@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-06 21:21:41
+@Last Modified time: 2019-04-06 21:56:07
 '''
 
 import codecs
@@ -485,7 +485,7 @@ class Up():
         if now_time > 0.5 and now_time < 8.5:
             return
         if os.path.exists('%scomment.pkl' % comment_dir):
-            with codecs.open('%scomment.pkl' % comment_dir, 'rb', encoding='utf-8') as f:
+            with codecs.open('%scomment.pkl' % comment_dir, 'rb') as f:
                 self.comment = pickle.load(f)
         if self.assign_up_mid == -1:
             return
@@ -509,7 +509,7 @@ class Up():
             work.start()
         for work in threading_list:
             work.join()
-        with codecs.open('%scomment.pkl' % comment_dir, 'wb', encoding='utf-8') as f:
+        with codecs.open('%scomment.pkl' % comment_dir, 'wb') as f:
             pickle.dump(self.comment, f)
         return av_id_list
 

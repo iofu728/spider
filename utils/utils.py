@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2018-10-19 15:33:46
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-06 21:29:08
+@Last Modified time: 2019-04-06 21:56:21
 '''
 
 import codecs
@@ -302,7 +302,7 @@ def dump_bigger(data, output_file: str):
     """
     max_bytes = 2**31 - 1
     bytes_out = pickle.dumps(data, protocol=4)
-    with codecs.open(output_file, 'wb', encoding='utf-8') as f_out:
+    with codecs.open(output_file, 'wb') as f_out:
         for idx in range(0, len(bytes_out), max_bytes):
             f_out.write(bytes_out[idx:idx + max_bytes])
 
@@ -314,7 +314,7 @@ def load_bigger(input_file: str):
     max_bytes = 2**31 - 1
     bytes_in = bytearray(0)
     input_size = os.path.getsize(input_file)
-    with codecs.open(input_file, 'rb', encoding='utf-8') as f_in:
+    with codecs.open(input_file, 'rb') as f_in:
         for _ in range(0, input_size, max_bytes):
             bytes_in += f_in.read(max_bytes)
     return pickle.loads(bytes_in)

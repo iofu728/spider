@@ -176,7 +176,7 @@ class Buildmd(object):
             if can_retry(img_url):
                 self.load_img(index, img_id, img_url)
             return
-        with codecs.open('buildmd/' + self.find_title(index).split('/')[0] + '/img/' + self.find_title(index).split('/')[1][:-3] + str(img_id + 1) + '.jpg', 'wb', encoding='utf-8') as f:
+        with codecs.open('buildmd/' + self.find_title(index).split('/')[0] + '/img/' + self.find_title(index).split('/')[1][:-3] + str(img_id + 1) + '.jpg', 'wb') as f:
             f.write(img.content)
 
     def load_goods(self):

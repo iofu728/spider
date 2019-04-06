@@ -2,9 +2,10 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-05 21:53:20
+@Last Modified time: 2019-04-06 21:21:41
 '''
 
+import codecs
 import threading
 import time
 import os
@@ -73,7 +74,7 @@ class Up():
     def load_configure(self):
         ''' load assign configure '''
         cfg = ConfigParser()
-        cfg.read(assign_path)
+        cfg.read(assign_path, 'utf-8')
         self.assign_up_name = cfg.get('basic', 'up_name')
         self.assign_up_mid = cfg.getint('basic', 'up_mid') if len(
             cfg['basic']['up_mid']) else -1
@@ -203,7 +204,7 @@ class Up():
             data = [time.strftime("%Y-%m-%d %H:%M:%S",
                                   time.localtime(time.time())), *data]
 
-        with open('%s%d.csv' % (history_dir, av_id), 'a') as f:
+        with codecs.open('%s%d.csv' % (history_dir, av_id), 'a', encoding='utf-8') as f:
             f.write(','.join([str(index) for index in data]) + '\n')
 
         if self.check_rank_list(av_id, rank_list):
@@ -338,7 +339,7 @@ class Up():
 
         data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data_time)),
                 av_id, follower, follower_2, *origin_data, *one_day_data]
-        with open(data_dir + 'public.csv', 'a') as f:
+        with codecs.open(data_dir + 'public.csv', 'a', encoding='utf-8') as f:
             f.write(','.join([str(ii) for ii in data]) + '\n')
 
     def public_data(self, av_id: int, times: int):
@@ -455,7 +456,7 @@ class Up():
 
         print('Rank_map_len:', len(self.rank_map.keys()), 'Empty:',
               len([1 for ii in self.rank_map.values() if not len(ii)]))
-        with open(data_dir + 'youshang', 'w') as f:
+        with codecs.open(data_dir + 'youshang', 'w', encoding='utf-8') as f:
             f.write('\n'.join([str(index) for index in self.rank_map.keys()]))
 
     def load_click(self, num=1000000):
@@ -484,7 +485,7 @@ class Up():
         if now_time > 0.5 and now_time < 8.5:
             return
         if os.path.exists('%scomment.pkl' % comment_dir):
-            with open('%scomment.pkl' % comment_dir, 'rb') as f:
+            with codecs.open('%scomment.pkl' % comment_dir, 'rb', encoding='utf-8') as f:
                 self.comment = pickle.load(f)
         if self.assign_up_mid == -1:
             return
@@ -508,7 +509,7 @@ class Up():
             work.start()
         for work in threading_list:
             work.join()
-        with open('%scomment.pkl' % comment_dir, 'wb') as f:
+        with codecs.open('%scomment.pkl' % comment_dir, 'wb', encoding='utf-8') as f:
             pickle.dump(self.comment, f)
         return av_id_list
 
@@ -545,7 +546,7 @@ class Up():
             for jj in replies_t:
                 jj[0] = '%s-%s' % (str(parent_floor), str(jj[0]))
                 replies.append(','.join([str(kk) for kk in jj]))
-        with open('%s%d_comment.csv' % (comment_dir, av_id), 'w') as f:
+        with codecs.open('%s%d_comment.csv' % (comment_dir, av_id), 'w', encoding='utf-8') as f:
             f.write('\n'.join(basic) + '\n')
             f.write('\n'.join(replies) + '\n')
 

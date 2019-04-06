@@ -2,9 +2,10 @@
 @Author: gunjianpan
 @Date:   2019-03-26 10:21:05
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-06 20:00:37
+@Last Modified time: 2019-04-06 21:21:49
 '''
 
+import codecs
 import asyncio
 import aiohttp
 import json
@@ -241,14 +242,14 @@ class OneBWebsocketClient(BWebsocketClient):
 
     async def _on_get_online(self, online):
         online = online['data']['room']['online']
-        with open(self.get_path('online'), 'a') as f:
+        with codecs.open(self.get_path('online'), 'a', encoding='utf-8') as f:
             f.write(self.get_data([online]))
-        print(f'Online: {online}')
+        print('Online:', online)
 
     async def _on_get_danmaku(self, content, user_name):
-        with open(self.get_path('danmaku'), 'a') as f:
+        with codecs.open(self.get_path('danmaku'), 'a', encoding='utf-8') as f:
             f.write(self.get_data([content, user_name]))
-        print(f'{content}：{user_name}')
+        print(content, user_name)
 
     def get_data(self, origin_data: list) -> str:
         ''' get data '''
@@ -289,7 +290,7 @@ if __name__ == '__main__':
     ''' Test for San Diego demon '''
     ''' PS: the thread of BSocket have to be currentThread in its processing. '''
     cfg = ConfigParser()
-    cfg.read(assign_path)
+    cfg.read(assign_path, 'utf-8')
     av_id = cfg.getint('basic', 'basic_av_id')
     p = cfg.getint('basic', 'basic_av_p') if len(
         cfg['basic']['basic_av_p']) else -1

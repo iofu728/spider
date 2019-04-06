@@ -39,6 +39,7 @@
       - [error: unpack requires a buffer of 20 bytes](#error-unpack-requires-a-buffer-of-20-bytes)
       - [How to analysis font](#how-to-analysis-font)
       - [configure file](#configure-file)
+      - [UnicodeEncodeError: 'ascii' codec can't encode characters in position 7-10: ordinal not in range(128)](#unicodeencodeerror-ascii-codec-cant-encode-characters-in-position-7-10-ordinal-not-in-range128)
 
 ## keyword
 
@@ -300,4 +301,11 @@ parent_tree.find_all(re.compile('''))
 
 ##### configure file
 
+- cfg = ConfigParser()
+- cfg.read(assign_path, 'utf-8')
 - [13.10read configure file](https://python3-cookbook.readthedocs.io/zh_CN/latest/c13/p10_read_configuration_files.html)
+
+##### UnicodeEncodeError: 'ascii' codec can't encode characters in position 7-10: ordinal not in range(128)
+
+- read/write in `utf-8`
+- with codecs.open(filename, 'r/w', encoding='utf-8')

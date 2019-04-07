@@ -368,7 +368,7 @@ class GetFreeProxy:
             print('Gather file not exist!!!')
             return
         with codecs.open('%sgatherproxy'%data_path, 'r', encoding='utf-8') as f:
-            file_d = f.readlines()
+            file_d = [ii.strip() for ii in f.readlines()]
         if not types:
             waitjudge = ['http://' + ii[:-1] for ii in file_d]
         elif types == 1:
@@ -379,10 +379,6 @@ class GetFreeProxy:
             waitjudge = [*waitjudge1, *waitjudge2]
         self.waitjudge = waitjudge
         print('load gather over!')
-        # self.threadjude()
-        # end_time(version)
-        # if types == 2:
-        #     self.testdb(2)
         end_time(version)
 
 

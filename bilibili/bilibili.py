@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-07 11:27:41
+@Last Modified time: 2019-04-07 11:54:54
 '''
 
 import codecs
@@ -404,14 +404,7 @@ class Up():
                 wait_check_public.append(ii)
             if not ii in self.last_view and not ii in self.rank_map:
                 self.rank_map[ii] = []
-        have_assign = False
-        for ii in self.assign_ids:
-            if ii in now_av_id:
-                have_assign = True
-        if self.have_assign and not have_assign:
-            send_email('No rank.....No Rank......No Rank.....',
-                       'No rank.....No Rank......No Rank.....')
-        self.have_assign = have_assign
+        have_assign = len([0 for ii in self.assign_ids if ii in now_av_id]) > 0
 
         ''' check tid type '''
         threading_public = []
@@ -450,11 +443,19 @@ class Up():
                 threading_list.append(work)
         for work in threading_list:
             work.start()
+        return have_assign
 
     def load_rank(self):
         ''' load rank '''
-        self.load_rank_index(1, 1)
-        self.load_rank_index(1, 3)
+        assign_1 = self.load_rank_index(1, 1)
+        assign_2 = self.load_rank_index(1, 3)
+        have_assign = assign_1 or assign_2
+        print(assign_1, assign_2, have_assign)
+
+        if self.have_assign and not have_assign:
+            send_email('No rank.....No Rank......No Rank.....',
+                       'No rank.....No Rank......No Rank.....')
+        self.have_assign = have_assign
 
         print('Rank_map_len:', len(self.rank_map.keys()), 'Empty:',
               len([1 for ii in self.rank_map.values() if not len(ii)]))

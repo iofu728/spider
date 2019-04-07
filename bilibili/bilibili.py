@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-06 21:56:07
+@Last Modified time: 2019-04-07 11:27:41
 '''
 
 import codecs
@@ -81,6 +81,7 @@ class Up():
         self.assign_rank_id = cfg.getint('basic', 'rank_id')
         self.assign_tid = cfg.getint('basic', 'tid')
         self.basic_av_id = cfg.getint('basic', 'basic_av_id')
+        self.view_abnormal = cfg.getint('basic', 'view_abnormal')
         self.assign_ids = [int(ii)
                            for ii in cfg.get('assign', 'av_ids').split(',')]
         self.keyword = cfg.get('comment', 'keyword').split(',')
@@ -220,6 +221,7 @@ class Up():
             del self.rank_map[av_id]
         elif av_id not in self.last_check and int(time.time()) > one_day + self.begin_timestamp:
             del self.rank_map[av_id]
+        self.last_view[av_id] = data[1]
 
     def check_view(self, av_id: int, view: int) -> bool:
         ''' check view '''
@@ -228,7 +230,7 @@ class Up():
         last_view = self.last_view[av_id]
         if last_view < view:
             return False
-        if last_view + 2000 < view:
+        if last_view + self.view_abnormal < view:
             return False
         return True
 
@@ -456,8 +458,10 @@ class Up():
 
         print('Rank_map_len:', len(self.rank_map.keys()), 'Empty:',
               len([1 for ii in self.rank_map.values() if not len(ii)]))
+        youshan = [','.join([str(kk) for kk in [ii, *jj]])
+                   for ii, jj in self.rank_map.items()]
         with codecs.open(data_dir + 'youshang', 'w', encoding='utf-8') as f:
-            f.write('\n'.join([str(index) for index in self.rank_map.keys()]))
+            f.write('\n'.join(youshan))
 
     def load_click(self, num=1000000):
         ''' schedule click '''

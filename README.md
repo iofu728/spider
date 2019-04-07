@@ -14,15 +14,15 @@
 - [Proxy pool](#proxy-pool)
 - [Application](#application)
   - [`Netease`](#netease)
-    - [`Press Test System`](#press-test-system)
-    - [`News`](#news)
+  - [`Press Test System`](#press-test-system)
+  - [`News`](#news)
   - [`Youdao Note`](#youdao-note)
-    - [`blog`](#blog)
-    - [`Brush Class`](#brush-class)
-    - [`zimuzu`](#zimuzu)
-    - [`Bilibili`](#bilibili)
-    - [`shaoq`](#shaoq)
-    - [`eastmoney`](#eastmoney)
+  - [`blog`](#blog)
+  - [`Brush Class`](#brush-class)
+  - [`zimuzu`](#zimuzu)
+  - [`Bilibili`](#bilibili)
+  - [`shaoq`](#shaoq)
+  - [`eastmoney`](#eastmoney)
 - [Development](#development)
 - [Structure](#structure)
 - [Design document](#design-document)
@@ -84,7 +84,7 @@
 - V2 Proxy IP pool, Record progress, Write to MySQL
   - Optimize the write to DB `Load data/ Replace INTO`
 
-#### `Press Test System`
+### `Press Test System`
 
 2. <u>`Press Test System`</u> - <u>`press/press.py`</u>
 
@@ -93,7 +93,7 @@
 - Give some web service uneven pressure
 - To do: press uniform
 
-#### `News`
+### `News`
 
 3. <u>`google & baidu info crawl`</u> - <u>`news/news.py`</u>
 
@@ -108,17 +108,17 @@
 - load data from `youdaoyun`
 - by series of rules to deal data to .md
 
-#### `blog`
+### `blog`
 
 5. <u>`csdn && zhihu && jianshu view info crawl`</u> - <u>`blog/titleview.py`</u>
 
-#### `Brush Class`
+### `Brush Class`
 
 6. <u>`PKU Class brush`</u> - <u>`brushclass/brushclass.py`</u>
 
 - when your expected class have places, It will send you some email.
 
-#### `zimuzu`
+### `zimuzu`
 
 7. <u>`ZiMuZu download list crawl`</u> - <u>`zimuzu/zimuzu.py`</u>
 
@@ -128,7 +128,7 @@
 - And you copy the Thunder url for one to download the movies.
 - Now The Winter will coming, I think you need it to review `<Game of Thrones>`.
 
-#### `Bilibili`
+### `Bilibili`
 
 8. <u>`Get av data by http`</u> - <u>`bilibili/bilibili.py`</u>
 
@@ -145,19 +145,19 @@
 
 - load comment from `/x/v2/reply`
 
-#### `shaoq`
+### `shaoq`
 
 11. <u>`Get text data by compiling javascript`</u> - <u>`exam/shaoq.py`</u>
 
 [more detail](#examshaoq)
 
-#### `eastmoney`
+### `eastmoney`
 
 12. <u>`Get stock info by analysis font`</u> - <u>`eastmoney/eastmoney.py`</u>
 
 - font analysis
 
-[more detail](#eastmoneyeastmoneys)
+[more detail](#eastmoneyeastmoney)
 
 **----To be continued----**
 

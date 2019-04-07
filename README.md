@@ -40,6 +40,7 @@
       - [How to analysis font](#how-to-analysis-font)
       - [configure file](#configure-file)
       - [UnicodeEncodeError: 'ascii' codec can't encode characters in position 7-10: ordinal not in range(128)](#unicodeencodeerror-ascii-codec-cant-encode-characters-in-position-7-10-ordinal-not-in-range128)
+      - [`bilibili` some url return 404 like `http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=`](#bilibili-some-url-return-404-like-httpapibilibilicomxrelationstatjsonpjsonpcallbackjp11vmid)
 
 ## keyword
 
@@ -309,3 +310,7 @@ parent_tree.find_all(re.compile('''))
 
 - read/write in `utf-8`
 - with codecs.open(filename, 'r/w', encoding='utf-8')
+
+##### `bilibili` some url return 404 like `http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=`
+
+basic_req auto add `host` to headers, but this url can't request in ‘Host’

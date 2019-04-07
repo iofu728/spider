@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-26 10:21:05
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-06 21:21:49
+@Last Modified time: 2019-04-08 00:06:59
 '''
 
 import codecs
@@ -20,7 +20,7 @@ from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
 from proxy.getproxy import GetFreeProxy
-from utils.utils import can_retry, basic_req
+from utils.utils import can_retry, basic_req, time_str
 
 logger = logging.getLogger(__name__)
 get_request_proxy = GetFreeProxy().get_request_proxy
@@ -253,7 +253,7 @@ class OneBWebsocketClient(BWebsocketClient):
 
     def get_data(self, origin_data: list) -> str:
         ''' get data '''
-        return ','.join(str(ii) for ii in [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *origin_data]) + '\n'
+        return ','.join(str(ii) for ii in [time_str(), *origin_data]) + '\n'
 
     def get_path(self, types: str) -> str:
         ''' get path '''

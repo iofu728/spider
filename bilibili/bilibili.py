@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-07 11:54:54
+@Last Modified time: 2019-04-07 20:19:08
 '''
 
 import codecs
@@ -17,7 +17,7 @@ import shutil
 
 from configparser import ConfigParser
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email
+from utils.utils import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email, headers
 
 get_request_proxy = GetFreeProxy().get_request_proxy
 one_day = 86400
@@ -43,16 +43,16 @@ assign_path = 'bilibili/assign_up.ini'
 class Up():
     ''' some spider application in bilibili '''
     BILIBILI_URL = 'https://www.bilibili.com'
-    BASIC_AV_URL = 'http://www.bilibili.com/video/av=%d'
+    BASIC_AV_URL = 'http://www.bilibili.com/video/av%d'
     CLICK_NOW_URL = 'http://api.bilibili.com/x/report/click/now?jsonp=jsonp'
     CLICK_WEB_URL = 'http://api.bilibili.com/x/report/click/web/h5'
     REPORT_HEARTBEAT_URL = 'http://api.bilibili.com/x/report/web/heartbeat'
     ARCHIVE_STAT_URL = 'http://api.bilibili.com/x/web-interface/archive/stat?aid=%d'
-    VIEW_URL = 'https://api.bilibili.com/x/web-interface/view?aid=%d'
+    VIEW_URL = 'http://api.bilibili.com/x/web-interface/view?aid=%d'
     RELATION_STAT_URL = 'http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=%d'
     BASIC_RANKING_URL = 'https://www.bilibili.com/ranking/all/%d/'
-    MEMBER_SUBMIT_URL = 'https://space.bilibili.com/ajax/member/getSubmitVideos?mid=%s&page=1&pagesize=50'
-    REPLY_V2_URL = 'https://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=0'
+    MEMBER_SUBMIT_URL = 'http://space.bilibili.com/ajax/member/getSubmitVideos?mid=%s&page=1&pagesize=50'
+    REPLY_V2_URL = 'http://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=0'
 
     def __init__(self):
         self.finish = 0
@@ -361,14 +361,17 @@ class Up():
     def get_star_num(self, mid: int, times: int):
         ''' get star num'''
         url = self.RELATION_STAT_URL % mid
-        changeHeaders({'Origin': self.BILIBILI_URL, 'Referer': self.AV_URL})
-        req = get_request_proxy(url, 2)
+        header = {**headers, **
+                  {'Origin': self.BILIBILI_URL, 'Referer': self.AV_URL}}
+        if 'Host' in header:
+            del header['Host']
+        req = get_request_proxy(url, 2, header=header)
         if req is None or req.status_code != 200 or len(req.text) < 8 or not '{' in req.text:
             if times < 3:
                 self.get_star_num(mid, times + 1)
             return
         try:
-            json_req = js.loads(req.text[7:-1])
+            json_req = json.loads(req.text[7:-1])
             self.star[mid] = json_req['data']['follower']
         except:
             pass

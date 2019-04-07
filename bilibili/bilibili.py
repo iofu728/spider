@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-07 20:19:08
+@Last Modified time: 2019-04-08 00:23:03
 '''
 
 import codecs
@@ -17,7 +17,7 @@ import shutil
 
 from configparser import ConfigParser
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email, headers
+from utils.utils import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email, headers, time_str
 
 get_request_proxy = GetFreeProxy().get_request_proxy
 one_day = 86400
@@ -199,11 +199,9 @@ class Up():
                 self.check_rank(av_id, times + 1)
             return
         if len(rank_list):
-            data = [time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data, *rank_list[:2], *rank_list[3:5]]
+            data = [time_str(), *data, *rank_list[:2], *rank_list[3:5]]
         else:
-            data = [time.strftime("%Y-%m-%d %H:%M:%S",
-                                  time.localtime(time.time())), *data]
+            data = [time_str(), *data]
 
         with codecs.open('%s%d.csv' % (history_dir, av_id), 'a', encoding='utf-8') as f:
             f.write(','.join([str(index) for index in data]) + '\n')
@@ -263,11 +261,9 @@ class Up():
                 'reply', 'share', 'danmaku']
         data = [json_req[index] for index in need]
         if len(rank_list):
-            data = [time.strftime(
-                "%Y-%m-%d %H:%M:%S", time.localtime(time.time())), *data, *rank_list[:2], *rank_list[3:5]]
+            data = [time_str(), *data, *rank_list[:2], *rank_list[3:5]]
         else:
-            data = [time.strftime("%Y-%m-%d %H:%M:%S",
-                                  time.localtime(time.time())), *data]
+            data = [time_str(), *data]
         self.data_v2[av_id] = data
 
     def have_error(self, json_req: dict, types=None) -> bool:
@@ -339,8 +335,8 @@ class Up():
         follower_2 = self.star[mid] if mid in self.star else 0
         one_day_data = self.data_v2[av_id] if av_id in self.data_v2 else []
 
-        data = [time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data_time)),
-                av_id, follower, follower_2, *origin_data, *one_day_data]
+        data = [time_str(data_time), av_id, follower,
+                follower_2, *origin_data, *one_day_data]
         with codecs.open(data_dir + 'public.csv', 'a', encoding='utf-8') as f:
             f.write(','.join([str(ii) for ii in data]) + '\n')
 
@@ -358,7 +354,7 @@ class Up():
         self.get_star_num(mid, 0)
         self.public[av_id] = [data_time, mid]
 
-    def get_star_num(self, mid: int, times: int):
+    def get_star_num(self, mid: int, times: int, load_disk=False):
         ''' get star num'''
         url = self.RELATION_STAT_URL % mid
         header = {**headers, **
@@ -373,6 +369,9 @@ class Up():
         try:
             json_req = json.loads(req.text[7:-1])
             self.star[mid] = json_req['data']['follower']
+            if load_disk:
+                with open('%sstar.csv' % data_dir, 'a') as f:
+                    f.write('%s,%d\n' % (time_str(), self.star[mid]))
         except:
             pass
 
@@ -478,6 +477,10 @@ class Up():
                 threading_list.append(work)
                 check = threading.Thread(target=self.get_check, args=())
                 threading_list.append(check)
+            if index % 15:
+                work = threading.Thread(
+                    target=self.get_star_num, args=(self.assign_up_mid, 0, True))
+                threading_list.append(work)
             for av_id in self.rank_map:
                 work = threading.Thread(target=self.check_rank, args=(av_id,))
                 threading_list.append(work)
@@ -487,8 +490,8 @@ class Up():
 
     def get_check(self):
         ''' check comment '''
-        now_hour = int(time.strftime("%H", time.localtime(time.time())))
-        now_min = int(time.strftime("%M", time.localtime(time.time())))
+        now_hour = int(time_str(format='%H'))
+        now_min = int(time_str(format='%M'))
         now_time = now_hour + now_min / 60
         if now_time > 0.5 and now_time < 8.5:
             return
@@ -592,8 +595,7 @@ class Up():
 
     def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_floor=None):
         ''' get comment detail '''
-        ctime = time.strftime("%Y-%m-%d %H:%M:%S",
-                              time.localtime(comment['ctime']))
+        ctime = time_str(comment['ctime'])
         wait_list = ['floor', 'member', 'content', 'like']
         wait_list_mem = ['uname', 'sex', 'sign', 'level_info']
         wait_list_content = ['message', 'plat']

@@ -8,5 +8,7 @@ tid:126
 view_abnormal:1000
 [assign]
 av_ids:21061574,11624347
+;split by ','
 [comment]
-keyword:死全家,草泥马
+keyword:死全家|草泥马|.{0,4}\$\$_.{0,4}
+;support re, use '|' split

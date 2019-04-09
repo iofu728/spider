@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2018-10-19 15:33:46
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-06 21:56:21
+@Last Modified time: 2019-04-08 00:13:15
 '''
 
 import codecs
@@ -257,7 +257,7 @@ def send_email(context: str, subject: str) -> bool:
     send email
     """
 
-    if not os.path.exists('%semailSend' % data_dir) or os.path.exists('%semailRec' % data_dir):
+    if not os.path.exists('%semailSend' % data_dir) or not os.path.exists('%semailRec' % data_dir):
         print('email send/Rec list not exist!!!')
         return
     with codecs.open('%semailSend' % data_dir, 'r', encoding='utf-8') as f:
@@ -318,3 +318,9 @@ def load_bigger(input_file: str):
         for _ in range(0, input_size, max_bytes):
             bytes_in += f_in.read(max_bytes)
     return pickle.loads(bytes_in)
+
+
+def time_str(timestamp: int = -1, format: str = '%Y-%m-%d %H:%M:%S'):
+    if timestamp > 0:
+        return time.strftime(format, time.localtime(timestamp))
+    return time.strftime(format, time.localtime(time.time()))

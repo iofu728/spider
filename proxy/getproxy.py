@@ -18,7 +18,7 @@ import http.cookiejar as cj
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 from utils.db import Db
-from utils.utils import begin_time, end_time, changeJsonTimeout, changeHtmlTimeout, basic_req
+from utils.utils import begin_time, end_time, changeJsonTimeout, changeHtmlTimeout, basic_req, time_str
 
 """
   * gatherproxy.com
@@ -131,7 +131,7 @@ class GetFreeProxy:
         failure log
         """
         with codecs.open("proxy.log", 'a', encoding='utf-8') as f:
-            f.write(time.strftime("%Y-%m-%d %H:%M:%S ",time.localtime()) + url + '\n')
+            f.write(time_str()+ url + '\n')
 
     def insertproxy(self, insertlist):
         """

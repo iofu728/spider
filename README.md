@@ -3,7 +3,7 @@
 <img width="100" src="https://cdn.nlark.com/yuque/0/2018/jpeg/104214/1540358574166-46cbbfd2-69fa-4406-aba9-784bf65efdf9.jpeg" alt="Spider logo"></a></p>
 <h1 align="center">Spider Man</h1>
 
-[![GitHub](https://img.shields.io/github/license/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider/master/LICENSE)
+[![GitHub](https://img.shields.io/github/license/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider/blob/master/LICENSE)
 [![GitHub tag](https://img.shields.io/github/tag/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider/releases)
 [![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/iofu728/spider.svg?style=popout-square)](https://github.com/iofu728/spider)
 
@@ -14,15 +14,15 @@
 - [Proxy pool](#proxy-pool)
 - [Application](#application)
   - [`Netease`](#netease)
-    - [`Press Test System`](#press-test-system)
-    - [`News`](#news)
+  - [`Press Test System`](#press-test-system)
+  - [`News`](#news)
   - [`Youdao Note`](#youdao-note)
-    - [`blog`](#blog)
-    - [`Brush Class`](#brush-class)
-    - [`zimuzu`](#zimuzu)
-    - [`Bilibili`](#bilibili)
-    - [`shaoq`](#shaoq)
-    - [`eastmoney`](#eastmoney)
+  - [`blog`](#blog)
+  - [`Brush Class`](#brush-class)
+  - [`zimuzu`](#zimuzu)
+  - [`Bilibili`](#bilibili)
+  - [`shaoq`](#shaoq)
+  - [`eastmoney`](#eastmoney)
 - [Development](#development)
 - [Structure](#structure)
 - [Design document](#design-document)
@@ -46,7 +46,7 @@
 
 - Big data store
 - High concurrency requests
-- Support Websocket
+- Support WebSocket
 - method for font cheat
 - method for js compile
 - Some Application
@@ -57,19 +57,24 @@
 
 - <u>`Highly Available Proxy IP Pool`</u>
   - By obtaining data from `Gatherproxy`, `Goubanjia`, `xici` etc. Free Proxy WebSite
-  - Analysis the Goubanjia port data
+  - Analysis of the Goubanjia port data
   - Quickly verify IP availability
   - Cooperate with Requests to automatically assign proxy Ip, with Retry mechanism, fail to write DB mechanism
-  - two model for proxy shell
-    - model 1: load gather proxy list && update proxy list file
-    - model 2: update proxy pool db && test available
+  - two models for proxy shell
+    - model 1: load gather proxy list && update proxy list file(need over the GFW, your personality passwd in http://gatherproxy.com to `proxy/data/passage` one line by username, one line by passwd)
+    - model 0: update proxy pool db && test available
   - one common proxy api
     - `from proxy.getproxy import GetFreeProxy`
     - `get_request_proxy = GetFreeProxy().get_request_proxy`
     - `get_request_proxy(url: str, types: int, data=None, test_func=None, header=None)`
-  - also one comon basic req api
-    - `from util import baisc_req`
+  - also one common basic req api
+    - `from util import basic_req`
     - `basic_req(url: str, types: int, proxies=None, data=None, header=None)`
+  - if you want spider by using proxy
+    - because access proxy web need over the GFW, so maybe you can't use `model 1` to download proxy file.
+    - 1. download proxy txt from http://gatherproxy.com
+    - 2. cp download_file proxy/data/gatherproxy
+    - 3. python proxy/getproxy.py --model==0
 
 ## Application
 
@@ -84,7 +89,7 @@
 - V2 Proxy IP pool, Record progress, Write to MySQL
   - Optimize the write to DB `Load data/ Replace INTO`
 
-#### `Press Test System`
+### `Press Test System`
 
 2. <u>`Press Test System`</u> - <u>`press/press.py`</u>
 
@@ -93,7 +98,7 @@
 - Give some web service uneven pressure
 - To do: press uniform
 
-#### `News`
+### `News`
 
 3. <u>`google & baidu info crawl`</u> - <u>`news/news.py`</u>
 
@@ -108,27 +113,27 @@
 - load data from `youdaoyun`
 - by series of rules to deal data to .md
 
-#### `blog`
+### `blog`
 
 5. <u>`csdn && zhihu && jianshu view info crawl`</u> - <u>`blog/titleview.py`</u>
 
-#### `Brush Class`
+### `Brush Class`
 
 6. <u>`PKU Class brush`</u> - <u>`brushclass/brushclass.py`</u>
 
 - when your expected class have places, It will send you some email.
 
-#### `zimuzu`
+### `zimuzu`
 
 7. <u>`ZiMuZu download list crawl`</u> - <u>`zimuzu/zimuzu.py`</u>
 
 - when you want to download lots of show like Season 22, Season 21.
 - If click one by one, It is very boring, so zimuzu.py is all you need.
-- The thing you only need do is to wait the program run.
-- And you copy the Thunder url for one to download the movies.
-- Now The Winter will coming, I think you need it to review `<Game of Thrones>`.
+- The thing you only need do is to wait for the program run.
+- And you copy the Thunder URL for one to download the movies.
+- Now The Winter will come, I think you need it to review `<Game of Thrones>`.
 
-#### `Bilibili`
+### `Bilibili`
 
 8. <u>`Get av data by http`</u> - <u>`bilibili/bilibili.py`</u>
 
@@ -137,35 +142,35 @@
 
 9. <u>`Get av data by websocket`</u> - <u>`bilibili/bsocket.py`</u>
 
-- base on websocket
+- base on WebSocket
 - byte analysis
-- heart beat
+- heartbeat
 
 10. <u>`Get comment data by http`</u> - <u>`bilibili/bilibili.py`</u>
 
 - load comment from `/x/v2/reply`
 
-#### `shaoq`
+### `shaoq`
 
 11. <u>`Get text data by compiling javascript`</u> - <u>`exam/shaoq.py`</u>
 
 [more detail](#examshaoq)
 
-#### `eastmoney`
+### `eastmoney`
 
 12. <u>`Get stock info by analysis font`</u> - <u>`eastmoney/eastmoney.py`</u>
 
 - font analysis
 
-[more detail](#eastmoneyeastmoneys)
+[more detail](#eastmoneyeastmoney)
 
 **----To be continued----**
 
 ## Development
 
-**All model base on `proxy.getproxy`, so it is very !import.**
+**All model base on `proxy.getproxy`, so it is a very !import.**
 
-`docker` is in the road.
+`docker` is on the road.
 
 ```bash
 $ git clone https://github.com/iofu728/spider.git
@@ -174,7 +179,7 @@ $ pip3 install -r requirement.txt
 
 # using proxy pool
 $ python proxy/getproxy.py --model=1         # model = 1: load gather proxy (now need have qualification to request google)
-$ python proxy/getproxy.py --model=1         # model = 0: test proxy
+$ python proxy/getproxy.py --model=0         # model = 0: test proxy
 
 $ from  proxy.getproxy import GetFreeProxy
 $ get_request_proxy = GetFreeProxy().get_request_proxy
@@ -281,9 +286,9 @@ parent_tree.find_all(re.compile('''))
 
 #### Idea
 
-1. get data from html -> json
+1. get data from HTML -> json
 2. get font map -> transform num
-3. or load font analysis font(contrast withe base)
+3. or load font analysis font(contrast with base)
 
 #### Trouble Shooting
 
@@ -313,4 +318,4 @@ parent_tree.find_all(re.compile('''))
 
 ##### `bilibili` some url return 404 like `http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=`
 
-basic_req auto add `host` to headers, but this url can't request in ‘Host’
+basic_req auto add `host` to headers, but this URL can't request in ‘Host’

@@ -257,7 +257,7 @@ def send_email(context: str, subject: str) -> bool:
     send email
     """
 
-    if not os.path.exists('%semailSend' % data_dir) or os.path.exists('%semailRec' % data_dir):
+    if not os.path.exists('%semailSend' % data_dir) or not os.path.exists('%semailRec' % data_dir):
         print('email send/Rec list not exist!!!')
         return
     with codecs.open('%semailSend' % data_dir, 'r', encoding='utf-8') as f:

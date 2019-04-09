@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-08 00:23:03
+@Last Modified time: 2019-04-09 10:26:28
 '''
 
 import codecs
@@ -84,7 +84,7 @@ class Up():
         self.view_abnormal = cfg.getint('basic', 'view_abnormal')
         self.assign_ids = [int(ii)
                            for ii in cfg.get('assign', 'av_ids').split(',')]
-        self.keyword = cfg.get('comment', 'keyword').split(',')
+        self.keyword = cfg.get('comment', 'keyword')
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
 
@@ -400,7 +400,6 @@ class Up():
                 rank_map[av_id] = [rank, score, name, index, day_index]
 
         ''' check assign av rank '''
-        self.load_configure()
         for ii in self.assign_ids:
             if not ii in self.public:
                 wait_check_public.append(ii)
@@ -471,13 +470,16 @@ class Up():
         self.rank_map = {ii: [] for ii in self.assign_ids}
 
         for index in range(num):
+            ''' reload configure '''
+            self.load_configure()
+
             threading_list = []
             if not index % 5:
                 work = threading.Thread(target=self.load_rank, args=())
                 threading_list.append(work)
                 check = threading.Thread(target=self.get_check, args=())
                 threading_list.append(check)
-            if index % 15:
+            if not index % 15:
                 work = threading.Thread(
                     target=self.get_star_num, args=(self.assign_up_mid, 0, True))
                 threading_list.append(work)
@@ -614,7 +616,7 @@ class Up():
         ''' check comment and send warning email if error '''
         floor, ctime, like, _, _, uname, sex, content, sign = req_list
 
-        if not len([0 for ii in self.keyword if ii in content]):
+        if not len(re.findall(self.keyword, content)):
             return True
 
         floor = str(

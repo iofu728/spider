@@ -1,12 +1,16 @@
-# -*- coding: utf-8 -*-
-# @Author: gunjianpan
-# @Date:   2019-02-28 09:47:07
-# @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-28 00:16:05
+'''
+@Author: gunjianpan
+@Date:   2019-02-28 09:47:06
+@Last Modified by:   gunjianpan
+@Last Modified time: 2019-04-13 14:11:45
+'''
 
 import codecs
+import os
 import re
+import shutil
 
+from configparser import ConfigParser
 from proxy.getproxy import GetFreeProxy
 from utils.utils import begin_time, end_time, can_retry
 
@@ -14,21 +18,26 @@ get_request_proxy = GetFreeProxy().get_request_proxy
 
 """
   * zimuzu @http
-  * zmz005.com/o5itP3
+  * zmz005.com/XXXXXX
 """
 
+configure_path = 'zimuzu/zimuzu.ini'
+data_dir = 'zimuzu/data/'
 
-class southPark(object):
-    """
-    load download South Park url from zimuzu
-    """
+
+class zimuzu():
+    ''' load download link from zimuzu '''
+
+    def __init__(self):
+        cfg = ConfigParser()
+        cfg.read(configure_path, 'utf-8')
+        self.zimuzu_id = cfg.get('basic', 'zimuzu_id')
+        self.drama_name = cfg.get('basic', 'drama_name')
 
     def load_url(self):
-        """
-        load url form zimuzu
-        """
+        ''' load url form zimuzu '''
 
-        url = 'http://zmz005.com/o5itP3'
+        url = 'http://zmz005.com/{}'.format(self.zimuzu_id)
         detail = get_request_proxy(url, 0)
         total = []
 
@@ -51,5 +60,14 @@ class southPark(object):
             url = [index.find_all('div', class_='copy-link')[1]['data-url']
                    for index in url_list]
             total.append('\n'.join(url) + '\n')
-        with codecs.open('zimuzu/data/southPark', 'w', encoding='utf-8') as f:
+        with codecs.open('{}{}'.format(data_dir, self.drama_name), 'w', encoding='utf-8') as f:
             f.write('\n'.join(total))
+
+
+if __name__ == '__main__':
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    if not os.path.exists(configure_path):
+        shutil.copy(configure_path + '.tmp', configure_path)
+    zimuzu = zimuzu()
+    zimuzu.load_url()

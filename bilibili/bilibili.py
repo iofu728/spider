@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-15 12:56:59
+@Last Modified time: 2019-04-15 18:09:11
 '''
 
 import codecs
@@ -22,8 +22,8 @@ from utils.utils import begin_time, end_time, changeHeaders, basic_req, can_retr
 get_request_proxy = GetFreeProxy().get_request_proxy
 one_day = 86400
 data_dir = 'bilibili/data/'
-history_dir = '%shistory/' % data_dir
-comment_dir = '%scomment/' % data_dir
+history_dir = '{}history/'.format(data_dir)
+comment_dir = '{}comment/'.format(data_dir)
 assign_path = 'bilibili/assign_up.ini'
 
 """
@@ -359,7 +359,7 @@ class Up():
         req = get_request_proxy(url, 2, header=header)
         if req is None or req.status_code != 200 or len(req.text) < 8 or not '{' in req.text:
             if times < 3:
-                self.get_star_num(mid, times + 1)
+                self.get_star_num(mid, times + 1, load_disk)
             return
         try:
             json_req = json.loads(req.text[7:-1])
@@ -391,7 +391,7 @@ class Up():
         last_star = self.last_star[mid]
         if last_star > star:
             return False
-        if last_star + self.view_abnormals < star:
+        if last_star + self.view_abnormal < star:
             return False
         return True
 

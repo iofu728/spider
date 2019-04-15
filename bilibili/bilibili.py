@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-15 11:39:50
+@Last Modified time: 2019-04-15 11:55:02
 '''
 
 import codecs
@@ -419,9 +419,10 @@ class Up():
             score = int(av.find_all('div', class_='pts')
                         [0].find_all('div')[0].text)
             name = av.find_all('span')[2].text
+            temp_rank_list = [rank, score, name, index, day_index]
+            self.check_rank_rose(av_id, temp_rank_list)
             if self.add_av(av_id, rank, score):
-                rank_map[av_id] = [rank, score, name, index, day_index]
-                self.check_rank_rose(av_id, rank_map[av_id])
+                rank_map[av_id] = temp_rank_list
 
         ''' check assign av rank '''
         for ii in self.assign_ids:

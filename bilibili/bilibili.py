@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-15 11:55:02
+@Last Modified time: 2019-04-15 12:56:59
 '''
 
 import codecs
@@ -389,7 +389,7 @@ class Up():
         if not mid in self.last_star:
             return True
         last_star = self.last_star[mid]
-        if last_star < star:
+        if last_star > star:
             return False
         if last_star + self.view_abnormals < star:
             return False

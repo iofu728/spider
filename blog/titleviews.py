@@ -119,6 +119,10 @@ class TitleViews(object):
         json = self.get_request(url + '1', 1)
         if not json:
             return
+        if not 'data' in json:
+            if 'code' in json:
+                print(json)
+            return
         for index in json['data']:
             zhihu_title = index['title']
             zhihu_id = int(index['url_token'])

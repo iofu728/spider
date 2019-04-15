@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-09 10:26:28
+@Last Modified time: 2019-04-15 11:39:50
 '''
 
 import codecs
@@ -66,6 +66,8 @@ class Up():
         self.last_rank = {}
         self.last_check = {}
         self.last_view = {}
+        self.last_star = {}
+        self.rank_map = {}
         self.comment = {}
         self.comment_max = {}
         self.begin_timestamp = int(time.time())
@@ -84,6 +86,8 @@ class Up():
         self.view_abnormal = cfg.getint('basic', 'view_abnormal')
         self.assign_ids = [int(ii)
                            for ii in cfg.get('assign', 'av_ids').split(',')]
+        rank_map = {ii: [] for ii in self.assign_ids}
+        self.rank_map = {**rank_map, **self.rank_map}
         self.keyword = cfg.get('comment', 'keyword')
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
@@ -206,16 +210,7 @@ class Up():
         with codecs.open('%s%d.csv' % (history_dir, av_id), 'a', encoding='utf-8') as f:
             f.write(','.join([str(index) for index in data]) + '\n')
 
-        if self.check_rank_list(av_id, rank_list):
-            av_id_id = int(av_id) * 10 + int(rank_list[-1])
-            if av_id_id not in self.rank:
-                self.rank[av_id_id] = [rank_list[0] // 10]
-            else:
-                self.rank[av_id_id].append(rank_list[0] // 10)
-            self.last_rank[av_id_id] = rank_list[0]
-            send_email('%dday List || Rank: %d Score: %d' % (int(
-                rank_list[-1]), rank, score), '%dday List || Rank: %d Score: %d' % (int(rank_list[-1]), rank, score))
-        if av_id in self.last_check and self.last_check[av_id] - int(time.time()) > one_day:
+        if av_id in self.last_check and int(time.time()) - self.last_check[av_id] > one_day:
             del self.rank_map[av_id]
         elif av_id not in self.last_check and int(time.time()) > one_day + self.begin_timestamp:
             del self.rank_map[av_id]
@@ -226,7 +221,7 @@ class Up():
         if not av_id in self.last_view:
             return True
         last_view = self.last_view[av_id]
-        if last_view < view:
+        if last_view > view:
             return False
         if last_view + self.view_abnormal < view:
             return False
@@ -369,19 +364,47 @@ class Up():
         try:
             json_req = json.loads(req.text[7:-1])
             self.star[mid] = json_req['data']['follower']
-            if load_disk:
-                with open('%sstar.csv' % data_dir, 'a') as f:
+            if load_disk and self.check_star(mid, self.star[mid]):
+                self.last_star[mid] = self.star[mid]
+                with open('{}star.csv'.format(data_dir), 'a') as f:
                     f.write('%s,%d\n' % (time_str(), self.star[mid]))
         except:
             pass
 
+    def check_rank_rose(self, av_id, rank_list):
+        ''' check rank rose '''
+        if self.check_rank_list(av_id, rank_list):
+            rank, score = rank_list[:2]
+            av_id_id = int(av_id) * 10 + int(rank_list[-1])
+            if av_id_id not in self.rank:
+                self.rank[av_id_id] = [rank_list[0] // 10]
+            else:
+                self.rank[av_id_id].append(rank_list[0] // 10)
+            self.last_rank[av_id_id] = rank_list[0]
+            send_email('%d day List || Rank: %d Score: %d' % (int(
+                rank_list[-1]), rank, score), '%d day List || Rank: %d Score: %d' % (int(rank_list[-1]), rank, score))
+
+    def check_star(self, mid: int, star: int) -> bool:
+        ''' check star '''
+        if not mid in self.last_star:
+            return True
+        last_star = self.last_star[mid]
+        if last_star < star:
+            return False
+        if last_star + self.view_abnormals < star:
+            return False
+        return True
+
     def load_rank_index(self, index: int, day_index: int):
         ''' load rank '''
-        changeHeaders({'Referer': self.RANKING_URL % (index, day_index)})
+        changeHeaders({'Referer': self.AV_URL})
         url = self.RANKING_URL % (index, day_index)
         html = basic_req(url, 0)
         rank_list = html.find_all('li', class_='rank-item')
-
+        if not len(rank_list):
+            if can_retry(url):
+                self.load_rank_index(index, day_index)
+            return False
         now_av_id = []
         wait_check_public = []
         rank_map = {}
@@ -398,6 +421,7 @@ class Up():
             name = av.find_all('span')[2].text
             if self.add_av(av_id, rank, score):
                 rank_map[av_id] = [rank, score, name, index, day_index]
+                self.check_rank_rose(av_id, rank_map[av_id])
 
         ''' check assign av rank '''
         for ii in self.assign_ids:
@@ -497,8 +521,8 @@ class Up():
         now_time = now_hour + now_min / 60
         if now_time > 0.5 and now_time < 8.5:
             return
-        if os.path.exists('%scomment.pkl' % comment_dir):
-            with codecs.open('%scomment.pkl' % comment_dir, 'rb') as f:
+        if os.path.exists('{}comment.pkl'.format(comment_dir)):
+            with codecs.open('{}comment.pkl'.format(comment_dir), 'rb') as f:
                 self.comment = pickle.load(f)
         if self.assign_up_mid == -1:
             return
@@ -510,6 +534,10 @@ class Up():
             return
         av_id_list = [[ii['aid'], ii['comment']]
                       for ii in json_req['data']['vlist']]
+        if self.basic_av_id not in av_id_list:
+            if can_retry(url):
+                self.get_check()
+            return
 
         threading_list = []
         for (ii, jj) in av_id_list:
@@ -522,7 +550,7 @@ class Up():
             work.start()
         for work in threading_list:
             work.join()
-        with codecs.open('%scomment.pkl' % comment_dir, 'wb') as f:
+        with codecs.open('{}comment.pkl'.format(comment_dir), 'wb') as f:
             pickle.dump(self.comment, f)
         return av_id_list
 

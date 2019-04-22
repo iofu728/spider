@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2019-03-16 15:18:10
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-15 18:09:11
+@Last Modified time: 2019-04-19 17:36:32
 '''
 
 import codecs
@@ -89,6 +89,7 @@ class Up():
         rank_map = {ii: [] for ii in self.assign_ids}
         self.rank_map = {**rank_map, **self.rank_map}
         self.keyword = cfg.get('comment', 'keyword')
+        self.ignore_comment = json.loads(cfg.get('comment', 'ignore'))
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
 
@@ -183,9 +184,6 @@ class Up():
     def check_rank(self, av_id: int, times=0):
         rank_list = self.rank_map[av_id] if av_id in self.rank_map else []
         changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
-        if len(rank_list):
-            score = int(rank_list[1])
-            rank = int(rank_list[0])
 
         url = self.ARCHIVE_STAT_URL % av_id
         json_req = get_request_proxy(url, 1)
@@ -203,7 +201,7 @@ class Up():
                 self.check_rank(av_id, times + 1)
             return
         if len(rank_list):
-            data = [time_str(), *data, *rank_list[:2], *rank_list[3:5]]
+            data = [time_str(), *data, *rank_list[:2], *rank_list[-2:]]
         else:
             data = [time_str(), *data]
 
@@ -256,7 +254,7 @@ class Up():
                 'reply', 'share', 'danmaku']
         data = [json_req[index] for index in need]
         if len(rank_list):
-            data = [time_str(), *data, *rank_list[:2], *rank_list[3:5]]
+            data = [time_str(), *data, *rank_list[:2], *rank_list[-2:]]
         else:
             data = [time_str(), *data]
         self.data_v2[av_id] = data
@@ -399,29 +397,28 @@ class Up():
         ''' load rank '''
         changeHeaders({'Referer': self.AV_URL})
         url = self.RANKING_URL % (index, day_index)
-        html = basic_req(url, 0)
-        rank_list = html.find_all('li', class_='rank-item')
-        if not len(rank_list):
+        text = basic_req(url, 3)
+        rank_str = re.findall('window.__INITIAL_STATE__=(.*?);', text)
+        if not len(rank_str):
             if can_retry(url):
                 self.load_rank_index(index, day_index)
             return False
+        rank_map = json.loads(rank_str[0])
+        rank_list = rank_map['rankList']
+
         now_av_id = []
         wait_check_public = []
         rank_map = {}
 
-        for av in rank_list:
-            av_href = av.find_all('a')[0]['href']
-            av_id = int(re.findall('av.*', av_href)[0][2:-1])
+        for ii, rank in enumerate(rank_list):
+            av_id = int(rank['aid'])
+            need_params = ['pts','author','mid','play','video_review', 'coins', 'duration', 'title']
+            temp_rank_list = [ii, *[rank[ii] for ii in need_params], index, day_index]
             now_av_id.append(av_id)
             if not self.check_type(av_id):
                 continue
-            rank = int(av.find_all('div', class_='num')[0].text)
-            score = int(av.find_all('div', class_='pts')
-                        [0].find_all('div')[0].text)
-            name = av.find_all('span')[2].text
-            temp_rank_list = [rank, score, name, index, day_index]
             self.check_rank_rose(av_id, temp_rank_list)
-            if self.add_av(av_id, rank, score):
+            if self.add_av(av_id, ii, temp_rank_list[1]):
                 rank_map[av_id] = temp_rank_list
 
         ''' check assign av rank '''
@@ -496,7 +493,6 @@ class Up():
 
         for index in range(num):
             ''' reload configure '''
-            self.load_configure()
 
             threading_list = []
             if not index % 5:
@@ -514,6 +510,7 @@ class Up():
             for work in threading_list:
                 work.start()
             time.sleep(120)
+            self.load_configure()
 
     def get_check(self):
         ''' check comment '''
@@ -535,7 +532,7 @@ class Up():
             return
         av_id_list = [[ii['aid'], ii['comment']]
                       for ii in json_req['data']['vlist']]
-        if self.basic_av_id not in av_id_list:
+        if self.basic_av_id not in [ii[0] for ii in av_id_list]:
             if can_retry(url):
                 self.get_check()
             return
@@ -651,6 +648,8 @@ class Up():
         floor = str(
             floor) if parent_floor is None else '%d-%d' % (parent_floor, floor)
         url = self.BASIC_AV_URL % av_id
+        if str(av_id) in self.ignore_comment and floor in self.ignore_comment[str(av_id)]:
+            return True
 
         email_content = '%s\nUrl: %s Page: %d #%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s\nlike: %d' % (
             ctime, url, pn, floor, uname, sex, content, sign, like)

@@ -1,26 +1,32 @@
-# -*- coding: utf-8 -*-
-# @Description: Get High Availability Proxy
-# @Author: gunjianpan
-# @Date:   2018-10-18 23:10:19
-# @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-26 01:12:06
+'''
+@Author: gunjianpan
+@Description: Get High Availability Proxy
+@Date:   2018-09-27 21:32:45
+@Last Modified by:   gunjianpan
+@Last Modified time: 2019-04-18 15:50:34
+'''
 
 import argparse
 import codecs
 import functools
+import http.cookiejar as cj
 import os
 import random
+import re
 import threading
 import time
 import requests
-import http.cookiejar as cj
-
+import sys
+sys.path.append(os.getcwd())
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
+
 from utils.db import Db
-from utils.utils import begin_time, end_time, changeJsonTimeout, changeHtmlTimeout, basic_req, time_str
+from utils.utils import begin_time, end_time, changeJsonTimeout, changeHtmlTimeout, basic_req, time_str, can_retry, echo
 
 """
+  * www.proxyserverlist24.top
+  * www.live-socks.net
   * gatherproxy.com
   * goubanjia.com
     xicidaili.com
@@ -32,15 +38,13 @@ from utils.utils import begin_time, end_time, changeJsonTimeout, changeHtmlTimeo
     └── passage      // gather passage
 """
 
-data_path = 'proxy/data/'
+data_dir = 'proxy/data/'
 MAXN = 0x3fffffff
 type_map = {1: 'https', 0: 'http'}
 
 
 class GetFreeProxy:
-    """
-    proxy pool
-    """
+    ''' proxy pool '''
 
     def __init__(self):
         self.Db = Db("netease")
@@ -53,6 +57,7 @@ class GetFreeProxy:
         self.waitjudge = []
         self.cannotuseip = {}
         self.failuredtime = {}
+        self.canuse_proxies = []
         self.initproxy()
 
     def get_request_proxy(self, url:str, types:int, data=None, test_func=None, header=None):
@@ -75,7 +80,7 @@ class GetFreeProxy:
 
         if not len(proxylist):
             if self.Db.db:
-                print('Proxy pool empty!!! Please check the db conn & db dataset!!!')
+                echo(0, 'Proxy pool empty!!! Please check the db conn & db dataset!!!')
             proxies = {}
         else:
             index = random.randint(0, len(proxylist) - 1)
@@ -139,7 +144,7 @@ class GetFreeProxy:
         """
         results = self.Db.insert_db(self.insert_sql % str(insertlist)[1:-1])
         if results:
-            print('Insert ' + str(len(insertlist)) + ' items Success!')
+            echo(2, 'Insert ' + str(len(insertlist)) + ' items Success!')
         else:
             pass
 
@@ -151,7 +156,7 @@ class GetFreeProxy:
         results = self.Db.update_db(self.replace_ip % str(updatelist)[1:-1])
         typemap = {0: 'can use ', 1: 'can not use '}
         if results:
-            print('Update', typemap[types],str(len(updatelist)),' items Success!')
+            echo(2, 'Update', typemap[types],str(len(updatelist)),' items Success!')
         else:
             pass
 
@@ -174,7 +179,7 @@ class GetFreeProxy:
 
         results = self.selectproxy([ii[0] for ii in self.canuseip.values()])
         ss_len = len([1 for ii in self.canuseip.values() if ii[1] > 1])
-        print("SS proxies %d"%ss_len)
+        echo(2, "SS proxies %d"%ss_len)
 
         insertlist = []
         updatelist = []
@@ -246,14 +251,14 @@ class GetFreeProxy:
                     self.proxylists_ss.append(index[0])
                 else:
                     self.proxylist.append(index[0])
-            print(len(self.proxylist), ' http proxy can use.')
-            print(len(self.proxylists), ' https proxy can use.')
-            print(len(self.proxylist_ss), ' ss http proxy can use.')
-            print(len(self.proxylists_ss), ' ss https proxy can use.')
+            echo(2, len(self.proxylist), ' http proxy can use.')
+            echo(2, len(self.proxylists), ' https proxy can use.')
+            echo(2, len(self.proxylist_ss), ' ss http proxy can use.')
+            echo(2, len(self.proxylists_ss), ' ss https proxy can use.')
         else:
-            print('>>>Please check db configure!!! The proxy pool cant use!!!>>>')
+            echo(0, 'Please check db configure!!! The proxy pool cant use!!!>>>')
 
-    def judgeurl(self, urls, index, times):
+    def judgeurl(self, urls, index, times, ss_test=False):
         """
         use /api/playlist to judge http; use /discover/playlist judge https
         1. don't timeout = 5
@@ -266,27 +271,30 @@ class GetFreeProxy:
         test_url = type_map[http_type] + '://music.163.com/api/playlist/detail?id=432853362'
         ss_url = 'https://www.google.com/?gws_rd=ssl'
         try:
-            # print(test_url, proxies)
-            # return
             data = basic_req(test_url, 1, proxies)
             result = data['result']
             tracks = result['tracks']
             if len(tracks) == 56:
-                if times < 2:
+                if times < 0:
                     self.judgeurl(urls, index, times + 1)
                 else:
+                    echo(1, urls, proxies, 'Proxies can use.')
+                    self.canuse_proxies.append(urls)
                     self.canuseip[index] = [urls, int(http_type)]
-                    data = basic_req(ss_url, 0)
-                    if len(str(data)) > 5000:
-                        self.canuseip[index] = [urls, int(http_type) + 2]
+                    if ss_test:
+                        data = basic_req(ss_url, 0)
+                        if len(str(data)) > 5000:
+                            self.canuseip[index] = [urls, int(http_type) + 2]
             else:
+                echo(0, urls, proxies, 'Tracks len error ^--<^>--^ ')
                 self.cannotuseip[index] = urls
         except:
+            echo(0, urls, proxies, 'return error [][][][][][]')
             if not index in self.canuseip:
                 self.cannotuseip[index] = urls
             pass
 
-    def threadjude(self):
+    def threadjude(self, batch_size=500):
         """
         threading to judge proxy
         """
@@ -295,9 +303,9 @@ class GetFreeProxy:
 
         text = self.waitjudge
         num = len(text)
-        for block in range(num // 1000 + 1):
+        for block in range(num // batch_size + 1):
             blockthreads = []
-            for index in range(block * 1000, min(num, 1000 * (block + 1))):
+            for index in range(block * batch_size, min(num, batch_size * (block + 1))):
                 work = threading.Thread(
                     target=self.judgeurl, args=(text[index],index, 0,))
                 blockthreads.append(work)
@@ -305,10 +313,8 @@ class GetFreeProxy:
                 work.start()
             for work in blockthreads:
                 work.join()
-            # return
             self.dbcanuseproxy()
             self.cleancannotuse()
-
         self.waitjudge = []
 
     def testdb(self, types):
@@ -341,7 +347,7 @@ class GetFreeProxy:
         """
 
         if not str(page).isdigit():
-            print("Please input num!")
+            echo(0, "Please input num!")
             return []
 
         version = begin_time()
@@ -363,23 +369,22 @@ class GetFreeProxy:
         first of all you should download proxy ip txt from:
         http://www.gatherproxy.com/zh/proxylist/country/?c=China
         """
-        version = begin_time()
-        if not os.path.exists('%sgatherproxy'%data_path):
-            print('Gather file not exist!!!')
+        if not os.path.exists('{}gatherproxy'.format(data_dir)):
+            echo(0, 'Gather file not exist!!!')
             return
-        with codecs.open('%sgatherproxy'%data_path, 'r', encoding='utf-8') as f:
+        with codecs.open('{}gatherproxy'.format(data_dir), 'r', encoding='utf-8') as f:
             file_d = [ii.strip() for ii in f.readlines()]
+        waitjudge_http = ['http://' + ii for ii in file_d]
+        waitjudge_https = ['https://' + ii for ii in file_d]
         if not types:
-            waitjudge = ['http://' + ii[:-1] for ii in file_d]
-        elif types == 1:
-            waitjudge = ['https://' + ii[:-1] for ii in file_d]
+            self.waitjudge += waitjudge_http
+        elif types ==1:
+            self.waitjudge += waitjudge_https
+        elif types == 2:
+            self.waitjudge += (waitjudge_http + waitjudge_https)
         else:
-            waitjudge1 = ['http://' + ii[:-1] for ii in file_d]
-            waitjudge2 = ['https://' + ii[:-1] for ii in file_d]
-            waitjudge = [*waitjudge1, *waitjudge2]
-        self.waitjudge = waitjudge
-        print('load gather over!')
-        end_time(version)
+            self.waitjudge += file_d
+        echo(2, 'load gather over!')
 
 
     def goubanjia(self):
@@ -450,7 +455,7 @@ class GetFreeProxy:
         threadings = []
         for index in range(1, area + 1):
             for pageindex in range(1, page + 1):
-                print(str(index) + ' ' + str(pageindex))
+                echo(2,str(index) + ' ' + str(pageindex))
                 work = threading.Thread(
                     target=self.sixsixthread, args=(index, pageindex))
                 threadings.append(work)
@@ -535,7 +540,7 @@ class GetFreeProxy:
             elif num in num_map:
                 verify_num[index] = num_map[num]
             else:
-                print('Error', index)
+                echo(0, 'Error', index)
                 # return False
         verify_code = 0
         error = True
@@ -551,12 +556,11 @@ class GetFreeProxy:
             verify_code = verify_num[0] * verify_num[1]
             error = False
         if error:
-            print('Error', operation)
-            # return False
-        if not os.path.exists('%spassage'%data_path):
-            print('gather passage not exist!!!')
+            echo(0, 'Error', operation)
+        if not os.path.exists('%spassage'%data_dir):
+            echo(0, 'gather passage not exist!!!')
             return
-        with codecs.open('%spassage'%data_path, 'r', encoding='utf-8') as f:
+        with codecs.open('%spassage'%data_dir, 'r', encoding='utf-8') as f:
             passage = [index[:-1] for index in f.readlines()]
         data = {'Username': passage[0], 'Password': passage[1], 'Captcha': str(verify_code)}
         time.sleep(2.163)
@@ -587,7 +591,7 @@ class GetFreeProxy:
         sid_url_html = BeautifulSoup(sid_url_req.text, 'html.parser')
         sid_url = sid_url_html.find_all('div', class_='wrapper')[1].find_all('a')[0]['href']
         if len(sid_url.split('sid=')) < 2:
-            print('cookie error')
+            echo(0, 'cookie error')
             self.get_cookie()
             self.load_gather()
             return
@@ -596,19 +600,74 @@ class GetFreeProxy:
 
         data = {'ID':sid , 'C': '', 'P': '', 'T': '', 'U': '0'}
         gatherproxy = requests.post(sid_url, headers=headers, data=data,verify=False)
-        with codecs.open(data_path + 'gatherproxy', 'w', encoding='utf-8') as f:
+        with codecs.open(data_dir + 'gatherproxy', 'w', encoding='utf-8') as f:
             f.write(gatherproxy.text)
 
+    def load_proxies_list(self, types=2):
+        ''' load proxies '''
+        SITES = ['http://www.proxyserverlist24.top/', 'http://www.live-socks.net/']
+        spider_pool = []
+        self.waitjudge = []
+        for site in SITES:
+            self.get_other_proxies(site)
+        if os.path.exists('{}gatherproxy'.format(data_dir)):
+            self.gatherproxy(3)
+        waitjudge = list(set(self.waitjudge))
+        waitjudge_http = ['http://' + ii for ii in waitjudge]
+        waitjudge_https = ['https://' + ii for ii in waitjudge]
+        if not types:
+            self.waitjudge = waitjudge_http
+        elif types == 1:
+            self.waitjudge = waitjudge_https
+        else:
+            self.waitjudge = (waitjudge_http + waitjudge_https)
+        echo(1, '-_-_-_-_-_-_-', len(waitjudge), 'Proxies wait to judge -_-_-_-_-_-_-')
+
+    def request_text(self, url):
+        ''' requests text '''
+        req = basic_req(url, 2)
+        if req is None:
+            echo(0, url)
+            if can_retry(url):
+                self.request_text(url)
+            else:
+                return ''
+        else:
+            echo(1, url)
+            return req.text
+
+    def get_other_proxies(self, url):
+        ''' get other proxies '''
+        text = self.request_text(url)
+        pages = re.findall(r'<h3[\s\S]*?<a.*?(http.*?\.html).*?</a>', '' if text is None else text)
+        if not len(pages ):
+            echo(0, 'Please do not frequently request {}!!!'.format(url))
+        else:
+            proxies = [re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}', self.request_text(ii)) for ii in pages]
+            self.waitjudge = [*self.waitjudge, *sum(proxies, [])]
+
+    def load_proxies_test(self):
+        ''' load mode & test proxies '''
+        start = time.time()
+        self.load_proxies_list()
+        proxies_len = len(self.waitjudge)
+        self.threadjude()
+        canuse_len = len(self.canuse_proxies)
+        echo(1, '\nTotal Proxies num: {}\nCan use num: {}\nTime spend: {:.2f}s\n'.format(proxies_len, canuse_len,time.time() - start))
+        with open('{}canuse_proxies.txt'.format(data_dir), 'w') as f:
+            f.write('\n'.join(self.canuse_proxies))
+
+
 if __name__ == '__main__':
-    if not os.path.exists(data_path):
-        os.makedirs(data_path)
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
     parser = argparse.ArgumentParser(description='gunjianpan proxy pool code')
-    parser.add_argument('--model', type=int, default=1, metavar='N',
-                        help='model of load_gather or test')
+    parser.add_argument('--model', type=int, default=0, metavar='model',help='model 0/1')
+    parser.add_argument('--is_service', type=bool, default=False, metavar='service',help='True or False')
+    parser.add_argument('--test_time', type=int, default=1, metavar='test_time',help='test_time')
     model = parser.parse_args().model
     a = GetFreeProxy()
     if model==1:
         a.load_gather()
     else:
-        a.gatherproxy(2)
-        a.testdb(2)
+        a.load_proxies_test()

@@ -144,9 +144,7 @@ class HotelDetail:
     def generate_other_params(self, hotel_id: int = 4889292, city_id: int=2,
                               startDate: str=time_str(-1, '%Y-%m-%d'),
                               depDate: str=time_str(int(time.time() + one_day), '%Y-%m-%d')):
-
-
-∂        ''' generate other params '''
+        ''' generate other params '''
         params = {
             'psid': None,
             'MasterHotelID': hotel_id,

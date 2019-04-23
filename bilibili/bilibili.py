@@ -1,8 +1,8 @@
 '''
 @Author: gunjianpan
-@Date:   2019-03-16 15:18:10
+@Date:   2019-04-07 20:25:45
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-19 17:36:32
+@Last Modified time: 2019-04-24 01:36:04
 '''
 
 import codecs
@@ -17,7 +17,7 @@ import shutil
 
 from configparser import ConfigParser
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email, headers, time_str
+from util.util import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email, headers, time_str
 
 get_request_proxy = GetFreeProxy().get_request_proxy
 one_day = 86400
@@ -89,7 +89,10 @@ class Up():
         rank_map = {ii: [] for ii in self.assign_ids}
         self.rank_map = {**rank_map, **self.rank_map}
         self.keyword = cfg.get('comment', 'keyword')
-        self.ignore_comment = json.loads(cfg.get('comment', 'ignore'))
+        self.ignore_floor = json.loads(cfg.get('comment', 'ignore_floor'))
+        self.ignore_list = cfg.get('comment', 'ignore_list')
+        self.ignore_start = cfg.getfloat('comment', 'ignore_start')
+        self.ignore_end = cfg.getfloat('comment', 'ignore_end')
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
 
@@ -517,7 +520,7 @@ class Up():
         now_hour = int(time_str(format='%H'))
         now_min = int(time_str(format='%M'))
         now_time = now_hour + now_min / 60
-        if now_time > 0.5 and now_time < 8.5:
+        if now_time > self.ignore_start and now_time < self.ignore_end:
             return
         if os.path.exists('{}comment.pkl'.format(comment_dir)):
             with codecs.open('{}comment.pkl'.format(comment_dir), 'rb') as f:
@@ -531,7 +534,7 @@ class Up():
                 self.get_check()
             return
         av_id_list = [[ii['aid'], ii['comment']]
-                      for ii in json_req['data']['vlist']]
+                      for ii in json_req['data']['vlist'] if not re.findall(self.ignore_list, str(ii['aid']))]
         if self.basic_av_id not in [ii[0] for ii in av_id_list]:
             if can_retry(url):
                 self.get_check()
@@ -648,7 +651,7 @@ class Up():
         floor = str(
             floor) if parent_floor is None else '%d-%d' % (parent_floor, floor)
         url = self.BASIC_AV_URL % av_id
-        if str(av_id) in self.ignore_comment and floor in self.ignore_comment[str(av_id)]:
+        if str(av_id) in self.ignore_floor and floor in self.ignore_floor[str(av_id)]:
             return True
 
         email_content = '%s\nUrl: %s Page: %d #%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s\nlike: %d' % (

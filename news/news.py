@@ -12,8 +12,8 @@ import pkuseg
 import re
 
 from proxy.getproxy import GetFreeProxy
-from utils.db import Db
-from utils.utils import begin_time, end_time, basic_req, can_retry
+from util.db import Db
+from util.util import begin_time, end_time, basic_req, can_retry
 
 get_request_proxy = GetFreeProxy().get_request_proxy
 

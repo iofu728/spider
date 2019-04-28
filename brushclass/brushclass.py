@@ -9,7 +9,7 @@ import random
 import os
 
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, end_time, send_email
+from util.util import begin_time, end_time, send_email
 
 get_request_proxy = GetFreeProxy().get_request_proxy
 data_path = 'brushclass/data/'

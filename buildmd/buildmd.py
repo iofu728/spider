@@ -13,7 +13,7 @@ import random
 
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, end_time, changeCookie, changeHtmlTimeout, basic_req, can_retry
+from util.util import begin_time, end_time, changeCookie, changeHtmlTimeout, basic_req, can_retry
 from urllib.request import urlopen
 
 """

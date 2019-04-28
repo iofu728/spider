@@ -21,8 +21,8 @@ sys.path.append(os.getcwd())
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 
-from utils.db import Db
-from utils.utils import begin_time, end_time, changeJsonTimeout, changeHtmlTimeout, basic_req, time_str, can_retry, echo
+from util.db import Db
+from util.util import begin_time, end_time, changeJsonTimeout, changeHtmlTimeout, basic_req, time_str, can_retry, echo
 
 """
   * www.proxyserverlist24.top
@@ -47,7 +47,7 @@ class GetFreeProxy:
     ''' proxy pool '''
 
     def __init__(self):
-        self.Db = Db("netease")
+        self.Db = Db("proxy")
         self.insert_sql = '''INSERT INTO ip_proxy( `address`, `http_type`) VALUES %s '''
         self.select_list = '''SELECT address, http_type from ip_proxy WHERE `is_failured` = 0'''
         self.select_sql = '''SELECT `id`, address, `is_failured` from ip_proxy WHERE `address` in %s '''
@@ -238,25 +238,25 @@ class GetFreeProxy:
         self.proxylists = []
         self.proxylist_ss = []
         self.proxylists_ss = []
-        if results != 0:
-
-            for index in results:
-                if index[1] == 1:
-                    self.proxylists.append(index[0])
-                elif index[1] == 2:
-                    self.proxylist.append(index[0])
-                    self.proxylist_ss.append(index[0])
-                elif index[1] == 3:
-                    self.proxylists.append(index[0])
-                    self.proxylists_ss.append(index[0])
-                else:
-                    self.proxylist.append(index[0])
-            echo(2, len(self.proxylist), ' http proxy can use.')
-            echo(2, len(self.proxylists), ' https proxy can use.')
-            echo(2, len(self.proxylist_ss), ' ss http proxy can use.')
-            echo(2, len(self.proxylists_ss), ' ss https proxy can use.')
-        else:
+        if not results:
             echo(0, 'Please check db configure!!! The proxy pool cant use!!!>>>')
+            return
+        for index in results:
+            if index[1] == 1:
+                self.proxylists.append(index[0])
+            elif index[1] == 2:
+                self.proxylist.append(index[0])
+                self.proxylist_ss.append(index[0])
+            elif index[1] == 3:
+                self.proxylists.append(index[0])
+                self.proxylists_ss.append(index[0])
+            else:
+                self.proxylist.append(index[0])
+        echo(2, len(self.proxylist), ' http proxy can use.')
+        echo(2, len(self.proxylists), ' https proxy can use.')
+        echo(2, len(self.proxylist_ss), ' ss http proxy can use.')
+        echo(2, len(self.proxylists_ss), ' ss https proxy can use.')
+            
 
     def judgeurl(self, urls, index, times, ss_test=False):
         """

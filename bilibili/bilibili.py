@@ -70,6 +70,7 @@ class Up():
         self.rank_map = {}
         self.comment = {}
         self.comment_max = {}
+        self.email_send_time = {}
         self.begin_timestamp = int(time.time())
         self.load_configure()
 
@@ -93,6 +94,7 @@ class Up():
         self.ignore_list = cfg.get('comment', 'ignore_list')
         self.ignore_start = cfg.getfloat('comment', 'ignore_start')
         self.ignore_end = cfg.getfloat('comment', 'ignore_end')
+        self.email_limit = cfg.getint('comment', 'email_limit')
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
 
@@ -495,8 +497,6 @@ class Up():
         self.rank_map = {ii: [] for ii in self.assign_ids}
 
         for index in range(num):
-            ''' reload configure '''
-
             threading_list = []
             if not index % 5:
                 work = threading.Thread(target=self.load_rank, args=())
@@ -647,12 +647,14 @@ class Up():
 
         if not len(re.findall(self.keyword, content)):
             return True
+        floor = '{}{}'.format(floor, '' if not parent_floor else '-{}'.format(floor))
 
-        floor = str(
-            floor) if parent_floor is None else '%d-%d' % (parent_floor, floor)
         url = self.BASIC_AV_URL % av_id
+        floor_str = '{}-{}'.format(av_id, floor)
         if str(av_id) in self.ignore_floor and floor in self.ignore_floor[str(av_id)]:
             return True
+        if self.email_limit < 1 or (floor_str in self.email_send_time and self.email_send_time[floor_str] > self.email_limit):
+            return True 
 
         email_content = '%s\nUrl: %s Page: %d #%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s\nlike: %d' % (
             ctime, url, pn, floor, uname, sex, content, sign, like)
@@ -664,6 +666,10 @@ class Up():
         while not send_email_result and send_email_time < 4:
             send_email_result = send_email(email_content, email_subject)
             send_email_time += 1
+        if floor_str in self.email_send_time:
+            self.email_send_time[floor_str] += 1
+        else:
+            self.email_send_time[floor_str] = 0
 
 
 if __name__ == '__main__':

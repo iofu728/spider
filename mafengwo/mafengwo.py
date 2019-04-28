@@ -14,7 +14,7 @@ import threading
 
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
-from utils.utils import basic_req, echo, time_str, can_retry, begin_time, end_time, shuffle_batch_run_thread
+from util.util import basic_req, echo, time_str, can_retry, begin_time, end_time, shuffle_batch_run_thread
 
 data_dir = 'mafengwo/data/'
 hotel_js_path = 'mafengwo/hotel.js'

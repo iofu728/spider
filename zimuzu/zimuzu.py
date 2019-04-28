@@ -12,7 +12,7 @@ import shutil
 
 from configparser import ConfigParser
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, end_time, can_retry
+from util.util import begin_time, end_time, can_retry
 
 get_request_proxy = GetFreeProxy().get_request_proxy
 

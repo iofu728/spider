@@ -12,8 +12,8 @@ import os
 
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
-from utils.db import Db
-from utils.utils import begin_time, end_time, changeCookie, basic_req, can_retry, changeHtmlTimeout
+from util.db import Db
+from util.util import begin_time, end_time, changeCookie, basic_req, can_retry, changeHtmlTimeout
 
 """
   * blog @http

@@ -7,8 +7,8 @@ import threading
 import time
 
 from proxy.getproxy import GetFreeProxy
-from utils.db import Db
-from utils.utils import begin_time, end_time, basic_req
+from util.db import Db
+from util.util import begin_time, end_time, basic_req
 
 get_request_proxy = GetFreeProxy().get_request_proxy
 

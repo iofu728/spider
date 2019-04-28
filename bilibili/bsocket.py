@@ -20,7 +20,7 @@ from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
 from proxy.getproxy import GetFreeProxy
-from utils.utils import can_retry, basic_req, time_str
+from util.util import can_retry, basic_req, time_str
 
 logger = logging.getLogger(__name__)
 get_request_proxy = GetFreeProxy().get_request_proxy

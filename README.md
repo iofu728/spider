@@ -22,30 +22,9 @@
 - [Brush Class](#brush-class)
 - [zimuzu](#zimuzu)
 - [Bilibili](#bilibili)
-  - [UnicodeEncodeError: 'ascii' codec can't encode characters in position 7-10: ordinal not in range(128)](#unicodeencodeerror-ascii-codec-cant-encode-characters-in-position-7-10-ordinal-not-in-range128)
-  - [`bilibili` some url return 404 like `http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=`](#bilibili-some-url-return-404-like-httpapibilibilicomxrelationstatjsonpjsonpcallbackjp11vmid)
 - [shaoq](#shaoq)
-  - [Idea](#idea)
-  - [Requirement](#requirement)
-  - [Can't get true html](#cant-get-true-html)
-  - [Error: Cannot find module 'jsdom'](#error-cannot-find-module-jsdom)
-  - [remove subtree & edit subtree & re.findall](#remove-subtree--edit-subtree--refindall)
 - [Eastmoney](#eastmoney)
-  - [Idea](#idea-1)
-  - [error: unpack requires a buffer of 20 bytes](#error-unpack-requires-a-buffer-of-20-bytes)
-  - [How to analysis font](#how-to-analysis-font)
-  - [configure file](#configure-file)
 - [Ctrip Hotel Detail](#ctrip-hotel-detail)
-  - [int32](#int32)
-  - [js charCodeAt() in py](#js-charcodeat-in-py)
-  - [python access file fold import](#python-access-file-fold-import)
-  - [generate char list](#generate-char-list)
-  - [Can't get cookie in `document.cookie`](#cant-get-cookie-in-documentcookie)
-  - [ctrip cookie analysis](#ctrip-cookie-analysis)
-  - [some fusion in ctrip](#some-fusion-in-ctrip)
-  - [Get current timezone offset](#get-current-timezone-offset)
-  - [JSON.stringfy(e)](#jsonstringfye)
-  - [Element​.get​Bounding​Client​Rect()](#element%E2%80%8Bget%E2%80%8Bbounding%E2%80%8Bclient%E2%80%8Brect)
 
 ## keyword
 
@@ -229,58 +208,58 @@ $ python blog/titleviews.py --model=0 >> log 2>&1 # model = 0: update gather mod
 
 - load comment from `/x/v2/reply`
 
-### UnicodeEncodeError: 'ascii' codec can't encode characters in position 7-10: ordinal not in range(128)
+- UnicodeEncodeError: 'ascii' codec can't encode characters in position 7-10: ordinal not in range(128)
 
-- read/write in `utf-8`
-- with codecs.open(filename, 'r/w', encoding='utf-8')
+  - read/write in `utf-8`
+  - with codecs.open(filename, 'r/w', encoding='utf-8')
 
-### `bilibili` some url return 404 like `http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=`
+- `bilibili` some url return 404 like `http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=`
 
-basic_req auto add `host` to headers, but this URL can't request in ‘Host’
+  basic_req auto add `host` to headers, but this URL can't request in ‘Host’
 
 ## shaoq
 
 > Get text data by compiling javascript - [exam/shaoq.py](https://github.com/iofu728/spider/blob/master/exam/shaoq.py)
 
-### Idea
+- Idea
 
-1. get cookie
-2. request image
-3. requests after 5.5s
-4. compile javascript code -> get css
-5. analysic css
+  1. get cookie
+  2. request image
+  3. requests after 5.5s
+  4. compile javascript code -> get css
+  5. analysic css
 
-### Requirement
+- Requirement
 
-```sh
-pip3 install PyExecJS
-yarn install add jsdom # npm install jsdom PS: not global
-```
+  ```sh
+  pip3 install PyExecJS
+  yarn install add jsdom # npm install jsdom PS: not global
+  ```
 
-### Can't get true html
+- Can't get true html
 
-- Wait time must be 5.5s.
-- So you can use `threading` or `await asyncio.gather` to request image
+  - Wait time must be 5.5s.
+  - So you can use `threading` or `await asyncio.gather` to request image
 
-- [Coroutines and Tasks](https://docs.python.org/3/library/asyncio-task.html)
+  - [Coroutines and Tasks](https://docs.python.org/3/library/asyncio-task.html)
 
-### Error: Cannot find module 'jsdom'
+- Error: Cannot find module 'jsdom'
 
-> jsdom must install in local not in global
+  > jsdom must install in local not in global
 
-- [Cannot find module 'jsdom'](https://github.com/scala-js/scala-js/issues/2642)
+  - [Cannot find module 'jsdom'](https://github.com/scala-js/scala-js/issues/2642)
 
-### remove subtree & edit subtree & re.findall
+- remove subtree & edit subtree & re.findall
 
-```py
-subtree.extract()
-subtree.string = new_string
-parent_tree.find_all(re.compile('''))
-```
+  ```py
+  subtree.extract()
+  subtree.string = new_string
+  parent_tree.find_all(re.compile('''))
+  ```
 
-- [extract()](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#extract)
-- [NavigableString](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#navigablestring)
-- [A regular expression](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#a-regular-expression)
+  - [extract()](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#extract)
+  - [NavigableString](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#navigablestring)
+  - [A regular expression](https://www.crummy.com/software/BeautifulSoup/bs4/doc/#a-regular-expression)
 
 ## Eastmoney
 
@@ -288,77 +267,77 @@ parent_tree.find_all(re.compile('''))
 
 - font analysis
 
-### Idea
+- Idea
 
-1. get data from HTML -> json
-2. get font map -> transform num
-3. or load font analysis font(contrast with base)
+  1. get data from HTML -> json
+  2. get font map -> transform num
+  3. or load font analysis font(contrast with base)
 
-### error: unpack requires a buffer of 20 bytes
+- error: unpack requires a buffer of 20 bytes
 
-- requests.text -> str,
-- requests.content -> byte
+  - requests.text -> str,
+  - requests.content -> byte
 
-- [Struct.error: unpack requires a buffer of 16 bytes](https://stackoverflow.com/questions/51110525/struct-error-unpack-requires-a-buffer-of-16-bytes)
+  - [Struct.error: unpack requires a buffer of 16 bytes](https://stackoverflow.com/questions/51110525/struct-error-unpack-requires-a-buffer-of-16-bytes)
 
-### How to analysis font
+- How to analysis font
 
-- use fonttools
-- get TTFont().getBestCamp()
-- contrast with base
+  - use fonttools
+  - get TTFont().getBestCamp()
+  - contrast with base
 
-### configure file
+- configure file
 
-- cfg = ConfigParser()
-- cfg.read(assign_path, 'utf-8')
-- [13.10read configure file](https://python3-cookbook.readthedocs.io/zh_CN/latest/c13/p10_read_configuration_files.html)
+  - cfg = ConfigParser()
+  - cfg.read(assign_path, 'utf-8')
+  - [13.10read configure file](https://python3-cookbook.readthedocs.io/zh_CN/latest/c13/p10_read_configuration_files.html)
 
 ## Ctrip Hotel Detail
 
 > Get Ctrip Hotel True Detail - [ctrip/hotelDetail.py](https://github.com/iofu728/spider/blob/master/ctrip/hotelDetail.py)
 
-### int32
+- int32
 
-```python
-np.int32()
-```
+  ```python
+  np.int32()
+  ```
 
-### js charCodeAt() in py
+- js charCodeAt() in py
 
-[python 中如何实现 js 里的 charCodeAt()方法？](https://www.zhihu.com/question/57108214)
+  [python 中如何实现 js 里的 charCodeAt()方法？](https://www.zhihu.com/question/57108214)
 
-```python
-ord(string[index])
-```
+  ```python
+  ord(string[index])
+  ```
 
-### python access file fold import
+- python access file fold import
 
-```python
-import sys
-sys.path.append(os.getcwd())
-```
+  ```python
+  import sys
+  sys.path.append(os.getcwd())
+  ```
 
-### generate char list
+- generate char list
 
-using ASCII
+  using ASCII
 
-```python
-lower_char = [chr(i) for i in range(97,123)] # a-z
-upper_char = [chr(i) for i in range(65,91)]  # A-Z
-```
+  ```python
+  lower_char = [chr(i) for i in range(97,123)] # a-z
+  upper_char = [chr(i) for i in range(65,91)]  # A-Z
+  ```
 
-### Can't get cookie in `document.cookie`
+- Can't get cookie in `document.cookie`
 
-Service use `HttpOnly` in `Set-Cookie`
+  Service use `HttpOnly` in `Set-Cookie`
 
-- [Why doesn't document.cookie show all the cookie for the site?](https://stackoverflow.com/questions/1022112/why-doesnt-document-cookie-show-all-the-cookie-for-the-site)
-- [Secure and HttpOnly](https://en.wikipedia.org/wiki/HTTP_cookie#Secure_and_HttpOnly)
+  - [Why doesn't document.cookie show all the cookie for the site?](https://stackoverflow.com/questions/1022112/why-doesnt-document-cookie-show-all-the-cookie-for-the-site)
+  - [Secure and HttpOnly](https://en.wikipedia.org/wiki/HTTP_cookie#Secure_and_HttpOnly)
 
-> The Secure attribute is meant to keep cookie communication limited to encrypted transmission, directing browsers to use cookies only via secure/encrypted connections. However, if a web server sets a cookie with a secure attribute from a non-secure connection, the cookie can still be intercepted when it is sent to the user by **man-in-the-middle attacks**. Therefore, for maximum security, cookies with the Secure attribute should only be set over a secure connection.
->
-> The HttpOnly attribute directs browsers not to expose cookies through channels other than HTTP (and HTTPS) requests. This means that the cookie cannot be accessed via client-side scripting languages (notably JavaScript), and therefore cannot be stolen easily via cross-site scripting (a pervasive attack technique).
+  > The Secure attribute is meant to keep cookie communication limited to encrypted transmission, directing browsers to use cookies only via secure/encrypted connections. However, if a web server sets a cookie with a secure attribute from a non-secure connection, the cookie can still be intercepted when it is sent to the user by **man-in-the-middle attacks**. Therefore, for maximum security, cookies with the Secure attribute should only be set over a secure connection.
+  >
+  > The HttpOnly attribute directs browsers not to expose cookies through channels other than HTTP (and HTTPS) requests. This means that the cookie cannot be accessed via client-side scripting languages (notably JavaScript), and therefore cannot be stolen easily via cross-site scripting (a pervasive attack technique).
 
-### ctrip cookie analysis
+- ctrip cookie analysis
 
 | key                           | method | how                                                                                                 | constant | login | finish |
 | ----------------------------- | ------ | --------------------------------------------------------------------------------------------------- | -------- | ----- | ------ |
@@ -400,139 +379,139 @@ Service use `HttpOnly` in `Set-Cookie`
 | `htlstm`                      | js     | `https://hotels.ctrip.com/hotel/xxx.html`                                                           | 0        | 0     | 1      |
 | `arp_scroll_position`         | js     | `https://hotels.ctrip.com/hotel/xxx.html`                                                           | 0        | 0     | 1      |
 
-### some fusion in ctrip
+- some fusion in ctrip
 
-```js
-function a31(a233, a23, a94) {
-  var a120 = {
-    KWcVI: "mMa",
-    hqRkQ: function a272(a309, a20) {
-      return a309 + a20;
-    },
-    WILPP: function a69(a242, a488) {
-      return a242(a488);
-    },
-    ydraP: function a293(a338, a255) {
-      return a338 == a255;
-    },
-    ceIER: ";expires=",
-    mDTlQ: function a221(a234, a225) {
-      return a234 + a225;
-    },
-    dnvrD: function a268(a61, a351) {
-      return a61 + a351;
-    },
-    DIGJw: function a368(a62, a223) {
-      return a62 == a223;
-    },
-    pIWEz: function a260(a256, a284) {
-      return a256 + a284;
-    },
-    jXvnT: ";path=/"
-  };
-  if (a120["KWcVI"] !== a120["KWcVI"]) {
-    var a67 = new Date();
-    a67[a845("0x1a", "4Vqw")](
-      a120[a845("0x1b", "RswF")](a67["getDate"](), a94)
-    );
-    document[a845("0x1c", "WjvM")] =
-      a120[a845("0x1d", "3082")](a233, "=") +
-      a120[a845("0x1e", "TDHu")](escape, a23) +
-      (a120["ydraP"](a94, null)
-        ? ""
-        : a120["hqRkQ"](a120["ceIER"], a67[a845("0x1f", "IErH")]())) +
-      a845("0x20", "eHIq");
-  } else {
-    var a148 = a921(this, function() {
-      var a291 = function() {
-          return "dev";
-        },
-        a366 = function() {
-          return "window";
-        };
-      var a198 = function() {
-        var a168 = new RegExp("\\w+ *\\(\\) *{\\w+ *[' | '].+[' | '];? *}");
-        return !a168["test"](a291["toString"]());
-      };
-      var a354 = function() {
-        var a29 = new RegExp("(\\[x|u](\\w){2,4})+");
-        return a29["test"](a366["toString"]());
-      };
-      var a243 = function(a2) {
-        var a315 = ~-0x1 >> (0x1 + (0xff % 0x0));
-        if (a2["indexOf"]("i" === a315)) {
-          a310(a2);
-        }
-      };
-      var a310 = function(a213) {
-        var a200 = ~-0x4 >> (0x1 + (0xff % 0x0));
-        if (a213["indexOf"]((!![] + "")[0x3]) !== a200) {
-          a243(a213);
-        }
-      };
-      if (!a198()) {
-        if (!a354()) {
-          a243("indÐµxOf");
-        } else {
-          a243("indexOf");
-        }
-      } else {
-        a243("indÐµxOf");
-      }
-    });
-    // a148();
-    var a169 = new Date();
-    a169["setDate"](a169["getDate"]() + a94);
-    document["cookie"] = a120["mDTlQ"](
-      a120["dnvrD"](
-        a120["dnvrD"](a120["dnvrD"](a233, "="), escape(a23)),
-        a120["DIGJw"](a94, null)
+  ```js
+  function a31(a233, a23, a94) {
+    var a120 = {
+      KWcVI: "mMa",
+      hqRkQ: function a272(a309, a20) {
+        return a309 + a20;
+      },
+      WILPP: function a69(a242, a488) {
+        return a242(a488);
+      },
+      ydraP: function a293(a338, a255) {
+        return a338 == a255;
+      },
+      ceIER: ";expires=",
+      mDTlQ: function a221(a234, a225) {
+        return a234 + a225;
+      },
+      dnvrD: function a268(a61, a351) {
+        return a61 + a351;
+      },
+      DIGJw: function a368(a62, a223) {
+        return a62 == a223;
+      },
+      pIWEz: function a260(a256, a284) {
+        return a256 + a284;
+      },
+      jXvnT: ";path=/"
+    };
+    if (a120["KWcVI"] !== a120["KWcVI"]) {
+      var a67 = new Date();
+      a67[a845("0x1a", "4Vqw")](
+        a120[a845("0x1b", "RswF")](a67["getDate"](), a94)
+      );
+      document[a845("0x1c", "WjvM")] =
+        a120[a845("0x1d", "3082")](a233, "=") +
+        a120[a845("0x1e", "TDHu")](escape, a23) +
+        (a120["ydraP"](a94, null)
           ? ""
-          : a120["pIWEz"](a120["ceIER"], a169["toGMTString"]())
-      ),
-      a120["jXvnT"]
-    );
+          : a120["hqRkQ"](a120["ceIER"], a67[a845("0x1f", "IErH")]())) +
+        a845("0x20", "eHIq");
+    } else {
+      var a148 = a921(this, function() {
+        var a291 = function() {
+            return "dev";
+          },
+          a366 = function() {
+            return "window";
+          };
+        var a198 = function() {
+          var a168 = new RegExp("\\w+ *\\(\\) *{\\w+ *[' | '].+[' | '];? *}");
+          return !a168["test"](a291["toString"]());
+        };
+        var a354 = function() {
+          var a29 = new RegExp("(\\[x|u](\\w){2,4})+");
+          return a29["test"](a366["toString"]());
+        };
+        var a243 = function(a2) {
+          var a315 = ~-0x1 >> (0x1 + (0xff % 0x0));
+          if (a2["indexOf"]("i" === a315)) {
+            a310(a2);
+          }
+        };
+        var a310 = function(a213) {
+          var a200 = ~-0x4 >> (0x1 + (0xff % 0x0));
+          if (a213["indexOf"]((!![] + "")[0x3]) !== a200) {
+            a243(a213);
+          }
+        };
+        if (!a198()) {
+          if (!a354()) {
+            a243("indÐµxOf");
+          } else {
+            a243("indexOf");
+          }
+        } else {
+          a243("indÐµxOf");
+        }
+      });
+      // a148();
+      var a169 = new Date();
+      a169["setDate"](a169["getDate"]() + a94);
+      document["cookie"] = a120["mDTlQ"](
+        a120["dnvrD"](
+          a120["dnvrD"](a120["dnvrD"](a233, "="), escape(a23)),
+          a120["DIGJw"](a94, null)
+            ? ""
+            : a120["pIWEz"](a120["ceIER"], a169["toGMTString"]())
+        ),
+        a120["jXvnT"]
+      );
+    }
   }
-}
-```
+  ```
 
-equal to
+  equal to
 
-```js
-document["cookie"] =
-  a233 +
-  "=" +
-  escape(a23) +
-  (a94 == null ? "" : ";expires=" + a169["toGMTString"]()) +
-  ";path=/";
-```
+  ```js
+  document["cookie"] =
+    a233 +
+    "=" +
+    escape(a23) +
+    (a94 == null ? "" : ";expires=" + a169["toGMTString"]()) +
+    ";path=/";
+  ```
 
-So, It is only a function to set cookie & expires.
+  So, It is only a function to set cookie & expires.
 
-And you can think `a31` is a entry point to judge where code about compiler cookie.
+  And you can think `a31` is a entry point to judge where code about compiler cookie.
 
-### Get current timezone offset
+- Get current timezone offset
 
-```python
-import datetime, tzlocal
-local_tz = tzlocal.get_localzone()
-timezone_offset = -int(local_tz.utcoffset(datetime.datetime.today()).total_seconds() / 60)
-```
+  ```python
+  import datetime, tzlocal
+  local_tz = tzlocal.get_localzone()
+  timezone_offset = -int(local_tz.utcoffset(datetime.datetime.today()).total_seconds() / 60)
+  ```
 
-### JSON.stringfy(e)
+- JSON.stringfy(e)
 
-```python
-import json
-json.dumps(e, separators=(',', ':'))
-```
+  ```python
+  import json
+  json.dumps(e, separators=(',', ':'))
+  ```
 
-- [JSON.stringify (Javascript) and json.dumps (Python) not equivalent on a list?](https://stackoverflow.com/questions/46227854/json-stringify-javascript-and-json-dumps-python-not-equivalent-on-a-list)
+  - [JSON.stringify (Javascript) and json.dumps (Python) not equivalent on a list?](https://stackoverflow.com/questions/46227854/json-stringify-javascript-and-json-dumps-python-not-equivalent-on-a-list)
 
-### Element​.get​Bounding​Client​Rect()
+- Element​.get​Bounding​Client​Rect()
 
-return Element position
+  return Element position
 
-- [Element​.get​Bounding​Client​Rect()](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
-- [​Event​Target​.add​Event​Listener()](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
+  - [Element​.get​Bounding​Client​Rect()](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
+  - [​Event​Target​.add​Event​Listener()](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
 
 **----To be continued----**

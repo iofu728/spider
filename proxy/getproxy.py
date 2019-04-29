@@ -60,7 +60,7 @@ class GetFreeProxy:
         self.canuse_proxies = []
         self.initproxy()
 
-    def get_request_proxy(self, url:str, types:int, data=None, test_func=None, header=None):
+    def proxy_req(self, url:str, types:int, data=None, test_func=None, header=None):
         """
         use proxy to send requests, and record the proxy cann't use
         @types S0XY: X=0.->get;   =1.->post;
@@ -92,8 +92,7 @@ class GetFreeProxy:
             if not test_func is None:
                 if not test_func(result):
                     if self.check_retry(url):
-                        self.get_request_proxy(
-                            url, types + 1000 * ss_type, data, test_func)
+                        self.proxy_req(url, types + 1000 * ss_type, data, test_func)
                     else:
                         self.failuredtime[url] = 0
                         return
@@ -112,7 +111,7 @@ class GetFreeProxy:
                 self.cleancannotuse()
 
             if self.check_retry(url):
-                self.get_request_proxy(url, types + 1000 * ss_type, data, test_func)
+                self.proxy_req(url, types + 1000 * ss_type, data, test_func)
             else:
                 return
 
@@ -397,7 +396,7 @@ class GetFreeProxy:
 
         version = begin_time()
         host = 'http://www.goubanjia.com'
-        html = self.get_request_proxy(host, 0)
+        html = self.proxy_req(host, 0)
 
         if not html:
             return []
@@ -434,7 +433,7 @@ class GetFreeProxy:
         ]
         host = 'http://www.data5u.com/'
         for uri in url_list:
-            html = self.get_request_proxy(host + uri, 0)
+            html = self.proxy_req(host + uri, 0)
             if not html:
                 continue
             table = html.find_all('ul', class_='l2')
@@ -468,8 +467,7 @@ class GetFreeProxy:
 
     def sixsixthread(self, index, pageindex):
         host = '''http://www.66ip.cn/areaindex_%d/%d.html'''
-        html = self.get_request_proxy(
-            host % (index, pageindex), 0)
+        html = self.proxy_req(host % (index, pageindex), 0)
         if not html:
             return []
         trs = html.find_all('table')[2].find_all('tr')
@@ -498,7 +496,7 @@ class GetFreeProxy:
 
     def kuaidailithread(self, index):
         host = '''https://www.kuaidaili.com/free/inha/%d/'''
-        html = self.get_request_proxy(host % index, 0)
+        html = self.proxy_req(host % index, 0)
         if not html:
             return []
         trs = html.find_all('tr')

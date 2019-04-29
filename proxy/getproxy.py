@@ -60,7 +60,7 @@ class GetFreeProxy:
         self.canuse_proxies = []
         self.initproxy()
 
-    def proxy_req(self, url:str, types:int, data=None, test_func=None, header=None):
+    def proxy_req(self, url:str, types:int, data=None, test_func=None, header=None, need_cookie:bool=False):
         """
         use proxy to send requests, and record the proxy cann't use
         @types S0XY: X=0.->get;   =1.->post;
@@ -88,11 +88,11 @@ class GetFreeProxy:
             proxies = {type_map[httptype]: proxies_url}
 
         try:
-            result = basic_req(url, types, proxies, data, header)
+            result = basic_req(url, types, proxies, data, header, need_cookie)
             if not test_func is None:
                 if not test_func(result):
                     if self.check_retry(url):
-                        self.proxy_req(url, types + 1000 * ss_type, data, test_func)
+                        self.proxy_req(url, types + 1000 * ss_type, data, test_func, header, need_cookie)
                     else:
                         self.failuredtime[url] = 0
                         return
@@ -111,7 +111,7 @@ class GetFreeProxy:
                 self.cleancannotuse()
 
             if self.check_retry(url):
-                self.proxy_req(url, types + 1000 * ss_type, data, test_func)
+                self.proxy_req(url, types + 1000 * ss_type, data, test_func, header, need_cookie)
             else:
                 return
 
@@ -664,8 +664,12 @@ if __name__ == '__main__':
     parser.add_argument('--is_service', type=bool, default=False, metavar='service',help='True or False')
     parser.add_argument('--test_time', type=int, default=1, metavar='test_time',help='test_time')
     model = parser.parse_args().model
-    a = GetFreeProxy()
-    if model==1:
-        a.load_gather()
+    pg = GetFreeProxy()
+    if not model:
+        pg.load_proxies_test()
+        
+    elif model == 1:
+        pg.load_gather()
     else:
-        a.load_proxies_test()
+        pg.testdb(2)
+        

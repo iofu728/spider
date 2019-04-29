@@ -19,7 +19,7 @@ from configparser import ConfigParser
 from proxy.getproxy import GetFreeProxy
 from util.util import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email, headers, time_str
 
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 one_day = 86400
 data_dir = 'bilibili/data/'
 history_dir = '{}history/'.format(data_dir)
@@ -102,7 +102,7 @@ class Up():
         ''' press have no data input '''
         url = self.AV_URL
         if types == 1:
-            html = get_request_proxy(url, 0)
+            html = proxy_req(url, 0)
         else:
             html = basic_req(url, 0)
 
@@ -113,7 +113,7 @@ class Up():
         ''' press have no data input '''
         url = self.AV_URL
         if types == 1:
-            html = get_request_proxy(url, 0)
+            html = proxy_req(url, 0)
         else:
             html = basic_req(url, 0)
 
@@ -124,7 +124,7 @@ class Up():
         times = 0
         url_1 = self.CLICK_NOW_URL
         if types == 1:
-            json_1 = get_request_proxy(url_1, 1)
+            json_1 = proxy_req(url_1, 1)
         else:
             json_1 = basic_req(url_1, 1)
         if not json_1 is None:
@@ -149,7 +149,7 @@ class Up():
             'sub_type': '0'
         }
         if types == 1:
-            json_req = get_request_proxy(url, 11, data)
+            json_req = proxy_req(url, 11, data)
         else:
             json_req = basic_req(url, 11, data=data)
         if not json_req is None:
@@ -175,7 +175,7 @@ class Up():
         }
 
         if types == 1:
-            json_3 = get_request_proxy(url_3, 11, data_3)
+            json_3 = proxy_req(url_3, 11, data_3)
         else:
             json_3 = basic_req(url_3, 11, data=data_3)
         if not json_3 is None:
@@ -191,7 +191,7 @@ class Up():
         changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
 
         url = self.ARCHIVE_STAT_URL % av_id
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
 
         if not self.have_error(json_req):
             if times < 3:
@@ -248,7 +248,7 @@ class Up():
         changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
 
         url = self.ARCHIVE_STAT_URL % av_id
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
 
         if not self.have_error(json_req):
             if times < 3:
@@ -292,7 +292,7 @@ class Up():
         changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
         url = self.VIEW_URL % av_id
 
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
 
         if json_req is None or 'data' not in json_req or 'tid' not in json_req['data']:
             if can_retry(url):
@@ -342,7 +342,7 @@ class Up():
         ''' get public basic data '''
         changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
         url = self.VIEW_URL % av_id
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
         if json_req is None or not 'data' in json_req or not 'pubdate' in json_req['data']:
             if times < 3:
                 self.public_data(av_id, times + 1)
@@ -359,7 +359,7 @@ class Up():
                   {'Origin': self.BILIBILI_URL, 'Referer': self.AV_URL}}
         if 'Host' in header:
             del header['Host']
-        req = get_request_proxy(url, 2, header=header)
+        req = proxy_req(url, 2, header=header)
         if req is None or req.status_code != 200 or len(req.text) < 8 or not '{' in req.text:
             if times < 3:
                 self.get_star_num(mid, times + 1, load_disk)
@@ -528,7 +528,7 @@ class Up():
         if self.assign_up_mid == -1:
             return
         url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
         if json_req is None or not 'data' in json_req or not 'vlist' in json_req['data']:
             if can_retry(url):
                 self.get_check()
@@ -595,7 +595,7 @@ class Up():
     def check_comment_once(self, av_id: int, pn: int):
         ''' check comment once '''
         url = self.REPLY_V2_URL % (pn, av_id)
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
         if json_req is None or not 'data' in json_req or not 'hots' in json_req['data']:
             if can_retry(url):
                 self.check_comment_once(av_id, pn)

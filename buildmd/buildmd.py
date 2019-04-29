@@ -32,7 +32,7 @@ from urllib.request import urlopen
     └── cookie_collect // tb cookie
 """
 
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 data_dir = 'buildmd/data/'
 
 
@@ -80,7 +80,7 @@ class Buildmd(object):
         get title lists
         """
         url = self.joint_url('3bb0c25eca85e764b6d55a281faf7195')
-        title_json = get_request_proxy(url, 1)
+        title_json = proxy_req(url, 1)
         if not title_json:
             if can_retry(url):
                 self.get_lists()
@@ -127,7 +127,7 @@ class Buildmd(object):
         build md in one
         """
         url = self.joint_url(tid)
-        title_json = get_request_proxy(url, 1)
+        title_json = proxy_req(url, 1)
         if not title_json:
             if can_retry(url, index):
                 self.build_md_once(index, tid)
@@ -171,7 +171,7 @@ class Buildmd(object):
         """
         load img
         """
-        img = get_request_proxy(img_url, 2)
+        img = proxy_req(img_url, 2)
         if img == True or img == False:
             if can_retry(img_url):
                 self.load_img(index, img_id, img_url)
@@ -213,7 +213,7 @@ class Buildmd(object):
         build md in one
         """
         url = self.joint_url(tid)
-        title_json = get_request_proxy(url, 1)
+        title_json = proxy_req(url, 1)
         if not title_json:
             if can_retry(url, index):
                 self.load_goods_once(index, tid)
@@ -628,7 +628,7 @@ class Buildmd(object):
         """
 
         origin_url = origin_url.replace('https', 'http')
-        # first_result = get_request_proxy(origin_url, 0)
+        # first_result = proxy_req(origin_url, 0)
         first_result = basic_req(origin_url, 0, header=self.headers)
 
         if not first_result or len(first_result.find_all('script')) < 2:
@@ -654,7 +654,7 @@ class Buildmd(object):
     def get_goods_second(self, url, index):
 
         second_result = basic_req(url, 0, header=self.headers)
-        # second_result = get_request_proxy(url, 0)
+        # second_result = proxy_req(url, 0)
 
         if not second_result or not len(second_result.find_all('input')):
             if can_retry(url):

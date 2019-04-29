@@ -20,7 +20,7 @@ data_dir = 'mafengwo/data/'
 hotel_js_path = 'mafengwo/hotel.js'
 decoder_js_path = '{}decoder.js'.format(data_dir)
 origin_js_path = '{}origin.js'.format(data_dir)
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 
 
 class Mafengwo:
@@ -132,7 +132,7 @@ class Mafengwo:
         }
         data = self.load_sn(data)
         print(data)
-        req = get_request_proxy(self.AJAX_ROUTER_URL, 11, data=data)
+        req = proxy_req(self.AJAX_ROUTER_URL, 11, data=data)
         if req is None or not 'data' in req or not 'list' in req['data']:
             if can_retry('{}{}{}'.format(self.AJAX_ROUTER_URL, city_id, pn)):
                 self.load_spot_once(pn, city_id)

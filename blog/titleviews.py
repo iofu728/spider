@@ -26,7 +26,7 @@ from util.util import begin_time, end_time, changeCookie, basic_req, can_retry, 
     ├── slug     // blog title slug
     └── title    // blog title list
 """
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 data_dir = 'blog/data/'
 
 
@@ -172,7 +172,7 @@ class TitleViews(object):
 
     def get_request_v2(self, url, types, header):
 
-        result = get_request_proxy(url, 0, header=header)
+        result = proxy_req(url, 0, header=header)
 
         if not result or not len(result.find_all('div', class_='content')):
             if can_retry(url):

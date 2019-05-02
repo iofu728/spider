@@ -1,8 +1,8 @@
 '''
 @Author: gunjianpan
-@Date:   2019-03-16 15:18:10
+@Date:   2019-04-07 20:25:45
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-19 17:36:32
+@Last Modified time: 2019-04-24 01:36:04
 '''
 
 import codecs
@@ -17,9 +17,9 @@ import shutil
 
 from configparser import ConfigParser
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email, headers, time_str
+from util.util import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email, headers, time_str
 
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 one_day = 86400
 data_dir = 'bilibili/data/'
 history_dir = '{}history/'.format(data_dir)
@@ -70,6 +70,7 @@ class Up():
         self.rank_map = {}
         self.comment = {}
         self.comment_max = {}
+        self.email_send_time = {}
         self.begin_timestamp = int(time.time())
         self.load_configure()
 
@@ -89,7 +90,11 @@ class Up():
         rank_map = {ii: [] for ii in self.assign_ids}
         self.rank_map = {**rank_map, **self.rank_map}
         self.keyword = cfg.get('comment', 'keyword')
-        self.ignore_comment = json.loads(cfg.get('comment', 'ignore'))
+        self.ignore_floor = json.loads(cfg.get('comment', 'ignore_floor'))
+        self.ignore_list = cfg.get('comment', 'ignore_list')
+        self.ignore_start = cfg.getfloat('comment', 'ignore_start')
+        self.ignore_end = cfg.getfloat('comment', 'ignore_end')
+        self.email_limit = cfg.getint('comment', 'email_limit')
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
 
@@ -97,7 +102,7 @@ class Up():
         ''' press have no data input '''
         url = self.AV_URL
         if types == 1:
-            html = get_request_proxy(url, 0)
+            html = proxy_req(url, 0)
         else:
             html = basic_req(url, 0)
 
@@ -108,7 +113,7 @@ class Up():
         ''' press have no data input '''
         url = self.AV_URL
         if types == 1:
-            html = get_request_proxy(url, 0)
+            html = proxy_req(url, 0)
         else:
             html = basic_req(url, 0)
 
@@ -119,7 +124,7 @@ class Up():
         times = 0
         url_1 = self.CLICK_NOW_URL
         if types == 1:
-            json_1 = get_request_proxy(url_1, 1)
+            json_1 = proxy_req(url_1, 1)
         else:
             json_1 = basic_req(url_1, 1)
         if not json_1 is None:
@@ -144,7 +149,7 @@ class Up():
             'sub_type': '0'
         }
         if types == 1:
-            json_req = get_request_proxy(url, 11, data)
+            json_req = proxy_req(url, 11, data)
         else:
             json_req = basic_req(url, 11, data=data)
         if not json_req is None:
@@ -170,7 +175,7 @@ class Up():
         }
 
         if types == 1:
-            json_3 = get_request_proxy(url_3, 11, data_3)
+            json_3 = proxy_req(url_3, 11, data_3)
         else:
             json_3 = basic_req(url_3, 11, data=data_3)
         if not json_3 is None:
@@ -186,7 +191,7 @@ class Up():
         changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
 
         url = self.ARCHIVE_STAT_URL % av_id
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
 
         if not self.have_error(json_req):
             if times < 3:
@@ -243,7 +248,7 @@ class Up():
         changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
 
         url = self.ARCHIVE_STAT_URL % av_id
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
 
         if not self.have_error(json_req):
             if times < 3:
@@ -287,7 +292,7 @@ class Up():
         changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
         url = self.VIEW_URL % av_id
 
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
 
         if json_req is None or 'data' not in json_req or 'tid' not in json_req['data']:
             if can_retry(url):
@@ -337,7 +342,7 @@ class Up():
         ''' get public basic data '''
         changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
         url = self.VIEW_URL % av_id
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
         if json_req is None or not 'data' in json_req or not 'pubdate' in json_req['data']:
             if times < 3:
                 self.public_data(av_id, times + 1)
@@ -354,7 +359,7 @@ class Up():
                   {'Origin': self.BILIBILI_URL, 'Referer': self.AV_URL}}
         if 'Host' in header:
             del header['Host']
-        req = get_request_proxy(url, 2, header=header)
+        req = proxy_req(url, 2, header=header)
         if req is None or req.status_code != 200 or len(req.text) < 8 or not '{' in req.text:
             if times < 3:
                 self.get_star_num(mid, times + 1, load_disk)
@@ -492,8 +497,6 @@ class Up():
         self.rank_map = {ii: [] for ii in self.assign_ids}
 
         for index in range(num):
-            ''' reload configure '''
-
             threading_list = []
             if not index % 5:
                 work = threading.Thread(target=self.load_rank, args=())
@@ -517,7 +520,7 @@ class Up():
         now_hour = int(time_str(format='%H'))
         now_min = int(time_str(format='%M'))
         now_time = now_hour + now_min / 60
-        if now_time > 0.5 and now_time < 8.5:
+        if now_time > self.ignore_start and now_time < self.ignore_end:
             return
         if os.path.exists('{}comment.pkl'.format(comment_dir)):
             with codecs.open('{}comment.pkl'.format(comment_dir), 'rb') as f:
@@ -525,13 +528,13 @@ class Up():
         if self.assign_up_mid == -1:
             return
         url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
         if json_req is None or not 'data' in json_req or not 'vlist' in json_req['data']:
             if can_retry(url):
                 self.get_check()
             return
         av_id_list = [[ii['aid'], ii['comment']]
-                      for ii in json_req['data']['vlist']]
+                      for ii in json_req['data']['vlist'] if not re.findall(self.ignore_list, str(ii['aid']))]
         if self.basic_av_id not in [ii[0] for ii in av_id_list]:
             if can_retry(url):
                 self.get_check()
@@ -592,7 +595,7 @@ class Up():
     def check_comment_once(self, av_id: int, pn: int):
         ''' check comment once '''
         url = self.REPLY_V2_URL % (pn, av_id)
-        json_req = get_request_proxy(url, 1)
+        json_req = proxy_req(url, 1)
         if json_req is None or not 'data' in json_req or not 'hots' in json_req['data']:
             if can_retry(url):
                 self.check_comment_once(av_id, pn)
@@ -644,12 +647,14 @@ class Up():
 
         if not len(re.findall(self.keyword, content)):
             return True
+        floor = '{}{}'.format(floor, '' if not parent_floor else '-{}'.format(floor))
 
-        floor = str(
-            floor) if parent_floor is None else '%d-%d' % (parent_floor, floor)
         url = self.BASIC_AV_URL % av_id
-        if str(av_id) in self.ignore_comment and floor in self.ignore_comment[str(av_id)]:
+        floor_str = '{}-{}'.format(av_id, floor)
+        if str(av_id) in self.ignore_floor and floor in self.ignore_floor[str(av_id)]:
             return True
+        if self.email_limit < 1 or (floor_str in self.email_send_time and self.email_send_time[floor_str] > self.email_limit):
+            return True 
 
         email_content = '%s\nUrl: %s Page: %d #%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s\nlike: %d' % (
             ctime, url, pn, floor, uname, sex, content, sign, like)
@@ -661,6 +666,10 @@ class Up():
         while not send_email_result and send_email_time < 4:
             send_email_result = send_email(email_content, email_subject)
             send_email_time += 1
+        if floor_str in self.email_send_time:
+            self.email_send_time[floor_str] += 1
+        else:
+            self.email_send_time[floor_str] = 0
 
 
 if __name__ == '__main__':

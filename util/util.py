@@ -2,7 +2,7 @@
 @Author: gunjianpan
 @Date:   2018-10-19 15:33:46
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-20 16:37:26
+@Last Modified time: 2019-04-28 11:59:44
 '''
 
 import codecs
@@ -30,7 +30,7 @@ headers = {
     "Accept-Language": "zh-CN,zh;q=0.9",
     'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"}
-data_dir = 'utils/data/'
+data_dir = 'util/data/'
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
 try:
@@ -47,7 +47,7 @@ spend_list = []
 failure_map = {}
 
 
-def basic_req(url: str, types: int, proxies=None, data=None, header=None):
+def basic_req(url: str, types: int, proxies=None, data=None, header=None, need_cookie: bool = False):
     """
     requests
     @types XY: X=0.->get;   =1.->post;
@@ -56,21 +56,23 @@ def basic_req(url: str, types: int, proxies=None, data=None, header=None):
     req_set(url)
     result = None
     if not types:
-        result = get_html(url, proxies, header)
+        result = get_html(url, proxies, header, need_cookie)
     elif types == 1:
-        result = get_json(url, proxies, header)
+        result = get_json(url, proxies, header, need_cookie)
     elif types == 2:
         result = get_basic(url, proxies, header)
     elif types == 3:
-        result = get_text(url, proxies, header)
+        result = get_text(url, proxies, header, need_cookie)
     elif types == 11:
-        result = post_json(url, proxies, data, header)
+        result = post_json(url, proxies, data, header, need_cookie)
     elif types == 12:
         result = post_basic(url, proxies, data, header)
     elif types == 13:
-        result = post_text(url, proxies, data, header)
+        result = post_text(url, proxies, data, header, need_cookie)
     else:
         echo(0, types, ' type is not supported!!!')
+    if need_cookie and result is None:
+        return None, {}
     return result
 
 
@@ -82,7 +84,7 @@ def req_set(url: str):
     headers['User-Agent'] = agent_lists[index]
 
 
-def get_html(url: str, proxies=None, header=None):
+def get_html(url: str, proxies=None, header=None, need_cookie: bool = False):
     ''' get html @return BeautifulSoup '''
     if header is None:
         header = headers
@@ -97,30 +99,40 @@ def get_html(url: str, proxies=None, header=None):
                                 timeout=html_timeout, proxies=proxies, allow_redirects=False)
         if html.apparent_encoding == 'utf-8' or 'gbk' in html.apparent_encoding:
             html.encoding = html.apparent_encoding
+        cookies = html.cookie.get_dict()
         html = html.text
     except:
+        cookies = {}
         html = '<html></html>'
+    if need_cookie:
+        return BeautifulSoup(html, 'html.parser'), cookies
     return BeautifulSoup(html, 'html.parser')
 
 
-def get_json(url: str, proxies=None, header=None):
+def get_json(url: str, proxies=None, header=None, need_cookie: bool = False):
     ''' get json @return dict '''
     if header is None:
         header = headers
     try:
-        return requests.get(url, headers=header, verify=False,
-                            timeout=json_timeout, proxies=proxies).json()
+        json_req = requests.get(url, headers=header, verify=False,
+                                timeout=json_timeout, proxies=proxies)
+        if need_cookie:
+            return json_req.json(), json_req.cookies.get_dict()
+        return json_req.json()
     except:
         return
 
 
-def post_json(url: str, proxies=None, data=None, header=None):
+def post_json(url: str, proxies=None, data=None, header=None, need_cookie: bool = False):
     ''' post json @return dict '''
     if header is None:
         header = headers
     try:
-        return requests.post(url, headers=header, verify=False, data=data,
-                             timeout=json_timeout, proxies=proxies).json()
+        json_req = requests.post(url, headers=header, verify=False, data=data,
+                                 timeout=json_timeout, proxies=proxies)
+        if need_cookie:
+            return json_req.json(), json_req.cookies.get_dict()
+        return json_req.json()
     except:
         return
 
@@ -147,7 +159,7 @@ def get_basic(url: str, proxies=None, header=None):
         return
 
 
-def get_text(url: str, proxies=None, header=None) -> str:
+def get_text(url: str, proxies=None, header=None, need_cookie: bool = False) -> str:
     ''' get text '''
     if header is None:
         header = headers
@@ -156,19 +168,28 @@ def get_text(url: str, proxies=None, header=None) -> str:
                            timeout=html_timeout, proxies=proxies)
         ''' change encoding '''
         req.encoding = req.apparent_encoding
+        if need_cookie:
+            return req.text, req.cookies.get_dict()
         return req.text
     except:
+        if need_cookie:
+            return '', {}
         return ''
 
 
-def post_text(url: str, proxies=None, header=None, data=None) -> str:
+def post_text(url: str, proxies=None, header=None, data=None, need_cookie: bool = False) -> str:
     ''' post text '''
     if header is None:
         header = headers
     try:
-        return requests.post(url, headers=header, verify=False, data=data,
-                             timeout=html_timeout, proxies=proxies).text
+        req = requests.post(url, headers=header, verify=False, data=data,
+                            timeout=html_timeout, proxies=proxies)
+        if need_cookie:
+            return req.text, req.cookies.get_dict()
+        return req.text
     except:
+        if need_cookie:
+            return '', {}
         return ''
 
 

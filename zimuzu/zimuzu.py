@@ -12,9 +12,9 @@ import shutil
 
 from configparser import ConfigParser
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, end_time, can_retry
+from util.util import begin_time, end_time, can_retry
 
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 
 """
   * zimuzu @http
@@ -38,7 +38,7 @@ class zimuzu():
         ''' load url form zimuzu '''
 
         url = 'http://zmz005.com/{}'.format(self.zimuzu_id)
-        detail = get_request_proxy(url, 0)
+        detail = proxy_req(url, 0)
         total = []
 
         if not detail:

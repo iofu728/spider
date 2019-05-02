@@ -12,10 +12,10 @@ import pkuseg
 import re
 
 from proxy.getproxy import GetFreeProxy
-from utils.db import Db
-from utils.utils import begin_time, end_time, basic_req, can_retry
+from util.db import Db
+from util.util import begin_time, end_time, basic_req, can_retry
 
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 
 """
   * news @http
@@ -70,7 +70,7 @@ class Get_baidu_news():
                 str(index * 20)
         else:
             url = 'http://news.baidu.com/ns?rn=20&ie=utf-8&cl=2&ct=1&bs=%E6%AF%92%E7%8B%97%E8%82%89&rsv_bp=1&sr=0&f=8&prevct=no&tn=news&word=%E5%81%B7%E7%8B%97'
-        news_lists = get_request_proxy(url, 0)
+        news_lists = proxy_req(url, 0)
         if not news_lists:
             if can_retry(url):
                 self.summarization_once(index)
@@ -353,7 +353,7 @@ class Get_baidu():
         texts = []
         url = 'https://www.baidu.com/s?ie=utf-8&mod=1&isbd=1&isid=919fab3c0002c9f1&wd=%E5%81%B7%E7%8B%97&oq=%E5%81%B7%E7%8B%97&tn=baiduhome_pg&ie=utf-8&rsv_idx=2&rsv_pq=919fab3c0002c9f1&rsv_t=7e30ggF%2BMa91oOURk1bMtN8af5unSwOR08TodNBB%2F%2B6B6RBEwUi8l8IAe28ACA%2B8b5I5&gpc=stf%3D1517038564%2C1548574564%7Cstftype%3D1&tfflag=1&bs=%E5%81%B7%E7%8B%97&rsv_sid=undefined&_ss=1&clist=28bc21fb856a58b7%09350102124f079888%0928bc21fb856a58b7%0928bc2159845c1cf3%0928bc2015823fa56b%0928a121fb84a7d1a6&hsug=&f4s=1&csor=2&_cr1=34767&pn=' + \
             str(index * 10)
-        news_lists = get_request_proxy(url, 0)
+        news_lists = proxy_req(url, 0)
         if not news_lists:
             if can_retry(url):
                 self.summarization_once(index)
@@ -419,7 +419,7 @@ class Get_baidu_bjh():
         texts = []
         url = 'https://www.baidu.com/s?tn=news&rtt=4&bsst=1&cl=2&wd=毒狗肉&pn=' + \
             str(index * 10)
-        news_lists = get_request_proxy(url, 0)
+        news_lists = proxy_req(url, 0)
         if not news_lists:
             if can_retry(url):
                 self.href_once(index)
@@ -469,7 +469,7 @@ class Get_baidu_bjh():
         get html from news
         """
         # print(index)
-        news_lists = get_request_proxy(url, 0)
+        news_lists = proxy_req(url, 0)
         if not news_lists:
             if can_retry(url):
                 self.detail_once(index, url)

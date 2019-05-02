@@ -9,9 +9,9 @@ import random
 import os
 
 from proxy.getproxy import GetFreeProxy
-from utils.utils import begin_time, end_time, send_email
+from util.util import begin_time, end_time, send_email
 
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 data_path = 'brushclass/data/'
 
 """
@@ -79,7 +79,7 @@ class Brush(object):
             "seq": 'yjkc20141100016542',
         }
 
-        ca = get_request_proxy(url, 11, data, header=headers)
+        ca = proxy_req(url, 11, data, header=headers)
 
         if not ca:
             if round(time.time()) - self.laster_timestamp > 60:

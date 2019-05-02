@@ -10,10 +10,10 @@ import threading
 
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
-from utils.db import Db
-from utils.utils import begin_time, end_time, basic_req, can_retry
+from util.db import Db
+from util.util import begin_time, end_time, basic_req, can_retry
 
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 
 """
   * netease @http
@@ -55,7 +55,7 @@ class Get_playlist_song():
         version = begin_time()
         self.classifylist = {}
         host = 'https://music.163.com/discover/playlist'
-        html = get_request_proxy(host, 0)
+        html = proxy_req(host, 0)
 
         if not html:
             print('Empty')
@@ -213,7 +213,7 @@ class Get_playlist_song():
         """
 
         host = 'http://music.163.com/api/playlist/detail?id=' + str(id)
-        json = get_request_proxy(host, 1)
+        json = proxy_req(host, 1)
         if json == 0:
             if can_retry(host):
                 self.get_song_detail(id)

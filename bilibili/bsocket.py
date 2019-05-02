@@ -20,10 +20,10 @@ from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
 from proxy.getproxy import GetFreeProxy
-from utils.utils import can_retry, basic_req, time_str
+from util.util import can_retry, basic_req, time_str
 
 logger = logging.getLogger(__name__)
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 data_dir = 'bilibili/data/'
 websocket_dir = '%swebsocket/' % data_dir
 assign_path = 'bilibili/assign_up.ini'
@@ -86,7 +86,7 @@ class BWebsocketClient:
     def _getroom_id(self, next_to=True, proxy=True):
         ''' get av room id '''
         url = self.ROOM_INIT_URL % self._av_id
-        html = get_request_proxy(url, 0) if proxy else basic_req(url, 0)
+        html = proxy_req(url, 0) if proxy else basic_req(url, 0)
         head = html.find_all('head')
         if not len(head) or len(head[0].find_all('script')) < 4 or not '{' in head[0].find_all('script')[3].text:
             if can_retry(url):

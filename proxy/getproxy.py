@@ -21,8 +21,8 @@ sys.path.append(os.getcwd())
 from apscheduler.schedulers.blocking import BlockingScheduler
 from bs4 import BeautifulSoup
 
-from utils.db import Db
-from utils.utils import begin_time, end_time, changeJsonTimeout, changeHtmlTimeout, basic_req, time_str, can_retry, echo
+from util.db import Db
+from util.util import begin_time, end_time, changeJsonTimeout, changeHtmlTimeout, basic_req, time_str, can_retry, echo
 
 """
   * www.proxyserverlist24.top
@@ -47,7 +47,7 @@ class GetFreeProxy:
     ''' proxy pool '''
 
     def __init__(self):
-        self.Db = Db("netease")
+        self.Db = Db("proxy")
         self.insert_sql = '''INSERT INTO ip_proxy( `address`, `http_type`) VALUES %s '''
         self.select_list = '''SELECT address, http_type from ip_proxy WHERE `is_failured` = 0'''
         self.select_sql = '''SELECT `id`, address, `is_failured` from ip_proxy WHERE `address` in %s '''
@@ -60,7 +60,7 @@ class GetFreeProxy:
         self.canuse_proxies = []
         self.initproxy()
 
-    def get_request_proxy(self, url:str, types:int, data=None, test_func=None, header=None):
+    def proxy_req(self, url:str, types:int, data=None, test_func=None, header=None, need_cookie:bool=False):
         """
         use proxy to send requests, and record the proxy cann't use
         @types S0XY: X=0.->get;   =1.->post;
@@ -88,12 +88,11 @@ class GetFreeProxy:
             proxies = {type_map[httptype]: proxies_url}
 
         try:
-            result = basic_req(url, types, proxies, data, header)
+            result = basic_req(url, types, proxies, data, header, need_cookie)
             if not test_func is None:
                 if not test_func(result):
                     if self.check_retry(url):
-                        self.get_request_proxy(
-                            url, types + 1000 * ss_type, data, test_func)
+                        self.proxy_req(url, types + 1000 * ss_type, data, test_func, header, need_cookie)
                     else:
                         self.failuredtime[url] = 0
                         return
@@ -112,7 +111,7 @@ class GetFreeProxy:
                 self.cleancannotuse()
 
             if self.check_retry(url):
-                self.get_request_proxy(url, types + 1000 * ss_type, data, test_func)
+                self.proxy_req(url, types + 1000 * ss_type, data, test_func, header, need_cookie)
             else:
                 return
 
@@ -238,25 +237,25 @@ class GetFreeProxy:
         self.proxylists = []
         self.proxylist_ss = []
         self.proxylists_ss = []
-        if results != 0:
-
-            for index in results:
-                if index[1] == 1:
-                    self.proxylists.append(index[0])
-                elif index[1] == 2:
-                    self.proxylist.append(index[0])
-                    self.proxylist_ss.append(index[0])
-                elif index[1] == 3:
-                    self.proxylists.append(index[0])
-                    self.proxylists_ss.append(index[0])
-                else:
-                    self.proxylist.append(index[0])
-            echo(2, len(self.proxylist), ' http proxy can use.')
-            echo(2, len(self.proxylists), ' https proxy can use.')
-            echo(2, len(self.proxylist_ss), ' ss http proxy can use.')
-            echo(2, len(self.proxylists_ss), ' ss https proxy can use.')
-        else:
+        if not results:
             echo(0, 'Please check db configure!!! The proxy pool cant use!!!>>>')
+            return
+        for index in results:
+            if index[1] == 1:
+                self.proxylists.append(index[0])
+            elif index[1] == 2:
+                self.proxylist.append(index[0])
+                self.proxylist_ss.append(index[0])
+            elif index[1] == 3:
+                self.proxylists.append(index[0])
+                self.proxylists_ss.append(index[0])
+            else:
+                self.proxylist.append(index[0])
+        echo(2, len(self.proxylist), ' http proxy can use.')
+        echo(2, len(self.proxylists), ' https proxy can use.')
+        echo(2, len(self.proxylist_ss), ' ss http proxy can use.')
+        echo(2, len(self.proxylists_ss), ' ss https proxy can use.')
+            
 
     def judgeurl(self, urls, index, times, ss_test=False):
         """
@@ -397,7 +396,7 @@ class GetFreeProxy:
 
         version = begin_time()
         host = 'http://www.goubanjia.com'
-        html = self.get_request_proxy(host, 0)
+        html = self.proxy_req(host, 0)
 
         if not html:
             return []
@@ -434,7 +433,7 @@ class GetFreeProxy:
         ]
         host = 'http://www.data5u.com/'
         for uri in url_list:
-            html = self.get_request_proxy(host + uri, 0)
+            html = self.proxy_req(host + uri, 0)
             if not html:
                 continue
             table = html.find_all('ul', class_='l2')
@@ -468,8 +467,7 @@ class GetFreeProxy:
 
     def sixsixthread(self, index, pageindex):
         host = '''http://www.66ip.cn/areaindex_%d/%d.html'''
-        html = self.get_request_proxy(
-            host % (index, pageindex), 0)
+        html = self.proxy_req(host % (index, pageindex), 0)
         if not html:
             return []
         trs = html.find_all('table')[2].find_all('tr')
@@ -498,7 +496,7 @@ class GetFreeProxy:
 
     def kuaidailithread(self, index):
         host = '''https://www.kuaidaili.com/free/inha/%d/'''
-        html = self.get_request_proxy(host % index, 0)
+        html = self.proxy_req(host % index, 0)
         if not html:
             return []
         trs = html.find_all('tr')
@@ -666,8 +664,12 @@ if __name__ == '__main__':
     parser.add_argument('--is_service', type=bool, default=False, metavar='service',help='True or False')
     parser.add_argument('--test_time', type=int, default=1, metavar='test_time',help='test_time')
     model = parser.parse_args().model
-    a = GetFreeProxy()
-    if model==1:
-        a.load_gather()
+    pg = GetFreeProxy()
+    if not model:
+        pg.load_proxies_test()
+        
+    elif model == 1:
+        pg.load_gather()
     else:
-        a.load_proxies_test()
+        pg.testdb(2)
+        

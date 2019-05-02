@@ -7,10 +7,10 @@ import threading
 import time
 
 from proxy.getproxy import GetFreeProxy
-from utils.db import Db
-from utils.utils import begin_time, end_time, basic_req
+from util.db import Db
+from util.util import begin_time, end_time, basic_req
 
-get_request_proxy = GetFreeProxy().get_request_proxy
+proxy_req = GetFreeProxy().proxy_req
 
 
 class Press_test():
@@ -24,7 +24,7 @@ class Press_test():
         """
         url = url + str(int(round(time.time() * 1000)))
         if types == 1:
-            html = get_request_proxy(url, 1)
+            html = proxy_req(url, 1)
         else:
             html = basic_req(url, 1)
 

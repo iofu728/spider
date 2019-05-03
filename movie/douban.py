@@ -1,37 +1,48 @@
-'''
-@Author: gunjianpan
-@Date:   2019-04-29 20:04:28
-@Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-30 00:18:37
-'''
+# -*- coding: utf-8 -*-
+# @Author: gunjianpan
+# @Date:   2019-04-29 20:04:28
+# @Last Modified by:   gunjianpan
+# @Last Modified time: 2019-05-03 21:53:24
 
+import json
 import random
+import re
 import string
-import time
 import threading
+import time
 import urllib
+from collections import Counter
 
 from proxy.getproxy import GetFreeProxy
-from util.util import basic_req, changeHeaders, can_retry, echo, begin_time, end_time
+from util.util import (basic_req, begin_time, can_retry, changeHeaders,
+                       changeHtmlTimeout, changeJsonTimeout, dump_bigger, echo,
+                       end_time, load_bigger, shuffle_batch_run_thread)
 
 proxy_req = GetFreeProxy().proxy_req
-
 data_dir = 'movie/data/'
 
 
-class DouBan(object):
+class DouBan:
     ''' get douban movie info '''
 
     API_BASIC_URL = 'http://api.douban.com/v2/movie/'
     API_PROXY_URL = 'http://douban.uieee.com/v2/movie/'
     BASIC_URL = 'https://movie.douban.com/'
-    SEARCH_TAG_URL = '{}j/search_tags?type=movie&source='.format(BASIC_URL)
+    SEARCH_TAG_URL = '{}j/search_tags?type=%s&source='.format(BASIC_URL)
     SEARCH_SUBJECT_URL = '{}j/search_subjects?'.format(BASIC_URL)
+    NEW_SEARCH_SUBJECT_URL = '{}j/new_search_subjects?'.format(BASIC_URL)
+    TAG_URL = '{}tag/#/'.format(BASIC_URL)
 
     def __init__(self):
         self.movie_id_dict = {}
+        self.movie_id2name = {}
+        self.again_list = []
         self.page_size = 100
+        self.page_limit = 1000
+        self.proxy_can_use = False
         self.sort_list = ['time', 'recommend', 'rank']
+        self.rank_list = ['top250', 'us_box',
+                          'weekly', 'in_theaters', 'coming_soon']
         self.get_movie_tag()
 
     def generate_cookie(self, type: str = 'explore'):
@@ -45,18 +56,52 @@ class DouBan(object):
 
         version = begin_time()
         movie_get = []
-        for ii in self.tag:
+        for kk in range(0, 1100, 100):
             for jj in self.sort_list:
-                movie_get.append(threading.Thread(
-                    target=self.get_movie_lists_once, args=('movie', ii, jj, 0,)))
-        for ww in movie_get:
-            ww.start()
-        for ww in movie_get:
-            ww.join()
-        movie_list = set(sum(self.movie_id_dict.values(), []))
-        output_path = '{}douban_movie_id.txt'.format(data_dir)
-        with open(output_path, 'w') as f:
+                for ii in self.tag_movie:
+                    movie_get.append(threading.Thread(
+                        target=self.get_movie_lists_once, args=('movie', ii, jj, kk,)))
+                for ii in self.tag_tv:
+                    movie_get.append(threading.Thread(
+                        target=self.get_movie_lists_once, args=('tv', ii, jj, kk,)))
+        shuffle_batch_run_thread(movie_get, 500, True)
+        again_list = [threading.Thread(target=self.get_movie_lists_once, args=(
+            ii[0], ii[1], ii[2], ii[3],)) for ii in self.again_list]
+        shuffle_batch_run_thread(again_list, 500, True)
+        self.again_list = []
+        echo(1, len(self.movie_id2name.keys()))
+
+        changeHtmlTimeout(40)
+        movie_get = []
+        tag_categories = self.tag_categories
+        for mm in range(0, 10000, 1000):
+            for tags in tag_categories[0][1:]:
+                for genres in tag_categories[1][1:]:
+                    for ii, jj in self.yearMap.values():
+                        year_range = '{},{}'.format(ii, jj)
+                        for sorts in self.tabs:
+                            movie_get.append(threading.Thread(
+                                target=self.get_movie_list_from_tabs, args=(sorts, tags, genres, year_range, mm,)))
+        echo(2, 'Thread Num:', len(movie_get))
+        shuffle_batch_run_thread(movie_get, 900, True)
+        again_list = [threading.Thread(target=self.get_movie_list_from_tabs, args=(
+            ii[0], ii[1], ii[2], ii[3], ii[4],)) if len(ii) == 5 else threading.Thread(target=self.get_movie_lists_once, args=(
+                ii[0], ii[1], ii[2], ii[3],)) for ii in self.again_list]
+        shuffle_batch_run_thread(again_list, 900, True)
+        time.sleep(120)
+        changeJsonTimeout(10)
+        for ii in self.rank_list:
+            self.get_movie_rank(ii, 0)
+            if ii == 'top250':
+                self.get_movie_rank(ii, 100)
+                self.get_movie_rank(ii, 200)
+
+        movie_list = self.movie_id2name.keys()
+        output_path = '{}douban_movie_id'.format(data_dir)
+        with open(output_path + '.txt', 'w') as f:
             f.write('\n'.join([str(ii) for ii in movie_list]))
+        dump_bigger(self.movie_id2name, output_path + '.pkl')
+
         movie_num = len(movie_list)
         echo(1, 'Movie num: {}\nOutput path: {}\nSpend time: {:.2f}s\n'.format(
             movie_num, output_path, end_time(version, 0)))
@@ -69,27 +114,146 @@ class DouBan(object):
         url = '{}{}'.format(self.SEARCH_SUBJECT_URL, '&'.join(params))
         self.generate_cookie()
         movie_json = proxy_req(url, 1)
-        echo(2, url, 'loading')
         if movie_json is None or not 'subjects' in movie_json:
             if can_retry(url):
-                time.sleep(5 + random.random() * 5)
                 self.get_movie_lists_once(types, tag, sorts, page_start)
             else:
+                self.again_list.append([types, tag, sorts, page_start])
                 echo(0, url, 'Failed')
             return
-        movie_list = [int(ii['id']) for ii in movie_json['subjects']]
-        index = '{}{}{}'.format(tag, sorts, page_start)
-        self.movie_id_dict[index] = movie_list
-        if len(movie_list):
-            self.get_movie_lists_once(
-                types, tag, sorts, page_start + self.page_size)
+        echo(2, url, 'loaded')
+        id2name = {int(ii['id']): ii['title'] for ii in movie_json['subjects']}
+        self.movie_id2name = {**self.movie_id2name, **id2name}
+
+    def get_movie_list_from_tabs(self, sorts: str, tags: str, genres: str, year_range: str, star: int = 0):
+        ''' get info from movie list '''
+        params_dict = {'sort': sorts, 'range': '0,10', 'tags': urllib.parse.quote(tags),
+                       'genres': urllib.parse.quote(genres), 'star': star, 'limit': 1000 if star < 9000 else 9999 - star, 'year_range': year_range}
+        params = ['{}={}'.format(ii, jj)
+                  for ii, jj in params_dict.items() if jj != '']
+        url = '{}{}'.format(self.NEW_SEARCH_SUBJECT_URL, '&'.join(params))
+        self.generate_cookie()
+        movie_req = proxy_req(url, 2)
+        if movie_req is None:
+            if can_retry(url):
+                self.get_movie_list_from_tabs(
+                    sorts, tags, genres, year_range, star)
+            else:
+                self.again_list.append([sorts, tags, genres, year_range, star])
+                echo(0, url, 'Failed')
+            return
+        if movie_req.status_code != 200:
+            return
+        try:
+            movie_json = movie_req.json()
+            echo(2, url, 'loaded')
+            id2name = {int(ii['id']): ii['title'] for ii in movie_json['data']}
+            self.movie_id2name = {**self.movie_id2name, **id2name}
+        except:
+            echo(0, url, 'Except!')
 
     def get_movie_tag(self):
         ''' get movie tag '''
-        tag = basic_req(self.SEARCH_TAG_URL, 1)
-        self.tag = tag['tags']
+        tag = basic_req(self.SEARCH_TAG_URL % 'movie', 1)
+        self.tag_movie = tag['tags']
+        tag = basic_req(self.SEARCH_TAG_URL % 'tv', 1)
+        self.tag_tv = tag['tags']
+        basic_text = basic_req(self.TAG_URL, 3)
+        EXPLORE_APP_URL = re.findall(r'https.*explore/app.js', basic_text)[0]
+        app_js_text = basic_req(EXPLORE_APP_URL, 3)
+        json_list = re.findall(r'ion\(\){return(.*?})}}', app_js_text)[2]
+        params = [*re.findall(r',(\w*?):', json_list), 'tag_items']
+        for ii in params:
+            json_list = json_list.replace('{}:'.format(ii), '"{}":'.format(ii))
+        json_list = json_list.replace('!', '').replace(
+            'document.documentElement.clientHeight', '"document.documentElement.clientHeight"')
+        json_map = json.loads(json_list + '}')
+        self.tag_categories = json_map['tag_categories']
+        self.yearMap = json_map['yearMap']
+        self.tabs = [ii[0] for ii in json_map['tabs']]
+
+    def get_movie_rank(self, types: str, start: int):
+        url = '{}{}?start={}&count=100'.format(
+            self.API_PROXY_URL, types, start)
+        rank_json = proxy_req(url, 1)
+        if rank_json is None or not 'subjects' in rank_json:
+            if can_retry(url):
+                self.get_movie_rank(types, start)
+            else:
+                self.again_list.append([types, start])
+                echo(0, url, 'Failed')
+            return
+        echo(2, url, 'loaded')
+
+        id2name = {int(ii['id']) if 'id' in ii else int(ii['subject']['id']): ii['title']
+                   if 'title' in ii else ii['subject']['title'] for ii in rank_json['subjects']}
+        self.movie_id2name = {**self.movie_id2name, **id2name}
+
+    def load_list(self):
+        version = begin_time()
+        self.movie_id2name = load_bigger(
+            '{}douban_movie_id.pkl'.format(data_dir))
+        with open('{}movie_list.txt'.format(data_dir), 'r') as f:
+            external_list = [ii.strip() for ii in f.readlines()]
+        total_list = list(self.movie_id2name.values()) + external_list
+        word_map = Counter(total_list)
+        wait_list = [ii for ii in external_list if word_map[ii] == 1]
+        self.finish_list = []
+        changeJsonTimeout(10)
+        wait_queue = [threading.Thread(
+            target=self.get_search_list, args=(ii,)) for ii in wait_list]
+        shuffle_batch_run_thread(wait_queue, 600, True)
+        again_list = [threading.Thread(
+            target=self.get_search_list, args=(ii,)) for ii in self.again_list]
+        shuffle_batch_run_thread(again_list, 600, True)
+        time.sleep(660)
+        output_path = '{}movie_id.pkl'.format(data_dir)
+        dump_bigger(self.movie_id2name, output_path)
+        movie_num = len(self.movie_id2name.keys())
+        echo(1, 'Movie num: {}\nOutput path: {}\nSpend time: {:.2f}s\n'.format(
+            movie_num, output_path, end_time(version, 0)))
+
+    def find_no_exist(self):
+        with open('{}movie_list.txt'.format(data_dir), 'r') as f:
+            external_list = [ii.strip() for ii in f.readlines()]
+        exist_names = list(self.movie_id2name.values())
+        wait_list = []
+        for ii in external_list:
+            if not ii in exist_names:
+                wait_list.append(ii)
+        dump_bigger(wait_list, '{}wait_list.pkl'.format(data_dir))
+
+    def get_search_list(self, q: str):
+        if self.proxy_can_use:
+            base_url = self.API_PROXY_URL if random.random() * 10 > 7 else self.API_BASIC_URL
+        else:
+            base_url = self.API_BASIC_URL
+        url = '{}search?q={}&count=66'.format(base_url, urllib.parse.quote(q))
+        search_json = proxy_req(url, 1)
+        if search_json is None or not 'subjects' in search_json:
+            if search_json and 'code' in search_json:
+                if search_json['code'] == 112:
+                    self.proxy_can_use = False
+            if can_retry(url, 6):
+                time.sleep(random.random() *
+                           (3.14 + random.randint(4, 10)) + 3.14)
+                self.get_search_list(q)
+            else:
+                self.again_list.append(q)
+                echo(0, url, 'Failed')
+            return
+        # echo(2, url, 'loaded')
+        id2name = {int(ii['id']): ii['title']
+                   for ii in search_json['subjects']}
+        self.movie_id2name = {**self.movie_id2name, **id2name}
+        self.finish_list.append(q)
+        if not len(self.finish_list) % 600:
+            echo(2, len(self.finish_list), 'Finish...')
+            dump_bigger(self.movie_id2name,
+                        '{}douban_movie_id.pkl'.format(data_dir))
 
 
 if __name__ == "__main__":
     mv = DouBan()
-    mv.get_movie_lists()
+    # mv.get_movie_lists()
+    mv.load_list()

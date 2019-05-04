@@ -2,9 +2,10 @@
 # @Author: gunjianpan
 # @Date:   2019-04-29 20:04:28
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-05-03 21:53:24
+# @Last Modified time: 2019-05-04 14:06:22
 
 import json
+import os
 import random
 import re
 import string
@@ -32,10 +33,13 @@ class DouBan:
     SEARCH_SUBJECT_URL = '{}j/search_subjects?'.format(BASIC_URL)
     NEW_SEARCH_SUBJECT_URL = '{}j/new_search_subjects?'.format(BASIC_URL)
     TAG_URL = '{}tag/#/'.format(BASIC_URL)
+    COMMENT_URL = '{}subject/%d/comments?start=%d&limit=20&sort=new_score&status=P&comments_only=1'.format(
+        BASIC_URL)
 
     def __init__(self):
         self.movie_id_dict = {}
         self.movie_id2name = {}
+        self.user_list = []
         self.again_list = []
         self.page_size = 100
         self.page_limit = 1000
@@ -252,8 +256,87 @@ class DouBan:
             dump_bigger(self.movie_id2name,
                         '{}douban_movie_id.pkl'.format(data_dir))
 
+    def get_comment_v1(self):
+        ''' get comment info & user info '''
+        version = begin_time()
+        self.movie_id2name = load_bigger(
+            '{}douban_movie_id.pkl'.format(data_dir))
+
+        comment_path = '{}douban_comment.pkl'.format(data_dir)
+        user_path = '{}douban_user.pkl'.format(data_dir)
+        if os.path.exists(comment_path):
+            self.comment = load_bigger(comment_path)
+        else:
+            self.comment = {ii: {} for ii in self.movie_id2name.keys()}
+        if os.path.exists(user_path):
+            self.user_info = load_bigger(user_path)
+        else:
+            self.user_info = {}
+        self.finish_list = []
+        self.again_list = []
+        self.more_user = []
+        comment_thread = []
+        for ii in self.movie_id2name.keys():
+            for jj in range(0, 100, 20):
+                comment_thread.append(threading.Thread(
+                    target=self.load_user_id, args=(ii, jj)))
+        shuffle_batch_run_thread(comment_thread, 800, True)
+        time.sleep(20)
+        while len(self.more_user):
+            more_user = [threading.Thread(
+                target=self.load_user_id, args=(ii[0], ii[1],)) for ii in self.more_user]
+            self.more_user = []
+            again_list = [threading.Thread(
+                target=self.load_user_id, args=(ii[0], ii[1],)) for ii in self.again_list]
+            self.again_list = []
+            shuffle_batch_run_thread([*more_user, again_list], 800, True)
+            time.sleep(20)
+        time.sleep(360)
+        dump_bigger(self.comment, comment_path)
+        dump_bigger(self.user_info, user_path)
+        comment_num = sum([len(ii.keys()) for ii in self.comment.values()])
+        echo(1, 'Comment num: {}\nSpend time: {:.2f}s\n'.format(
+            comment_num, end_time(version, 0)))
+
+    def load_user_id(self, movie_id: int, start: int):
+        ''' load comment '''
+        url = self.COMMENT_URL % (movie_id, start)
+        comment_json = proxy_req(url, 1)
+        if comment_json is None or not 'html' in comment_json:
+            if can_retry(url, 6):
+                time.sleep(random.random() * 3.14)
+                self.load_user_id(movie_id, start)
+            else:
+                self.again_list.append([movie_id, start])
+                echo(0, url, 'Failed')
+            return
+        comment_html = comment_json['html']
+        user_list = re.findall(
+            r'title="(.*?)" href="https://www.douban.com/people/([\s\S]{1,30}?)/"\>', comment_html)
+
+        if not len(user_list):
+            return
+        votes = re.findall(r'votes"\>(\w{1,7}?)<', comment_html)
+        comment_time = re.findall(r'-time " title="(.*?)">\n', comment_html)
+        short = re.findall(r'class="short">([\s\S]*?)</span>', comment_html)
+        if len(user_list) != len(comment_time) or len(user_list) != len(short):
+            echo(0, url, 'Comment reg error!!!')
+        comment = {jj[1]: [jj[0], jj[1], comment_time[ii], short[ii], votes[ii] if ii < len(votes) else '']
+                   for ii, jj in enumerate(user_list)}
+        user_list = {ii[1] for ii in user_list}
+        self.user_info = {*self.user_info, *user_list}
+        self.comment[movie_id] = {**self.comment[movie_id], **comment}
+        if len(user_list) == 20 and not (start + 20) % 100:
+            self.more_user.append([movie_id, start])
+        self.finish_list.append(1)
+        if not len(self.finish_list) % 100:
+            echo(2, len(self.finish_list), 'Finish...')
+            dump_bigger(self.comment, '{}douban_comment.pkl'.format(data_dir))
+            dump_bigger(self.user_info, '{}douban_user.pkl'.format(data_dir))
+
 
 if __name__ == "__main__":
     mv = DouBan()
     # mv.get_movie_lists()
-    mv.load_list()
+    # mv.load_list()
+    mv.get_comment_v1()

@@ -6,18 +6,19 @@
 '''
 
 import codecs
-import numpy as np
 import os
 import pickle
 import platform
 import random
-import requests
 import smtplib
+import threading
 import time
-import urllib3
-
-from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
+
+import numpy as np
+import requests
+import urllib3
+from bs4 import BeautifulSoup
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -42,7 +43,7 @@ except:
     agent_lists = [headers['User-Agent']]
 agent_len = len(agent_lists) - 1
 html_timeout = 5
-json_timeout = 5
+json_timeout = 4
 start = []
 spend_list = []
 failure_map = {}
@@ -351,7 +352,9 @@ def shuffle_batch_run_thread(threading_list: list, batch_size: int = 24, is_awai
     for block in range(total_block):
         for ii in threading_list[block * batch_size:min(thread_num, batch_size * (block + 1))]:
             ii.start()
-        if not is_await:
+        if threading.active_count() > batch_size * 1.1:
+            time.sleep(random.random())
+        if not is_await or block % 100 == 10:
             for ii in threading_list[block * batch_size:min(thread_num, batch_size * (block + 1))]:
                 ii.join()
         else:

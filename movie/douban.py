@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-29 20:04:28
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-05-04 14:06:22
+# @Last Modified time: 2019-05-04 15:29:53
 
 import json
 import os
@@ -13,6 +13,8 @@ import threading
 import time
 import urllib
 from collections import Counter
+
+import numpy as np
 
 from proxy.getproxy import GetFreeProxy
 from util.util import (basic_req, begin_time, can_retry, changeHeaders,
@@ -280,7 +282,7 @@ class DouBan:
             for jj in range(0, 100, 20):
                 comment_thread.append(threading.Thread(
                     target=self.load_user_id, args=(ii, jj)))
-        shuffle_batch_run_thread(comment_thread, 800, True)
+        shuffle_batch_run_thread(comment_thread, 600, True)
         time.sleep(20)
         while len(self.more_user):
             more_user = [threading.Thread(
@@ -289,7 +291,7 @@ class DouBan:
             again_list = [threading.Thread(
                 target=self.load_user_id, args=(ii[0], ii[1],)) for ii in self.again_list]
             self.again_list = []
-            shuffle_batch_run_thread([*more_user, again_list], 800, True)
+            shuffle_batch_run_thread([*more_user, again_list], 600, True)
             time.sleep(20)
         time.sleep(360)
         dump_bigger(self.comment, comment_path)
@@ -303,7 +305,7 @@ class DouBan:
         url = self.COMMENT_URL % (movie_id, start)
         comment_json = proxy_req(url, 1)
         if comment_json is None or not 'html' in comment_json:
-            if can_retry(url, 6):
+            if can_retry(url, 5):
                 time.sleep(random.random() * 3.14)
                 self.load_user_id(movie_id, start)
             else:
@@ -333,6 +335,19 @@ class DouBan:
             echo(2, len(self.finish_list), 'Finish...')
             dump_bigger(self.comment, '{}douban_comment.pkl'.format(data_dir))
             dump_bigger(self.user_info, '{}douban_user.pkl'.format(data_dir))
+
+    def shuffle_movie_list(self):
+        ''' prepare distribution spider '''
+        movie_id2name = load_bigger('movie/data/douban_movie_id.pkl')
+        ids = list(movie_id2name.keys())
+        np.random.shuffle(ids)
+        one_bath_size = len(ids) // 3
+        first_map = {ii: 0 for ii in ids[:one_bath_size]}
+        second_map = {ii: 0 for ii in ids[one_bath_size:one_bath_size * 2]}
+        third_map = {ii: 0 for ii in ids[one_bath_size*2:]}
+        dump_bigger(first_map, 'movie/data/douban_movie_id1.pkl')
+        dump_bigger(second_map, 'movie/data/douban_movie_id2.pkl')
+        dump_bigger(third_map, 'movie/data/douban_movie_id3.pkl')
 
 
 if __name__ == "__main__":

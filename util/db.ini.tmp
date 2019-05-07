@@ -1,0 +1,5 @@
+[mysql]
+hostname:localhost
+username:root
+passwd:
+charset:utf8mb4

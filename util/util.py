@@ -2,22 +2,23 @@
 @Author: gunjianpan
 @Date:   2018-10-19 15:33:46
 @Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-28 11:59:44
+@Last Modified time: 2019-05-03 00:18:03
 '''
 
 import codecs
-import numpy as np
 import os
 import pickle
 import platform
 import random
-import requests
 import smtplib
+import threading
 import time
-import urllib3
-
-from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
+
+import numpy as np
+import requests
+import urllib3
+from bs4 import BeautifulSoup
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -31,6 +32,7 @@ headers = {
     'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"}
 data_dir = 'util/data/'
+log_path = 'service.log'
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
 try:
@@ -41,10 +43,11 @@ except:
     agent_lists = [headers['User-Agent']]
 agent_len = len(agent_lists) - 1
 html_timeout = 5
-json_timeout = 5
+json_timeout = 4
 start = []
 spend_list = []
 failure_map = {}
+is_service = False
 
 
 def basic_req(url: str, types: int, proxies=None, data=None, header=None, need_cookie: bool = False):
@@ -244,13 +247,13 @@ def empty():
     spend_list = []
 
 
-def can_retry(url: str, index=None) -> bool:
+def can_retry(url: str, time: int = 3) -> bool:
     ''' judge can retry once '''
     global failure_map
     if url not in failure_map:
         failure_map[url] = 0
         return True
-    elif failure_map[url] < 2:
+    elif failure_map[url] < time:
         failure_map[url] += 1
         return True
     else:
@@ -327,24 +330,34 @@ def time_str(timestamp: int = -1, format: str = '%Y-%m-%d %H:%M:%S'):
     return time.strftime(format, time.localtime(time.time()))
 
 
-def echo(color, *args, is_service=False):
+def echo(color, *args):
     ''' echo log @param: color: 0 -> error, 1 -> success, 2 -> info '''
+    args = ' '.join([str(ii) for ii in args])
     if is_service:
+        with open(log_path, 'a') as f:
+            f.write('{}\n'.format(args))
         return
     colors = {'error': '\033[91m', 'success': '\033[94m', 'info': '\033[93m'}
-    args = ' '.join([str(ii) for ii in args])
     if type(color) != int or not color in list(range(len(colors.keys()))) or platform.system() == 'Windows':
         print(args)
     else:
         print(list(colors.values())[color], args, '\033[0m')
 
 
-def shuffle_batch_run_thread(threading_list: list, batch_size=24):
+def shuffle_batch_run_thread(threading_list: list, batch_size: int = 24, is_await: bool = False):
     ''' shuffle batch run thread '''
     thread_num = len(threading_list)
     np.random.shuffle(threading_list)  # shuffle thread
-    for block in range(thread_num // batch_size + 1):
+    total_block = thread_num // batch_size + 1
+    for block in range(total_block):
         for ii in threading_list[block * batch_size:min(thread_num, batch_size * (block + 1))]:
             ii.start()
-        for ii in threading_list[block * batch_size:min(thread_num, batch_size * (block + 1))]:
-            ii.join()
+        if threading.active_count() > batch_size * 1.1:
+            time.sleep(random.random())
+        if not is_await or block % 100 == 10:
+            for ii in threading_list[block * batch_size:min(thread_num, batch_size * (block + 1))]:
+                ii.join()
+        else:
+            time.sleep(min(max(5, batch_size * 2 / 210), 10))
+        echo(1, time_str(), '{}/{}'.format(total_block, block), 'epochs finish.',
+             'One Block {} Thread '.format(batch_size))

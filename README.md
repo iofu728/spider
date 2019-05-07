@@ -10,21 +10,24 @@
 <div align="center"><strong>高可用代理IP池 高并发生成器 一些实战经验</strong></div>
 <div align="center"><strong>Highly Available Proxy IP Pool, Highly Concurrent Request Builder, Some Application</strong></div>
 
-- [keyword](#keyword)
-- [Quick Start](#quick-start)
-- [Structure](#structure)
-- [Proxy pool](#proxy-pool)
-- [Netease](#netease)
-- [Press Test System](#press-test-system)
-- [News](#news)
-- [Youdao Note](#youdao-note)
-- [blog](#blog)
-- [Brush Class](#brush-class)
-- [zimuzu](#zimuzu)
-- [Bilibili](#bilibili)
-- [shaoq](#shaoq)
-- [Eastmoney](#eastmoney)
-- [Ctrip Hotel Detail](#ctrip-hotel-detail)
+## Navigation
+
+| site                 | document                                  | Last Modified time |
+| -------------------- | ----------------------------------------- | ------------------ |
+| gatherproxy.com,etc. | [Proxy pool](#proxy-pool)                 | 19-04-30           |
+| music.163.com        | [Netease](#netease)                       | 18-10-21           |
+| -                    | [Press Test System](#press-test-system)   | 18-11-10           |
+| news.baidu.com       | [News](#news)                             | 19-01-25           |
+| note.youdao.com      | [Youdao Note](#youdao-note)               | 19-01-27           |
+| jianshu.com/csdn.net | [blog](#blog)                             | 19-03-28           |
+| elective.pku.edu.cn  | [Brush Class](#brush-class)               | 19-02-25           |
+| zimuzu.tv            | [zimuzu](#zimuzu)                         | 19-04-13           |
+| bilibili.com         | [Bilibili](#bilibili)                     | 19-04-24           |
+| exam.shaoq.com       | [shaoq](#shaoq)                           | 19-03-21           |
+| data.eastmoney.com   | [Eastmoney](#eastmoney)                   | 19-03-29           |
+| hotel.ctrip.com      | [Ctrip Hotel Detail](#ctrip-hotel-detail) | 19-04-28           |
+| douban.com           | [DouBan](#douban)                         | 19-05-07           |
+| 66ip.cn              | [66ip](#66ip)                             | 19-06-07           |
 
 ## keyword
 
@@ -513,5 +516,71 @@ $ python blog/titleviews.py --model=0 >> log 2>&1 # model = 0: update gather mod
 
   - [Element​.get​Bounding​Client​Rect()](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect)
   - [​Event​Target​.add​Event​Listener()](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
+
+## DouBan
+
+- RuntimeError: dictionary changed size during iteration (when user pickle)
+
+  - This situation maybe happen when your pickle params change in pickling.
+  - so copy of your params before pickle
+
+  ```python
+  comment_loader = comment.copy()
+  dump_bigger(comment_loader, '{}data.pkl'.format(data_dir))
+  ```
+
+  [How to avoid “RuntimeError: dictionary changed size during iteration” error?](https://stackoverflow.com/questions/11941817/how-to-avoid-runtimeerror-dictionary-changed-size-during-iteration-error)
+  [pickling SimpleLazyObject fails just after accessing related object of wrapped model instance.](https://code.djangoproject.com/ticket/25426)
+
+- RecursionError: maximum recursion depth exceeded while pickling an object
+
+  - object depth more than MAXIMUM stack depth
+
+  ```python
+  import sys
+  sys.setrecursionlimit(10000)
+  ```
+
+## 66ip
+
+> Q: @liu wong 一段 js 代码在浏览器上执行的结果和在 python 上用 execjs 执行的结果不一样，有啥原因呢？ http://www.66ip.cn/
+
+> A: 一般 eval 差异 主要是有编译环境，DOM，py 与 js 的字符规则，context 等有关
+> 像 66ip 这个网站，主要是从 py 与 js 的字符规则不同 + DOM 入手的，当然它也有可能是无意的(毕竟爬虫工程师用的不只是 py)
+> 首次访问 66ip 这个网站，会返回一个 521 的 response，header 里面塞了一个 HTTP-only 的 cookie，body 里面塞了一个 script
+
+```js
+var x = "@...".replace(/@*$/, "").split("@"),
+  y = "...",
+  f = function(x, y) {
+    return num;
+  },
+  z = f(
+    y
+      .match(/\w/g)
+      .sort(function(x, y) {
+        return f(x) - f(y);
+      })
+      .pop()
+  );
+while (z++)
+  try {
+    eval(
+      y.replace(/\b\w+\b/g, function(y) {
+        return x[f(y, z) - 1] || "_" + y;
+      })
+    );
+    break;
+  } catch (_) {}
+```
+
+> 可以看到 eval 的是 y 字符串用 x 数组做了一个字符替换之后的结果，所以按道理应该和编译环境没有关系，但把 eval 改成 aa 之后放在 py 和放在 node，chrome 中编译结果却不一样
+> 这是因为在 p 正则\b 会被转义为\x80，这就会导致正则匹配不到，就更不可能替换了，导致我们拿到的 eval_script 实际上是一串乱码
+> 这里用 r'{}'.format(eval_script) 来防止特殊符号被转义
+> 剩下的就是 对拿到的 eval_script 进行 dom 替换操作
+> 总的来说是一个挺不错的 js 逆向入门练手项目, 代码量不大，逻辑清晰
+> 具体代码参见[iofu728/spider](https://github.com/iofu728/spider/blob/master/proxy/ip66.py)
+
+![image](https://cdn.nlark.com/yuque/0/2019/png/104214/1557240022438-bc891ec5-7bbc-412a-b4d4-f330608d21f0.png)
 
 **----To be continued----**

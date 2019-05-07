@@ -27,7 +27,7 @@
 | data.eastmoney.com   | [Eastmoney](#eastmoney)                   | 19-03-29           |
 | hotel.ctrip.com      | [Ctrip Hotel Detail](#ctrip-hotel-detail) | 19-04-28           |
 | douban.com           | [DouBan](#douban)                         | 19-05-07           |
-| 66ip.cn              | [66ip](#66ip)                             | 19-06-07           |
+| 66ip.cn              | [66ip](#66ip)                             | 19-05-07           |
 
 ## keyword
 

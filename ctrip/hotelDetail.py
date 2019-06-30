@@ -1,9 +1,9 @@
-'''
-@Author: gunjianpan
-@Date:   2019-04-20 10:57:55
-@Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-28 21:37:42
-'''
+# -*- coding: utf-8 -*-
+# @Author: gunjianpan
+# @Date:   2019-04-20 10:57:55
+# @Last Modified by:   gunjianpan
+# @Last Modified time: 2019-06-30 23:07:38
+
 import codecs
 import datetime
 import execjs
@@ -28,7 +28,7 @@ one_day = 86400
 
 def decoder_confusion():
     ''' decoder confusion '''
-    with open('{}fingerprint.js'.format(data_dir), 'r') as f:
+    with open(f'{data_dir}fingerprint.js', 'r') as f:
         origin_js = [codecs.unicode_escape_decode(
             ii.strip())[0] for ii in f.readlines()]
     __0x3717e_begin = origin_js[1].index('[') + 1
@@ -45,16 +45,16 @@ def decoder_confusion():
     params = sorted(list(set([ii for ii in params if len(
         ii) > 6])), key=lambda ii: len(ii), reverse=True)
     for ii, jj in enumerate(__0x3717e):
-        origin_str = origin_str.replace('__0x3717e[{}]'.format(ii), jj)
+        origin_str = origin_str.replace(f'__0x3717e[{ii}]', jj)
     for ii, jj in enumerate(params):
-        origin_str = origin_str.replace(jj, 'a{}'.format(ii))
-    with open('{}fingerprint_confusion.js'.format(data_dir), 'w') as f:
+        origin_str = origin_str.replace(jj, f'a{ii}')
+    with open(f'{data_dir}fingerprint_confusion.js', 'w') as f:
         f.write('\n'.join(origin_str.split('|||||')))
 
 
 def load_ocean():
     ''' load ocean '''
-    with open('{}oceanball_origin.js'.format(data_dir), 'r') as f:
+    with open(f'{data_dir}oceanball_origin.js', 'r') as f:
         origin_js = [ii.strip() for ii in f.readlines()]
     origin_str = '|||'.join(origin_js)
     params = [*re.findall(r'var ([a-zA-Z]*?) =', origin_str),
@@ -69,13 +69,41 @@ def load_ocean():
     params = sorted(list(set([ii for ii in params if len(
         ii) > 6])), key=lambda ii: len(ii), reverse=True)
     for ii, jj in enumerate(params):
-        origin_str = origin_str.replace(jj, 'a{}'.format(ii))
-    with open('{}oceanball_origin_decoder.js'.format(data_dir), 'w') as f:
+        origin_str = origin_str.replace(jj, f'a{ii}')
+    with open(f'{data_dir}oceanball_origin_decoder.js', 'w') as f:
         f.write(origin_str.replace('|||', '\n'))
 
 
+def load_ocean_v2():
+    ''' load ocean ball v2 @2019.6.9 '''
+    decoder_file('(_unknown_\w{5})', 'oceanballv2.js')
+
+
+def decoder_file(reg: str, file_name: str):
+    ''' decoder file '''
+    with open(f'{data_dir}{file_name}', 'r') as f:
+        origin_js = [ii.strip() for ii in f.readlines()]
+    origin_str = '|||'.join(origin_js)
+    origin_str = replace_params(origin_js, reg)
+    file_name_split = file_name.split('.', 1)
+    with open(f'{data_dir}{file_name_split[0]}_decoder.{file_name_split[1]}', 'w') as f:
+        f.write(origin_str.replace('|||', '\n'))
+
+
+def replace_params(origin_str: str, reg: str):
+    ''' replace params '''
+    params_re = re.findall(reg, origin_str)
+    params = []
+    for ii in params_re:
+        if not ii in params:
+            params.append(ii)
+    for ii, jj in enumerate(params):
+        origin_str = origin_str.replace(jj, f'a{ii}')
+    return origin_str
+
+
 def load_html_js():
-    with open('{}html_js.js'.format(data_dir), 'r') as f:
+    with open(f'{data_dir}html_js.js', 'r') as f:
         origin_js = [ii.strip() for ii in f.readlines()]
     origin_str = '|||'.join(origin_js)
 
@@ -144,6 +172,72 @@ class HotelDetail:
         o = ''.join(["CAS", *[char_list[ii]
                               for ii in np.random.randint(0, 51, e)]])
         return o
+
+    def generate_eleven_v2(self, hotel_id: int):
+        ################################################################
+        #
+        #   [generate eleven] version 19.6.6(Test ✔️) write by gunjianpan
+        #
+        #   1. random generate 15 bit param `callback`;
+        #   2. use callback request OCEANBALL -> get origin js;
+        #   3. eval once -> (match array, and then chr() it) -> decoder js;
+        #   4. replace document and windows(you also can use execjs & jsdom);
+        #   5. warning you should replace `this` to some params,
+        #      Otherwise, you will get `老板给小三买了包， 却没有给你钱买房`
+        #   6. final, return, and joint params;
+        #
+        ################################################################
+
+        callback = self.generate_callback(15)
+        now_time = int(time.time() * 1000)
+        url = f'{OCEANBALL_URL}?callback={callback}&_={now_time}'
+        referer_url = HOTEL_DETAIL_URL % hotel_id
+        changeHeaders({'Referer': referer_url})
+        oj, cookie = basic_req(url, 3, need_cookie=True)
+        print(cookie)
+        oj = replace_params(oj, '(_\w{3,7}_\w{5})')
+
+        ''' replace "'" & " '''
+        oj = oj.replace('"this"', 'this').replace('\'', '"').replace('\n', '')
+
+        ''' replace window '''
+        oj = oj.replace('Window', 'window')
+        oj = oj.replace('window', 'windows')
+
+        ''' return answer '''
+        echo(0, 'Num of a5[h][i]', oj.count('a18[0])}}return a17(a5[h][i]'))
+        echo(0, 'Num 0f end', oj.count('});; })();'))
+        oj = oj.replace('a18[0])}}return a17(a5[h][i]',
+                        'a18[0])}; tt=a5[h][i]();}return a17(a5[h][i]')
+        oj = oj.replace('});; })();', '});;return tt; })();')
+
+        ''' windows setting '''
+        windows_str = 'function(){ var windows = {};windows["' + \
+            callback + '"] = function(e) {console.log(e);};'
+        oj = oj.replace('function(){ ', windows_str)
+
+        oj = "function aabb(){tt=" + oj + ";return tt;}"
+
+        ''' replace param undefine replace'''
+        oj = oj.replace('env.define;', 'windows.define;')
+        oj = oj.replace('env.module;', 'windows.module;')
+        oj = oj.replace('env.global;', 'windows.global;')
+        oj = oj.replace('env.require;', 'windows.require;')
+        oj = oj.replace('env.', '')
+        xx = oj
+
+        ''' synchronous node & chrome v8 param'''
+        oj = oj.replace('var a1=', 'require=undefined;var a1=')
+        oj = oj.replace('process:process,', 'process:NO,')
+        oj = oj.replace('process,', 'NO, ')
+        oj = oj.replace('h=a3.pop(),i=a10(h);return a17(i.apply(h.o,g),ud,ud,0),',
+                        'h=a3.pop(),i=a10(h);var test = h.k!="getOwnPropertyNames" ? i.apply(h.o,g) :[];if(h.o=="function tostring() { [python code] }"){test=23};return a17(test, ud, ud, 0),')
+
+        ''' eval script '''
+        eleven = js2py.eval_js(oj + ';aabb()')
+        echo(1, 'eleven', eleven)
+
+        return eleven
 
     def generate_eleven(self, hotel_id: int):
         ################################################################
@@ -265,7 +359,7 @@ class HotelDetail:
         ''' get hotel detail '''
         params = {
             **self.generate_other_params(hotel_id),
-            'eleven': self.generate_eleven(hotel_id),
+            'eleven': self.generate_eleven_v2(hotel_id),
             'callback': self.generate_callback(16),
             '_': int(time.time() * 1000)
         }

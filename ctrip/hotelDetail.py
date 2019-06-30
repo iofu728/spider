@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-20 10:57:55
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-06-30 23:07:38
+# @Last Modified time: 2019-07-01 00:35:30
 
 import codecs
 import datetime
@@ -199,6 +199,7 @@ class HotelDetail:
 
         ''' replace "'" & " '''
         oj = oj.replace('"this"', 'this').replace('\'', '"').replace('\n', '')
+        origin_js = oj
 
         ''' replace window '''
         oj = oj.replace('Window', 'window')
@@ -224,19 +225,23 @@ class HotelDetail:
         oj = oj.replace('env.global;', 'windows.global;')
         oj = oj.replace('env.require;', 'windows.require;')
         oj = oj.replace('env.', '')
-        xx = oj
 
         ''' synchronous node & chrome v8 param'''
-        oj = oj.replace('var a1=', 'require=undefined;var a1=')
+        oj = oj.replace(
+            'var a1=', 'require=undefined;module=undefined;global=undefined;var a1=')
         oj = oj.replace('process:process,', 'process:NO,')
         oj = oj.replace('process,', 'NO, ')
+        xx = oj
         oj = oj.replace('h=a3.pop(),i=a10(h);return a17(i.apply(h.o,g),ud,ud,0),',
-                        'h=a3.pop(),i=a10(h);var test = h.k!="getOwnPropertyNames" ? i.apply(h.o,g) :[];if(h.o=="function tostring() { [python code] }"){test=23};return a17(test, ud, ud, 0),')
+                        'h=a3.pop(),i=a10(h);var test = h.k!="getOwnPropertyNames" ? i.apply(h.o,g) :[];if(h.o=="function tostring() { [python code] }"){test=23};if(g=="object window"){test=21};return a17(test, ud, ud, 0),')
+        xx = xx.replace('h=a3.pop(),i=a10(h);return a17(i.apply(h.o,g),ud,ud,0),',
+                        'h=a3.pop(),i=a10(h);var test = h.k!="getOwnPropertyNames" ? i.apply(h.o,g) :[];if(h.o=="function tostring() { [python code] }"){test=23};console.log(test,h.k,h.o,g);return a17(test, ud, ud, 0),')
 
         ''' eval script '''
         eleven = js2py.eval_js(oj + ';aabb()')
         echo(1, 'eleven', eleven)
 
+        # return eleven, origin_js, xx, callback
         return eleven
 
     def generate_eleven(self, hotel_id: int):
@@ -337,17 +342,18 @@ class HotelDetail:
             'contyped': 0,
             'priceInfo': -1,
             'equip': None,
-            'filter': 'bed|0,bf|0,networkwifi|0,networklan|0,policy|0,hourroom|0,reserve|0,pay|0,triple|0,addbed|0,chooseroom|0,ctrip|0,hotelinvoice|0,CtripService|0',
+            'filter': None,
             'productcode': None,
             'couponList': None,
             'abForHuaZhu': None,
-            'defaultLoad': 'F',
+            'defaultLoad': 'T',
             'esfiltertag': None,
             'estagid': None,
             'Currency': None,
             'Exchange': None,
             'minRoomId': 0,
             'maskDiscount': 0,
+            'TmFromList': 'F',
             'th': 119,
             'RoomGuestCount': '1,1,0',
             'promotionf': None,

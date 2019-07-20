@@ -1,9 +1,9 @@
-'''
-@Author: gunjianpan
-@Date:   2018-10-19 15:33:46
-@Last Modified by:   gunjianpan
-@Last Modified time: 2019-05-03 00:18:03
-'''
+# -*- coding: utf-8 -*-
+# @Author: gunjianpan
+# @Date:   2019-06-06 17:15:46
+# @Last Modified by:   gunjianpan
+# @Last Modified time: 2019-07-21 01:55:55
+
 
 import codecs
 import os
@@ -307,7 +307,7 @@ def dump_bigger(data, output_file: str):
     ''' pickle.dump big file which size more than 4GB '''
     max_bytes = 2**31 - 1
     bytes_out = pickle.dumps(data, protocol=4)
-    with codecs.open(output_file, 'wb') as f_out:
+    with open(output_file, 'wb') as f_out:
         for idx in range(0, len(bytes_out), max_bytes):
             f_out.write(bytes_out[idx:idx + max_bytes])
 
@@ -317,7 +317,7 @@ def load_bigger(input_file: str):
     max_bytes = 2**31 - 1
     bytes_in = bytearray(0)
     input_size = os.path.getsize(input_file)
-    with codecs.open(input_file, 'rb') as f_in:
+    with open(input_file, 'rb') as f_in:
         for _ in range(0, input_size, max_bytes):
             bytes_in += f_in.read(max_bytes)
     return pickle.loads(bytes_in)
@@ -330,7 +330,7 @@ def time_str(timestamp: int = -1, format: str = '%Y-%m-%d %H:%M:%S'):
     return time.strftime(format, time.localtime(time.time()))
 
 
-def echo(color, *args):
+def echo(color: int, *args):
     ''' echo log @param: color: 0 -> error, 1 -> success, 2 -> info '''
     args = ' '.join([str(ii) for ii in args])
     if is_service:
@@ -351,10 +351,11 @@ def shuffle_batch_run_thread(threading_list: list, batch_size: int = 24, is_awai
     total_block = thread_num // batch_size + 1
     for block in range(total_block):
         for ii in threading_list[block * batch_size:min(thread_num, batch_size * (block + 1))]:
+            if threading.active_count() > batch_size:
+                time.sleep(random.randint(2, 4) * (random.random() + 1))
             ii.start()
-        if threading.active_count() > batch_size * 1.1:
-            time.sleep(random.random())
-        if not is_await or block % 100 == 10:
+
+        if not is_await or block % 10 == 1:
             for ii in threading_list[block * batch_size:min(thread_num, batch_size * (block + 1))]:
                 ii.join()
         else:

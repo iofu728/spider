@@ -1,23 +1,25 @@
-'''
-@Author: gunjianpan
-@Date:   2019-04-07 20:25:45
-@Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-24 01:36:04
-'''
+# -*- coding: utf-8 -*-
+# @Author: gunjianpan
+# @Date:   2019-04-07 20:25:45
+# @Last Modified by:   gunjianpan
+# @Last Modified time: 2019-07-21 01:41:05
+
 
 import codecs
-import threading
-import time
+import json
 import os
+import pickle
 import random
 import re
-import json
-import pickle
 import shutil
-
+import threading
+import time
 from configparser import ConfigParser
+from typing import List
+
 from proxy.getproxy import GetFreeProxy
-from util.util import begin_time, end_time, changeHeaders, basic_req, can_retry, send_email, headers, time_str
+from util.util import (basic_req, begin_time, can_retry, changeHeaders, echo,
+                       end_time, headers, send_email, time_str)
 
 proxy_req = GetFreeProxy().proxy_req
 one_day = 86400
@@ -52,7 +54,7 @@ class Up():
     RELATION_STAT_URL = 'http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=%d'
     BASIC_RANKING_URL = 'https://www.bilibili.com/ranking/all/%d/'
     MEMBER_SUBMIT_URL = 'http://space.bilibili.com/ajax/member/getSubmitVideos?mid=%s&page=1&pagesize=50'
-    REPLY_V2_URL = 'http://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=0'
+    REPLY_V2_URL = 'http://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=2'
 
     def __init__(self):
         self.finish = 0
@@ -69,9 +71,10 @@ class Up():
         self.last_star = {}
         self.rank_map = {}
         self.comment = {}
-        self.comment_max = {}
         self.email_send_time = {}
         self.begin_timestamp = int(time.time())
+        self.av_id_list = []
+        self.del_map = {}
         self.load_configure()
 
     def load_configure(self):
@@ -87,10 +90,10 @@ class Up():
         self.view_abnormal = cfg.getint('basic', 'view_abnormal')
         self.assign_ids = [int(ii)
                            for ii in cfg.get('assign', 'av_ids').split(',')]
-        rank_map = {ii: [] for ii in self.assign_ids}
+        rank_map = {ii: [] for ii in self.assign_ids if ii not in self.del_map}
         self.rank_map = {**rank_map, **self.rank_map}
         self.keyword = cfg.get('comment', 'keyword')
-        self.ignore_floor = json.loads(cfg.get('comment', 'ignore_floor'))
+        self.ignore_rpid = json.loads(cfg.get('comment', 'ignore_rpid'))
         self.ignore_list = cfg.get('comment', 'ignore_list')
         self.ignore_start = cfg.getfloat('comment', 'ignore_start')
         self.ignore_end = cfg.getfloat('comment', 'ignore_end')
@@ -214,8 +217,10 @@ class Up():
             f.write(','.join([str(index) for index in data]) + '\n')
 
         if av_id in self.last_check and int(time.time()) - self.last_check[av_id] > one_day:
+            self.del_map[av_id] = 1
             del self.rank_map[av_id]
         elif av_id not in self.last_check and int(time.time()) > one_day + self.begin_timestamp:
+            self.del_map[av_id] = 1
             del self.rank_map[av_id]
         self.last_view[av_id] = data[1]
 
@@ -501,6 +506,7 @@ class Up():
             if not index % 5:
                 work = threading.Thread(target=self.load_rank, args=())
                 threading_list.append(work)
+            if not index % 2:
                 check = threading.Thread(target=self.get_check, args=())
                 threading_list.append(check)
             if not index % 15:
@@ -517,18 +523,8 @@ class Up():
 
     def get_check(self):
         ''' check comment '''
-        now_hour = int(time_str(format='%H'))
-        now_min = int(time_str(format='%M'))
-        now_time = now_hour + now_min / 60
-        if now_time > self.ignore_start and now_time < self.ignore_end:
-            return
-        if os.path.exists('{}comment.pkl'.format(comment_dir)):
-            with codecs.open('{}comment.pkl'.format(comment_dir), 'rb') as f:
-                self.comment = pickle.load(f)
-        if self.assign_up_mid == -1:
-            return
         url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
-        json_req = proxy_req(url, 1)
+        json_req = basic_req(url, 1)
         if json_req is None or not 'data' in json_req or not 'vlist' in json_req['data']:
             if can_retry(url):
                 self.get_check()
@@ -538,6 +534,29 @@ class Up():
         if self.basic_av_id not in [ii[0] for ii in av_id_list]:
             if can_retry(url):
                 self.get_check()
+            return
+        self.comment_next = {ii: True for ii, _ in av_id_list}
+        if self.av_id_list and len(self.av_id_list) and len(self.av_id_list) != len(av_id_list):
+            new_av_id = [ii for (ii, _) in av_id_list if not ii in self.av_id_list and not ii in self.del_map]
+            self.rank_map = {**self.rank_map, **{ii:[] for ii in new_av_id}}
+            echo(2, new_av_id)
+            for ii in new_av_id:
+                shell_str = 'nohup ipython3 bilibili/bsocket.py {} %d >> log.txt 2>&1 &'.format(ii)
+                echo(2, shell_str)
+                os.system(shell_str % 0)
+                os.system(shell_str % 1)
+        
+        self.av_id_list = [ii for (ii,_) in av_id_list]
+
+        now_hour = int(time_str(format='%H'))
+        now_min = int(time_str(format='%M'))
+        now_time = now_hour + now_min / 60
+        if now_time > self.ignore_start and now_time < self.ignore_end:
+            return
+        if os.path.exists('{}comment.pkl'.format(comment_dir)):
+            with codecs.open('{}comment.pkl'.format(comment_dir), 'rb') as f:
+                self.comment = pickle.load(f)
+        if self.assign_up_mid == -1:
             return
 
         threading_list = []
@@ -557,36 +576,23 @@ class Up():
 
     def comment_check_schedule(self, av_id: int, comment: int):
         ''' schedule comment check thread '''
-        check_index = comment
-        for pn in range(1, (comment - 1) // 20 + 2):
-            need_check = False
-            for ii in range(20):
-                if check_index < 1:
-                    return
-                if not check_index in self.comment[av_id]:
-                    print(pn, av_id, check_index)
-                    need_check = True
-                    check_index -= (20 - ii)
-                    break
-                check_index -= 1
-            if not need_check:
-                continue
 
+        for pn in range(1, (comment - 1) // 20 + 2):
+            if not self.comment_next[av_id]:
+                return
+            echo(2, 'Comment check, av_id:', av_id, 'pn:', pn)
             self.check_comment_once(av_id, pn)
-            if av_id in self.comment_max:
-                check_index = self.comment_max[av_id] - 1
-        comment = [self.comment[av_id][k]
-                   for k in sorted(self.comment[av_id].keys())]
+        comment = [self.comment[av_id][k] for k in sorted(self.comment[av_id].keys())]
         basic = [','.join([str(jj) for jj in ii['basic']])
                  for ii in comment if 'basic' in ii]
         replies = []
         for ii in comment:
             if not 'replies' in ii:
                 continue
-            parent_floor = ii['basic'][0]
+            parent_rpid = ii['basic'][0]
             replies_t = ii['replies']
             for jj in replies_t:
-                jj[0] = '%s-%s' % (str(parent_floor), str(jj[0]))
+                jj[0] = '%s-%s' % (str(parent_rpid), str(jj[0]))
                 replies.append(','.join([str(kk) for kk in jj]))
         with codecs.open('%s%d_comment.csv' % (comment_dir, av_id), 'w', encoding='utf-8') as f:
             f.write('\n'.join(basic) + '\n')
@@ -603,73 +609,70 @@ class Up():
 
         hots = json_req['data']['hots']
         replies = json_req['data']['replies']
-        temp_floor = [] if replies is None else [ii['floor'] for ii in replies]
-        if replies is None:
-            wait_check = [] if hots is None else hots
+        if pn > 1:
+            wait_check = replies
         else:
             wait_check = replies if hots is None else [*hots, *replies]
+        wait_check = [{**jj, 'idx': ii + 1} for ii, jj in enumerate(wait_check)]
 
         for ii in wait_check:
             info = {'basic': self.get_comment_detail(ii, av_id, pn)}
-            floor = info['basic'][0]
+            rpid = info['basic'][0]
             crep = ii['replies']
+            idx = ii['idx']
 
             if not crep is None:
-                info['replies'] = [self.get_comment_detail(
-                    ii, av_id, pn, floor) for ii in crep]
-            self.comment[av_id][floor] = info
-        if len(temp_floor):
-            for ii in range(min(temp_floor), max(temp_floor) + 1):
-                if not ii in self.comment[av_id]:
-                    self.comment[av_id][ii] = {}
-            self.comment_max[av_id] = min(temp_floor)
+                info['replies'] = [self.get_comment_detail({**ii, 'idx': idx}, av_id, pn, rpid) for ii in crep]
+            self.comment[av_id][rpid] = info
+        wait_check = [ii for ii in wait_check if not ii['rpid'] in self.comment[av_id]]
+        self.comment_next[av_id] = len(wait_check) >= 20
+        echo(int(self.comment_next[av_id]), 'av_id:', av_id,'len of wait_check:', len(wait_check))
 
-    def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_floor=None):
+
+    def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_rpid=None) -> List:
         ''' get comment detail '''
+        # print(comment)
         ctime = time_str(comment['ctime'])
-        wait_list = ['floor', 'member', 'content', 'like']
+        wait_list = ['rpid', 'member', 'content', 'like', 'idx']
         wait_list_mem = ['uname', 'sex', 'sign', 'level_info']
         wait_list_content = ['message', 'plat']
-        floor, member, content, like = [comment[ii] for ii in wait_list]
+        rpid, member, content, like, idx = [comment[ii] for ii in wait_list]
         uname, sex, sign, level = [member[ii] for ii in wait_list_mem]
         current_level = level['current_level']
         content, plat = [content[ii] for ii in wait_list_content]
-        req_list = [floor, ctime, like, plat,
-                    current_level, uname, sex, content, sign]
-        self.have_bad_comment(req_list, av_id, pn, parent_floor)
-        req_list[-1] = req_list[-1].replace(',', ' ').replace('\n', ' ')
+        req_list = [rpid, ctime, like, plat, current_level, uname, sex, content, sign, idx]
+        self.have_bad_comment(req_list, av_id, pn, parent_rpid)
         req_list[-2] = req_list[-2].replace(',', ' ').replace('\n', ' ')
+        req_list[-3] = req_list[-3].replace(',', ' ').replace('\n', ' ')
         return req_list
 
-    def have_bad_comment(self, req_list: list, av_id: int, pn: int, parent_floor=None):
+    def have_bad_comment(self, req_list: list, av_id: int, pn: int, parent_rpid=None):
         ''' check comment and send warning email if error '''
-        floor, ctime, like, _, _, uname, sex, content, sign = req_list
+        rpid, ctime, like, _, _, uname, sex, content, sign, idx = req_list
 
         if not len(re.findall(self.keyword, content)):
             return True
-        floor = '{}{}'.format(floor, '' if not parent_floor else '-{}'.format(floor))
+        rpid = '{}{}'.format(rpid, '' if not parent_rpid else '-{}'.format(rpid))
 
         url = self.BASIC_AV_URL % av_id
-        floor_str = '{}-{}'.format(av_id, floor)
-        if str(av_id) in self.ignore_floor and floor in self.ignore_floor[str(av_id)]:
+        rpid_str = '{}-{}'.format(av_id, rpid)
+        if str(av_id) in self.ignore_rpid and rpid in self.ignore_rpid[str(av_id)]:
             return True
-        if self.email_limit < 1 or (floor_str in self.email_send_time and self.email_send_time[floor_str] > self.email_limit):
+        if self.email_limit < 1 or (rpid_str in self.email_send_time and self.email_send_time[rpid_str] > self.email_limit):
             return True 
 
-        email_content = '%s\nUrl: %s Page: %d #%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s\nlike: %d' % (
-            ctime, url, pn, floor, uname, sex, content, sign, like)
-        email_subject = '(%s)av_id: %s || #%s Comment Warning !!!' % (
-            ctime, av_id, floor)
+        email_content = '%s\nUrl: %s Page: %d #%d@%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s\nlike: %d' % (ctime, url, pn, idx, rpid, uname, sex, content, sign, like)
+        email_subject = '(%s)av_id: %s || #%s Comment Warning !!!' % (ctime, av_id, rpid)
         print(email_content, email_subject)
         send_email_time = 0
         send_email_result = False
         while not send_email_result and send_email_time < 4:
             send_email_result = send_email(email_content, email_subject)
             send_email_time += 1
-        if floor_str in self.email_send_time:
-            self.email_send_time[floor_str] += 1
+        if rpid_str in self.email_send_time:
+            self.email_send_time[rpid_str] += 1
         else:
-            self.email_send_time[floor_str] = 0
+            self.email_send_time[rpid_str] = 0
 
 
 if __name__ == '__main__':

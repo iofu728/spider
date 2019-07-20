@@ -1,9 +1,8 @@
-'''
-@Author: gunjianpan
-@Date:   2019-03-26 10:21:05
-@Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-08 00:06:59
-'''
+# -*- coding: utf-8 -*-
+# @Author: gunjianpan
+# @Date:   2019-06-08 12:12:03
+# @Last Modified by:   gunjianpan
+# @Last Modified time: 2019-07-21 00:57:04
 
 import codecs
 import asyncio
@@ -14,6 +13,8 @@ import os
 import shutil
 import struct
 import time
+import re
+import sys
 
 from collections import namedtuple
 from configparser import ConfigParser
@@ -86,24 +87,20 @@ class BWebsocketClient:
     def _getroom_id(self, next_to=True, proxy=True):
         ''' get av room id '''
         url = self.ROOM_INIT_URL % self._av_id
-        html = proxy_req(url, 0) if proxy else basic_req(url, 0)
-        head = html.find_all('head')
-        if not len(head) or len(head[0].find_all('script')) < 4 or not '{' in head[0].find_all('script')[3].text:
+        text = proxy_req(url, 3) if proxy else basic_req(url, 3)
+        cid = re.findall('"cid":(.*?),', text)
+        if not len(cid):
             if can_retry(url):
                 self._getroom_id(proxy=proxy)
             else:
                 self._getroom_id(proxy=False)
             next_to = False
         if next_to:
-            script_list = head[0].find_all('script')[3].text
-            script_begin = script_list.index('{')
-            script_end = script_list.index(';')
-            script_data = script_list[script_begin:script_end]
-            json_data = json.loads(script_data)
-            if self._p == -1 or len(json_data['videoData']['pages']) < self._p:
-                self._room_id = json_data['videoData']['cid']
+            if self._p == -1 or self._p == 1:
+                self._room_id = int(cid[0])
             else:
-                self._room_id = json_data['videoData']['pages'][self._p - 1]['cid']
+                self._room_id = int(cid[2])
+
             print('Room_id:', self._room_id)
 
     def parse_struct(self, data: dict, operation: int):
@@ -289,10 +286,14 @@ if __name__ == '__main__':
 
     ''' Test for San Diego demon '''
     ''' PS: the thread of BSocket have to be currentThread in its processing. '''
-    cfg = ConfigParser()
-    cfg.read(assign_path, 'utf-8')
-    av_id = cfg.getint('basic', 'basic_av_id')
-    p = cfg.getint('basic', 'basic_av_p') if len(
-        cfg['basic']['basic_av_p']) else -1
+    if len(sys.argv) == 3:
+        av_id = int(sys.argv[1])
+        p = int(sys.argv[2])
+    else:
+        cfg = ConfigParser()
+        cfg.read(assign_path, 'utf-8')
+        av_id = cfg.getint('basic', 'basic_av_id')
+        p = cfg.getint('basic', 'basic_av_p') if len(
+            cfg['basic']['basic_av_p']) else -1
 
     BSocket(av_id, p=p)

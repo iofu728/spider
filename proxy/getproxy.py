@@ -1,10 +1,9 @@
-'''
-@Author: gunjianpan
-@Description: Get High Availability Proxy
-@Date:   2018-09-27 21:32:45
-@Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-18 15:50:34
-'''
+# -*- coding: utf-8 -*-
+# @Author: gunjianpan
+# @Date:   2019-06-06 17:15:37
+# @Last Modified by:   gunjianpan
+# @Last Modified time: 2019-07-21 01:54:57
+
 
 import argparse
 import codecs
@@ -60,7 +59,7 @@ class GetFreeProxy:
         self.canuse_proxies = []
         self.initproxy()
 
-    def proxy_req(self, url:str, types:int, data=None, test_func=None, header=None, need_cookie:bool=False):
+    def proxy_req(self, url:str, types:int, data=None, test_func=None, header=None):
         """
         use proxy to send requests, and record the proxy cann't use
         @types S0XY: X=0.->get;   =1.->post;
@@ -88,11 +87,11 @@ class GetFreeProxy:
             proxies = {type_map[httptype]: proxies_url}
 
         try:
-            result = basic_req(url, types, proxies, data, header, need_cookie)
+            result = basic_req(url, types, proxies, data, header)
             if not test_func is None:
                 if not test_func(result):
                     if self.check_retry(url):
-                        self.proxy_req(url, types + 1000 * ss_type, data, test_func, header, need_cookie)
+                        self.proxy_req(url, types + 1000 * ss_type, data, test_func)
                     else:
                         self.failuredtime[url] = 0
                         return
@@ -111,7 +110,7 @@ class GetFreeProxy:
                 self.cleancannotuse()
 
             if self.check_retry(url):
-                self.proxy_req(url, types + 1000 * ss_type, data, test_func, header, need_cookie)
+                self.proxy_req(url, types + 1000 * ss_type, data, test_func)
             else:
                 return
 
@@ -527,8 +526,8 @@ class GetFreeProxy:
         }
         login_url = 'http://www.gatherproxy.com/subscribe/login'
 
-        cookie_html = basic_req(login_url, 0,header=headers)
-        verify_text = cookie_html.find_all('div', class_='label')[2].span.text
+        cookie_html = basic_req(login_url, 3, header=headers)
+        verify_text = re.findall('<span class="blue">(.*?)</span>', cookie_html)[0]
         verify_list = verify_text.replace('= ','').strip().split()
         num_map = {'Zero': 0,'One': 1,'Two': 2, 'Three':3,'Four':4,'Fine':5,'Six':6,'Seven':7,'Eight': 8, 'Nine':9, 'Ten': 10}
         verify_num = [verify_list[0], verify_list[2]]
@@ -664,12 +663,8 @@ if __name__ == '__main__':
     parser.add_argument('--is_service', type=bool, default=False, metavar='service',help='True or False')
     parser.add_argument('--test_time', type=int, default=1, metavar='test_time',help='test_time')
     model = parser.parse_args().model
-    pg = GetFreeProxy()
-    if not model:
-        pg.load_proxies_test()
-        
-    elif model == 1:
-        pg.load_gather()
+    a = GetFreeProxy()
+    if model==1:
+        a.load_gather()
     else:
-        pg.testdb(2)
-        
+        a.load_proxies_test()

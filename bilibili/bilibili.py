@@ -2,11 +2,12 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-22 00:48:19
+# @Last Modified time: 2019-07-28 00:09:08
 
 
 import codecs
 import json
+import numpy as np
 import os
 import pickle
 import random
@@ -19,7 +20,7 @@ from typing import List
 
 from proxy.getproxy import GetFreeProxy
 from util.util import (basic_req, begin_time, can_retry, changeHeaders, echo,
-                       end_time, headers, send_email, time_str)
+                       end_time, headers, send_email, time_str, time_stamp)
 
 proxy_req = GetFreeProxy().proxy_req
 one_day = 86400
@@ -76,6 +77,7 @@ class Up():
         self.av_id_list = []
         self.del_map = {}
         self.load_configure()
+        self.load_histort_data()
 
     def load_configure(self):
         ''' load assign configure '''
@@ -100,6 +102,21 @@ class Up():
         self.email_limit = cfg.getint('comment', 'email_limit')
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
+    
+    def load_histort_data(self):
+        history_csv_path = os.path.join(data_dir, 'history_new.csv')
+        if not os.path.exists(history_csv_path):
+            return
+        with open(history_csv_path, 'r', encoding='utf-8') as f:
+            csv = [ii.strip() for ii in f.readlines()]
+        history = [[int(jj) for jj in ii.split(',')[:-1]] for ii in csv[3:]]
+        self.history_map = {ii[0]: ii[1:] for ii in history}
+        self.history_title = csv[0].split(',')[1:-1]
+        self.history_check_list = [1, 3, 6, 12, 18, 24, 30, 36, 72, 144, 288, 432]
+        self.history_check_finish = []
+        self.history_time = csv[2].split(',')[1:-1] 
+        self.history_av = csv[1].split(',')[1:-1]
+        self.public = {**self.public, **{int(ii): [time_stamp(self.history_time[jj]), 0] for jj, ii in enumerate(self.history_av)}}
 
     def basic_view(self, url: str, times: int, types: int):
         ''' press have no data input '''
@@ -223,6 +240,38 @@ class Up():
             self.del_map[av_id] = 1
             del self.rank_map[av_id]
         self.last_view[av_id] = data[1]
+        now_time = time.time()
+        echo(0, av_id, av_id == self.basic_av_id, av_id in self.public, (now_time - self.public[av_id][0]) < 3.1 * one_day * 60, self.public[av_id])
+        if av_id == self.basic_av_id and av_id in self.public and (now_time - self.public[av_id][0]) < 3.1 * one_day * 60:
+            time_gap = (now_time - self.public[av_id][0]) / 60
+            if int(time_gap // 10) in self.history_check_list and time_gap not in self.history_check_finish:
+                self.history_rank(time_gap, data[1], av_id)
+            
+
+    def history_rank(self, time_gap:int, now_view:int, av_id:int):
+        echo(0, 'send history rank') 
+        time_gap = int(time_gap // 10) * 10
+        other_views = self.history_map[time_gap]
+        other_views_len = len(other_views)
+        other_views.append(now_view)
+        ov_sort_idx = np.argsort(-np.array(other_views))
+        now_sorted = [jj for jj, ii in enumerate(ov_sort_idx) if ii == other_views_len][0] + 1
+        other_result = [(self.history_title[ii], jj + 1, other_views[ii], self.history_av[ii], self.history_time[ii]) for jj, ii in enumerate(ov_sort_idx[:4]) if ii != other_views_len]
+        time_tt = self.get_time_str(time_gap)
+        email_title = 'av{}发布{}, 本年度排名No.{}, 访问人数: {}'.format(av_id, time_tt, now_sorted, now_view)
+        context = '{}\n'.format(email_title)
+        for title, no, view, av, tt in other_result[:3]:
+            context += '{}, av{}, 本年度No.{}, 访问人数: {}, 发布时间: {}\n'.format(title, av, no, view, tt)
+        context += '\nBest wish for you\n--------\nSend from script by gunjianpan.'
+        send_email(context, email_title)
+        self.history_check_finish.append(int(time_gap // 10))
+
+    def get_time_str(self, time_gap:int):
+        if time_gap < 60:
+            return '{}min'.format(time_gap)
+        if time_gap < 1440:
+            return '{}h'.format(int(time_gap // 60))
+        return '{}天'.format(int(time_gap // 1440))
 
     def check_view(self, av_id: int, view: int) -> bool:
         ''' check view '''
@@ -540,6 +589,9 @@ class Up():
             new_av_id = [ii for (ii, _) in av_id_list if not ii in self.av_id_list and not ii in self.del_map]
             self.rank_map = {**self.rank_map, **{ii:[] for ii in new_av_id}}
             echo(2, new_av_id)
+            email_str = 'av:{} is release!!! Please check the auto pipeline.'.format(new_av_id)
+            email_str2 = '{}{} is release.\nPlease check the online & common program.\n\nBest wish for you\n--------\nSend from script by gunjianpan.'.format(self.BASIC_AV_URL, new_av_id) 
+            send_email(email_str2, email_str)
             for ii in new_av_id:
                 shell_str = 'nohup ipython3 bilibili/bsocket.py {} %d >> log.txt 2>&1 &'.format(ii)
                 echo(2, shell_str)
@@ -547,9 +599,8 @@ class Up():
                 os.system(shell_str % 1)
         
         self.av_id_list = [ii for (ii,_) in av_id_list]
-
-        now_hour = int(time_str(format='%H'))
-        now_min = int(time_str(format='%M'))
+        now_hour = int(time_str(time_format='%H'))
+        now_min = int(time_str(time_format='%M'))
         now_time = now_hour + now_min / 60
         if now_time > self.ignore_start and now_time < self.ignore_end:
             return

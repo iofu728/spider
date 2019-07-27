@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-06-06 17:15:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-21 01:55:55
+# @Last Modified time: 2019-07-27 21:24:18
 
 
 import codecs
@@ -323,11 +323,16 @@ def load_bigger(input_file: str):
     return pickle.loads(bytes_in)
 
 
-def time_str(timestamp: int = -1, format: str = '%Y-%m-%d %H:%M:%S'):
-    ''' time str '''
-    if timestamp > 0:
-        return time.strftime(format, time.localtime(timestamp))
-    return time.strftime(format, time.localtime(time.time()))
+def time_str(time_stamp: int = -1, time_format: str = '%Y-%m-%d %H:%M:%S'):
+    ''' time stamp -> time str '''
+    if time_stamp > 0:
+        return time.strftime(time_format, time.localtime(time_stamp))
+    return time.strftime(time_format, time.localtime(time.time()))
+
+
+def time_stamp(time_str: str, time_format: str = '%Y-%m-%d %H:%M:%S'):
+    ''' time str -> time stamp '''
+    return time.mktime(time.strptime(time_str, time_format))
 
 
 def echo(color: int, *args):

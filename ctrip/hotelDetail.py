@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-20 10:57:55
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-28 02:15:26
+# @Last Modified time: 2019-07-28 02:15:51
 
 import codecs
 import datetime
@@ -194,7 +194,7 @@ class HotelDetail:
         #   4. find where the code eval;
         #      'h=a3.pop(),i=a11(h);return a18(i.apply(h.o,g),ud,ud,0),'
         #   5. compare the env of chrome with node.
-        #      'https://github.com/iofu728/spider/tree/develop#'
+        #      'https://github.com/iofu728/spider/tree/develop#oceannballv2'
         #   5. you will get `爬虫前进的道路上还是会有各种各样想不到的事情会发生`
         #   6. final, return, and joint params;
         #

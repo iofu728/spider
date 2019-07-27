@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-20 10:57:55
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-01 00:35:30
+# @Last Modified time: 2019-07-28 02:15:26
 
 import codecs
 import datetime
@@ -15,6 +15,7 @@ import random
 import re
 import shutil
 import time
+import threading
 import tzlocal
 
 from bs4 import BeautifulSoup
@@ -76,7 +77,7 @@ def load_ocean():
 
 def load_ocean_v2():
     ''' load ocean ball v2 @2019.6.9 '''
-    decoder_file('(_unknown_\w{5})', 'oceanballv2.js')
+    decoder_file('(_\w{3,7}_\w{5})', 'oceanballv2_july.js')
 
 
 def decoder_file(reg: str, file_name: str):
@@ -84,15 +85,16 @@ def decoder_file(reg: str, file_name: str):
     with open(f'{data_dir}{file_name}', 'r') as f:
         origin_js = [ii.strip() for ii in f.readlines()]
     origin_str = '|||'.join(origin_js)
-    origin_str = replace_params(origin_js, reg)
+    origin_str = replace_params(origin_str, reg)
     file_name_split = file_name.split('.', 1)
     with open(f'{data_dir}{file_name_split[0]}_decoder.{file_name_split[1]}', 'w') as f:
         f.write(origin_str.replace('|||', '\n'))
 
 
-def replace_params(origin_str: str, reg: str):
+def replace_params(origin_str: str, reg: str) -> str:
     ''' replace params '''
     params_re = re.findall(reg, origin_str)
+    echo(1, "You're", re.findall('_(.*?)_', params_re[0])[0])
     params = []
     for ii in params_re:
         if not ii in params:
@@ -164,57 +166,65 @@ class HotelDetail:
 
     def __init__(self):
         self.default_hotel_id = 4889292
+        self.header = {
+            'pragma': 'no-cache',
+            'cache-control': 'no-cache',
+            'Cookie': '',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            "Accept-Encoding": "",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"
+        }
 
     def generate_callback(self, e):
         ''' generate callback params e '''
-        char_list = [chr(ii)
-                     for ii in range(65, 123) if ii > 96 or ii < 91]
-        o = ''.join(["CAS", *[char_list[ii]
-                              for ii in np.random.randint(0, 51, e)]])
+        cl = [chr(ii) for ii in range(65, 123) if ii > 96 or ii < 91]
+        o = ''.join(["CAS", *[cl[ii] for ii in np.random.randint(0, 51, e)]])
         return o
 
     def generate_eleven_v2(self, hotel_id: int):
         ################################################################
         #
-        #   [generate eleven] version 19.6.6(Test ✔️) write by gunjianpan
+        #   [generate eleven] version 19.7.28(Test ✔️) write by gunjianpan
         #
         #   1. random generate 15 bit param `callback`;
         #   2. use callback request OCEANBALL -> get origin js;
-        #   3. eval once -> (match array, and then chr() it) -> decoder js;
-        #   4. replace document and windows(you also can use execjs & jsdom);
-        #   5. warning you should replace `this` to some params,
-        #      Otherwise, you will get `老板给小三买了包， 却没有给你钱买房`
+        #   3. decoder params to union param;
+        #   4. find where the code eval;
+        #      'h=a3.pop(),i=a11(h);return a18(i.apply(h.o,g),ud,ud,0),'
+        #   5. compare the env of chrome with node.
+        #      'https://github.com/iofu728/spider/tree/develop#'
+        #   5. you will get `爬虫前进的道路上还是会有各种各样想不到的事情会发生`
         #   6. final, return, and joint params;
         #
         ################################################################
 
+        referer_url = HOTEL_DETAIL_URL % hotel_id
+        self.header['Referer'] = referer_url
         callback = self.generate_callback(15)
         now_time = int(time.time() * 1000)
         url = f'{OCEANBALL_URL}?callback={callback}&_={now_time}'
-        referer_url = HOTEL_DETAIL_URL % hotel_id
-        changeHeaders({'Referer': referer_url})
-        oj, cookie = basic_req(url, 3, need_cookie=True)
+        oj, cookie = basic_req(url, 3, need_cookie=True, header=self.header)
         print(cookie)
         oj = replace_params(oj, '(_\w{3,7}_\w{5})')
-
-        ''' replace "'" & " '''
         oj = oj.replace('"this"', 'this').replace('\'', '"').replace('\n', '')
-        origin_js = oj
+        ooj = oj
 
         ''' replace window '''
         oj = oj.replace('Window', 'window')
         oj = oj.replace('window', 'windows')
 
         ''' return answer '''
-        echo(0, 'Num of a5[h][i]', oj.count('a18[0])}}return a17(a5[h][i]'))
+        echo(0, 'Num of a6[h][i]', oj.count('a19[0])}}return a18(a6[h][i]'))
         echo(0, 'Num 0f end', oj.count('});; })();'))
-        oj = oj.replace('a18[0])}}return a17(a5[h][i]',
-                        'a18[0])}; tt=a5[h][i]();}return a17(a5[h][i]')
-        oj = oj.replace('});; })();', '});;return tt; })();')
+        oj = oj.replace('});; })();', '});;return aa;})();')
+        ooj = ooj.replace('});; })();', '});;return aa;})();')
 
         ''' windows setting '''
-        windows_str = 'function(){ var windows = {};windows["' + \
-            callback + '"] = function(e) {console.log(e);};'
+        windows_str = 'function(){ var windows = {"navigator":{"userAgent":"Mozilla/5.0"}};aa=[];windows["' + \
+            callback + \
+            '"] = function(e) {temp = e();console.log(temp);return temp};'
         oj = oj.replace('function(){ ', windows_str)
 
         oj = "function aabb(){tt=" + oj + ";return tt;}"
@@ -228,20 +238,18 @@ class HotelDetail:
 
         ''' synchronous node & chrome v8 param'''
         oj = oj.replace(
-            'var a1=', 'require=undefined;module=undefined;global=undefined;var a1=')
+            'var a2=', 'require=undefined;module=undefined;global=undefined;var a2=')
         oj = oj.replace('process:process,', 'process:NO,')
         oj = oj.replace('process,', 'NO, ')
-        xx = oj
-        oj = oj.replace('h=a3.pop(),i=a10(h);return a17(i.apply(h.o,g),ud,ud,0),',
-                        'h=a3.pop(),i=a10(h);var test = h.k!="getOwnPropertyNames" ? i.apply(h.o,g) :[];if(h.o=="function tostring() { [python code] }"){test=23};if(g=="object window"){test=21};return a17(test, ud, ud, 0),')
-        xx = xx.replace('h=a3.pop(),i=a10(h);return a17(i.apply(h.o,g),ud,ud,0),',
-                        'h=a3.pop(),i=a10(h);var test = h.k!="getOwnPropertyNames" ? i.apply(h.o,g) :[];if(h.o=="function tostring() { [python code] }"){test=23};console.log(test,h.k,h.o,g);return a17(test, ud, ud, 0),')
+        oj = oj.replace(
+            'return a19[p];', 'var last = a19[p];if (last.k == 0 && last.o == 0 && last.r == 0 && last.v != 0) {last.v = TypeError();}return last;')
+
+        oj = oj.replace('h=a3.pop(),i=a11(h);return a18(i.apply(h.o,g),ud,ud,0),',
+                        'h=a3.pop(),i=a11(h);var test = h.k!="getOwnPropertyNames" ? i.apply(h.o,g) :[];if(h.o=="function tostring() { [python code] }"){test=23};if(g=="object window"){test=21};if(h.k=="keys"){test=["TEMPORARY", "PERSISTENT"];}aa=test;return a18(test, ud, ud, 0),')
 
         ''' eval script '''
         eleven = js2py.eval_js(oj + ';aabb()')
         echo(1, 'eleven', eleven)
-
-        # return eleven, origin_js, xx, callback
         return eleven
 
     def generate_eleven(self, hotel_id: int):
@@ -373,7 +381,7 @@ class HotelDetail:
             ii, (jj if not jj is None else '')) for ii, jj in params.items()]
         url = '{}?{}'.format(HOTEL_ROOMLIST_DETAIL_URL, '&'.join(params_list))
         echo(2, 'XHR url', url)
-        req, _ = basic_req(url, 1, need_cookie=True)
+        req, _ = basic_req(url, 1, need_cookie=True, header=self.header)
         return req
 
     def parse_detail(self, hotel_id: int = 4889292):
@@ -381,7 +389,7 @@ class HotelDetail:
 
         version = begin_time()
         # self.user_action(hotel_id)
-        self.generate_cookie(hotel_id)
+        # self.generate_cookie(hotel_id)
         # self.prepare_req()
         text = self.get_hotel_detail(hotel_id)
         html = BeautifulSoup(text['html'], 'html.parser')

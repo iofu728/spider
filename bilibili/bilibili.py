@@ -244,7 +244,7 @@ class Up():
         echo(0, av_id, av_id == self.basic_av_id, av_id in self.public, (now_time - self.public[av_id][0]) < 3.1 * one_day * 60, self.public[av_id])
         if av_id == self.basic_av_id and av_id in self.public and (now_time - self.public[av_id][0]) < 3.1 * one_day * 60:
             time_gap = (now_time - self.public[av_id][0]) / 60
-            if int(time_gap // 10) in self.history_check_list and time_gap not in self.history_check_finish:
+            if int(time_gap // 10) in self.history_check_list and int(time_gap // 10) not in self.history_check_finish:
                 self.history_rank(time_gap, data[1], av_id)
             
 

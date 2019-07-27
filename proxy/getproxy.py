@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-06-06 17:15:37
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-21 01:54:57
+# @Last Modified time: 2019-07-26 21:56:43
 
 
 import argparse
@@ -584,7 +584,10 @@ class GetFreeProxy:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
         }
         url = 'http://www.gatherproxy.com/subscribe/infos'
-        sid_url_req = requests.get(url, headers=headers, verify=False)
+        try:
+            sid_url_req = requests.get(url, headers=headers, verify=False, timeout=10)
+        except:
+            return
         sid_url_html = BeautifulSoup(sid_url_req.text, 'html.parser')
         sid_url = sid_url_html.find_all('div', class_='wrapper')[1].find_all('a')[0]['href']
         if len(sid_url.split('sid=')) < 2:
@@ -596,7 +599,7 @@ class GetFreeProxy:
         sid_url = 'http://www.gatherproxy.com' + sid_url
 
         data = {'ID':sid , 'C': '', 'P': '', 'T': '', 'U': '0'}
-        gatherproxy = requests.post(sid_url, headers=headers, data=data,verify=False)
+        gatherproxy = requests.post(sid_url, headers=headers, data=data, verify=False)
         with codecs.open(data_dir + 'gatherproxy', 'w', encoding='utf-8') as f:
             f.write(gatherproxy.text)
 
@@ -664,7 +667,9 @@ if __name__ == '__main__':
     parser.add_argument('--test_time', type=int, default=1, metavar='test_time',help='test_time')
     model = parser.parse_args().model
     a = GetFreeProxy()
-    if model==1:
+    if model == 1:
         a.load_gather()
-    else:
+    elif model == 0:
         a.load_proxies_test()
+    else:
+        a.testdb(2)

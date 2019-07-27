@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-21 01:41:05
+# @Last Modified time: 2019-07-22 00:48:19
 
 
 import codecs
@@ -197,7 +197,7 @@ class Up():
         json_req = proxy_req(url, 1)
 
         if not self.have_error(json_req):
-            if times < 3:
+            if (av_id not in self.av_id_list and times < 3) or (av_id in self.av_id_list and times < 6):
                 self.check_rank(av_id, times + 1)
             return
         json_req = json_req['data']

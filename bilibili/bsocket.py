@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # @Author: gunjianpan
-# @Date:   2019-06-08 12:12:03
+# @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-21 00:57:04
+# @Last Modified time: 2019-07-27 12:29:20
 
 import codecs
 import asyncio
@@ -96,10 +96,10 @@ class BWebsocketClient:
                 self._getroom_id(proxy=False)
             next_to = False
         if next_to:
-            if self._p == -1 or self._p == 1:
+            if self._p == -1:
                 self._room_id = int(cid[0])
             else:
-                self._room_id = int(cid[2])
+                self._room_id = int(cid[self._p])
 
             print('Room_id:', self._room_id)
 
@@ -174,7 +174,7 @@ class BWebsocketClient:
         ''' heart beat every 30s '''
         if self._types and int(time.time()) > self._begin_time + one_day:
             self.close()
-        while True:
+        for _ in range(int(one_day * 7 / 30)):
             try:
                 await self._websocket.send_bytes(self.parse_struct({}, Operation.SEND_HEARTBEAT))
                 await asyncio.sleep(30)

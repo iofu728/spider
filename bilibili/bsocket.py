@@ -2,26 +2,27 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-27 12:29:20
+# @Last Modified time: 2019-08-10 16:33:50
 
-import codecs
 import asyncio
-import aiohttp
+import codecs
 import json
 import logging
 import os
+import re
 import shutil
 import struct
-import time
-import re
 import sys
-
+import time
 from collections import namedtuple
 from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
+
+import aiohttp
+
 from proxy.getproxy import GetFreeProxy
-from util.util import can_retry, basic_req, time_str
+from util.util import basic_req, can_retry, echo, mkdir, time_str
 
 logger = logging.getLogger(__name__)
 proxy_req = GetFreeProxy().proxy_req
@@ -71,7 +72,7 @@ class BWebsocketClient:
         self._session = aiohttp.ClientSession(loop=self._loop)
         self._is_running = False
         self._websocket = None
-        self._p = p if p > 0 else -1
+        self._p = p if p > 0 else 1
         self._getroom_id()
 
     async def close(self):
@@ -84,27 +85,26 @@ class BWebsocketClient:
         self._is_running = True
         return asyncio.ensure_future(self._message_loop(), loop=self._loop)
 
-    def _getroom_id(self, next_to=True, proxy=True):
+    def _getroom_id(self, proxy: bool = True):
         ''' get av room id '''
         url = self.ROOM_INIT_URL % self._av_id
         text = proxy_req(url, 3) if proxy else basic_req(url, 3)
-        cid = re.findall('"cid":(.*?),', text)
-        if not len(cid):
-            if can_retry(url):
-                self._getroom_id(proxy=proxy)
-            else:
-                self._getroom_id(proxy=False)
-            next_to = False
-        if next_to:
-            if self._p == -1:
-                self._room_id = int(cid[0])
-            else:
-                self._room_id = int(cid[self._p])
+        pages = re.findall('"pages":\[(.*?)\],', text)
 
-            print('Room_id:', self._room_id)
+        if not len(pages):
+            if can_retry(url, 5):
+                self._getroom_id(proxy=proxy)
+        cid = re.findall('"cid":(.*?),', pages[0])
+        assert len(cid) >= self._p, 'Actual Page len: {} <=> Need Pages Num: {}'.format(
+            len(cid), self._p)
+        self._room_id = int(cid[self._p - 1])
+        echo(3, 'Room_id:', self._room_id)
 
     def parse_struct(self, data: dict, operation: int):
         ''' parse struct '''
+        assert int(time.time()) < self._begin_time + \
+            7 * one_day, 'Excess Max RunTime!!!'
+
         if operation == 7:
             body = json.dumps(data).replace(" ", '').encode('utf-8')
         else:
@@ -277,10 +277,8 @@ def BSocket(av_id: int, types: int = 0, p: int = -1):
 
 
 if __name__ == '__main__':
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-    if not os.path.exists(websocket_dir):
-        os.makedirs(websocket_dir)
+    mkdir(data_dir)
+    mkdir(websocket_dir)
     if not os.path.exists(assign_path):
         shutil.copy(assign_path + '.tmp', assign_path)
 

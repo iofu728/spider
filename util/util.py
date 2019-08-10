@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-06-06 17:15:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-27 21:24:18
+# @Last Modified time: 2019-08-10 15:07:54
 
 
 import codecs
@@ -336,13 +336,14 @@ def time_stamp(time_str: str, time_format: str = '%Y-%m-%d %H:%M:%S'):
 
 
 def echo(color: int, *args):
-    ''' echo log @param: color: 0 -> error, 1 -> success, 2 -> info '''
+    ''' echo log @param: color: 0 -> red, 1 -> green, 2 -> yellow, 3 -> blue '''
     args = ' '.join([str(ii) for ii in args])
     if is_service:
         with open(log_path, 'a') as f:
             f.write('{}\n'.format(args))
         return
-    colors = {'error': '\033[91m', 'success': '\033[94m', 'info': '\033[93m'}
+    colors = {'red': '\033[91m', 'green': '\033[92m',
+              'yellow': '\033[93m', 'blue': '\033[94m'}
     if type(color) != int or not color in list(range(len(colors.keys()))) or platform.system() == 'Windows':
         print(args)
     else:
@@ -367,3 +368,18 @@ def shuffle_batch_run_thread(threading_list: list, batch_size: int = 24, is_awai
             time.sleep(min(max(5, batch_size * 2 / 210), 10))
         echo(1, time_str(), '{}/{}'.format(total_block, block), 'epochs finish.',
              'One Block {} Thread '.format(batch_size))
+
+
+def mkdir(origin_dir: str):
+    ''' mkdir file dir'''
+    if not os.path.exists(origin_dir):
+        os.mkdir(origin_dir)
+
+
+def read_file(read_path: str) -> list:
+    ''' read file '''
+    if not os.path.exists(read_path):
+        return []
+    with open(read_path, 'r', encoding='utf-8') as f:
+        data = [ii.strip() for ii in f.readlines()]
+    return data

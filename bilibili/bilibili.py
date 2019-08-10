@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-10 16:21:42
+# @Last Modified time: 2019-08-10 17:09:17
 
 
 import codecs
@@ -12,6 +12,7 @@ import pickle
 import random
 import re
 import shutil
+import sys
 import threading
 import time
 from configparser import ConfigParser
@@ -19,6 +20,7 @@ from typing import List
 
 import numpy as np
 
+sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
 from util.util import (basic_req, begin_time, can_retry, changeHeaders, echo,
                        end_time, headers, mkdir, read_file, send_email,
@@ -723,7 +725,7 @@ class Up():
             self.comment[av_id][rpid] = info
         wait_check = [ii for ii in wait_check if not ii['rpid'] in self.comment[av_id]]
         self.comment_next[av_id] = len(wait_check) >= 20
-        echo(int(self.comment_next[av_id]), 'av_id:', av_id,'len of wait_check:', len(wait_check))
+        echo(3, int(self.comment_next[av_id]), 'av_id:', av_id,'len of wait_check:', len(wait_check))
 
 
     def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_rpid=None) -> List:

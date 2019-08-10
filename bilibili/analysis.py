@@ -1,15 +1,18 @@
-'''
-@Author: gunjianpan
-@Date:   2019-04-04 10:57:24
-@Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-04 14:02:54
-'''
+# -*- coding: utf-8 -*-
+# @Author: gunjianpan
+# @Date:   2019-04-04 10:57:24
+# @Last Modified by:   gunjianpan
+# @Last Modified time: 2019-08-10 14:47:13
 
 import pandas as pd
 import numpy as np
 import time
 import os
-from util.util import time_stamp
+from util.util import time_stamp, echo, read_file
+
+data_dir = 'bilibili/data/'
+history_data_dir = '{}history_data/'.format(data_dir)
+history_dir = '{}history/'.format(data_dir)
 
 
 def analysis_csv():
@@ -45,11 +48,9 @@ def analysis_csv():
 
 def clean_csv(av_id: int):
     ''' clean csv '''
-    basic_dir = 'bilibili/yybzz_data'
-    csv_path = os.path.join(basic_dir, '{}.csv'.format(av_id))
-    output_path = os.path.join(basic_dir, '{}_new.csv'.format(av_id))
-    with open(csv_path, 'r') as f:
-        csv = [ii.strip() for ii in f.readlines()]
+    csv_path = os.path.join(history_dir, '{}.csv'.format(av_id))
+    output_path = os.path.join(history_data_dir, '{}_new.csv'.format(av_id))
+    csv = read_file(csv_path)
     last_time, last_view = csv[0].split(',')[:2]
     result = [csv[0]]
     last_time = time_stamp(last_time)
@@ -60,13 +61,18 @@ def clean_csv(av_id: int):
         now_time = time_stamp(now_time)
         now_view = int(now_view)
         time_gap = now_time - last_time
+
         if now_view < last_view or now_view - last_view > 5000:
+            # echo(1, last_view, last_time, now_view, now_time)
             continue
         if abs(time_gap) > 150:
             for ii in range(int((time_gap - 30) // 120)):
                 result.append(empty_line)
         if abs(time_gap) > 90:
+            # echo(0, last_view, last_time, now_view, now_time)
             result.append(line)
-        last_view, last_time = now_view, now_time
+            last_view, last_time = now_view, now_time
+        # else:
+        #     echo(2, last_view, last_time, now_view, now_time)
     with open(output_path, 'w') as f:
         f.write('\n'.join(result))

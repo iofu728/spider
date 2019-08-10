@@ -583,4 +583,26 @@ while (z++)
 
 ![image](https://cdn.nlark.com/yuque/0/2019/png/104214/1557240022438-bc891ec5-7bbc-412a-b4d4-f330608d21f0.png)
 
+## OceanBall V2
+
+check param list:
+
+| param        | Ctrip | Incognito | Node | !!import |
+| ------------ | ----- | --------- | ---- | -------- |
+| define       | ✔     | x         | x    |
+| \_\_filename | x     | x         | x    |
+| module       | x     | x         | ✔    | x        |
+| process      | ✔     | x         | ✔    |
+| \_\_dirname  | ✔     | x         | x    |
+| global       | x     | x         | ✔    | x        |
+| INT_MAX      | ✔     | x         | x    |
+| require      | ✔     | x         | ✔    | ✔        |
+| History      | ✔     | x         |
+| Location     | ✔     | x         |
+| Window       | ✔     | x         |
+| Document     | ✔     | x         |
+| window       | ✔     | x         |
+| navigator    | ✔     | x         |
+| history      | ✔     | x         |
+
 **----To be continued----**

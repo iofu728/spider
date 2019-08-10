@@ -1,26 +1,28 @@
-'''
-@Author: gunjianpan
-@Date:   2019-03-26 10:21:05
-@Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-08 00:06:59
-'''
+# -*- coding: utf-8 -*-
+# @Author: gunjianpan
+# @Date:   2019-03-26 10:21:05
+# @Last Modified by:   gunjianpan
+# @Last Modified time: 2019-08-10 16:56:44
 
-import codecs
-import asyncio
 import aiohttp
+import asyncio
+import codecs
 import json
 import logging
 import os
+import re
 import shutil
 import struct
+import sys
 import time
-
 from collections import namedtuple
 from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
+
+sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
-from util.util import can_retry, basic_req, time_str
+from util.util import basic_req, can_retry, echo, mkdir, time_str
 
 logger = logging.getLogger(__name__)
 proxy_req = GetFreeProxy().proxy_req
@@ -70,7 +72,7 @@ class BWebsocketClient:
         self._session = aiohttp.ClientSession(loop=self._loop)
         self._is_running = False
         self._websocket = None
-        self._p = p if p > 0 else -1
+        self._p = p if p > 0 else 1
         self._getroom_id()
 
     async def close(self):
@@ -83,31 +85,26 @@ class BWebsocketClient:
         self._is_running = True
         return asyncio.ensure_future(self._message_loop(), loop=self._loop)
 
-    def _getroom_id(self, next_to=True, proxy=True):
+    def _getroom_id(self, proxy: bool = True):
         ''' get av room id '''
         url = self.ROOM_INIT_URL % self._av_id
-        html = proxy_req(url, 0) if proxy else basic_req(url, 0)
-        head = html.find_all('head')
-        if not len(head) or len(head[0].find_all('script')) < 4 or not '{' in head[0].find_all('script')[3].text:
-            if can_retry(url):
+        text = proxy_req(url, 3) if proxy else basic_req(url, 3)
+        pages = re.findall('"pages":\[(.*?)\],', text)
+
+        if not len(pages):
+            if can_retry(url, 5):
                 self._getroom_id(proxy=proxy)
-            else:
-                self._getroom_id(proxy=False)
-            next_to = False
-        if next_to:
-            script_list = head[0].find_all('script')[3].text
-            script_begin = script_list.index('{')
-            script_end = script_list.index(';')
-            script_data = script_list[script_begin:script_end]
-            json_data = json.loads(script_data)
-            if self._p == -1 or len(json_data['videoData']['pages']) < self._p:
-                self._room_id = json_data['videoData']['cid']
-            else:
-                self._room_id = json_data['videoData']['pages'][self._p - 1]['cid']
-            print('Room_id:', self._room_id)
+        cid = re.findall('"cid":(.*?),', pages[0])
+        assert len(cid) >= self._p, 'Actual Page len: {} <=> Need Pages Num: {}'.format(
+            len(cid), self._p)
+        self._room_id = int(cid[self._p - 1])
+        echo(3, 'Room_id:', self._room_id)
 
     def parse_struct(self, data: dict, operation: int):
         ''' parse struct '''
+        assert int(time.time()) < self._begin_time + \
+            7 * one_day, 'Excess Max RunTime!!!'
+
         if operation == 7:
             body = json.dumps(data).replace(" ", '').encode('utf-8')
         else:
@@ -177,7 +174,7 @@ class BWebsocketClient:
         ''' heart beat every 30s '''
         if self._types and int(time.time()) > self._begin_time + one_day:
             self.close()
-        while True:
+        for _ in range(int(one_day * 7 / 30)):
             try:
                 await self._websocket.send_bytes(self.parse_struct({}, Operation.SEND_HEARTBEAT))
                 await asyncio.sleep(30)
@@ -280,19 +277,21 @@ def BSocket(av_id: int, types: int = 0, p: int = -1):
 
 
 if __name__ == '__main__':
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-    if not os.path.exists(websocket_dir):
-        os.makedirs(websocket_dir)
+    mkdir(data_dir)
+    mkdir(websocket_dir)
     if not os.path.exists(assign_path):
         shutil.copy(assign_path + '.tmp', assign_path)
 
     ''' Test for San Diego demon '''
     ''' PS: the thread of BSocket have to be currentThread in its processing. '''
-    cfg = ConfigParser()
-    cfg.read(assign_path, 'utf-8')
-    av_id = cfg.getint('basic', 'basic_av_id')
-    p = cfg.getint('basic', 'basic_av_p') if len(
-        cfg['basic']['basic_av_p']) else -1
+    if len(sys.argv) == 3:
+        av_id = int(sys.argv[1])
+        p = int(sys.argv[2])
+    else:
+        cfg = ConfigParser()
+        cfg.read(assign_path, 'utf-8')
+        av_id = cfg.getint('basic', 'basic_av_id')
+        p = cfg.getint('basic', 'basic_av_p') if len(
+            cfg['basic']['basic_av_p']) else -1
 
     BSocket(av_id, p=p)

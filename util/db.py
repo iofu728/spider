@@ -21,11 +21,6 @@ class Db(object):
     def __init__(self, database: str, return_type: str = 'list'):
         self.load_configure()
         self.connect_db(database, return_type)
-        # try:
-        #     self.db = pymysql.connect("localhost", "root", "", database)
-        # except:
-        #     print('db connect error!!! Please check util/db.py')
-        #     self.db = False
 
     def load_configure(self):
         ''' load configure '''

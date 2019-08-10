@@ -2,12 +2,11 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-28 00:09:08
+# @Last Modified time: 2019-08-10 16:21:42
 
 
 import codecs
 import json
-import numpy as np
 import os
 import pickle
 import random
@@ -18,13 +17,17 @@ import time
 from configparser import ConfigParser
 from typing import List
 
+import numpy as np
+
 from proxy.getproxy import GetFreeProxy
 from util.util import (basic_req, begin_time, can_retry, changeHeaders, echo,
-                       end_time, headers, send_email, time_str, time_stamp)
+                       end_time, headers, mkdir, read_file, send_email,
+                       time_stamp, time_str)
 
 proxy_req = GetFreeProxy().proxy_req
 one_day = 86400
 data_dir = 'bilibili/data/'
+history_data_dir = '{}history_data/'.format(data_dir)
 history_dir = '{}history/'.format(data_dir)
 comment_dir = '{}comment/'.format(data_dir)
 assign_path = 'bilibili/assign_up.ini'
@@ -75,9 +78,10 @@ class Up():
         self.email_send_time = {}
         self.begin_timestamp = int(time.time())
         self.av_id_list = []
+        self.ac_id_map = {}
         self.del_map = {}
         self.load_configure()
-        self.load_histort_data()
+        self.load_history_data()
 
     def load_configure(self):
         ''' load assign configure '''
@@ -102,21 +106,45 @@ class Up():
         self.email_limit = cfg.getint('comment', 'email_limit')
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
-    
-    def load_histort_data(self):
-        history_csv_path = os.path.join(data_dir, 'history_new.csv')
-        if not os.path.exists(history_csv_path):
+        self.history_check_list = [int(ii) for ii in cfg.get('basic', 'history_check_list').split(',')]
+
+    def load_av_lists(self):
+        url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
+        json_req = basic_req(url, 1)
+        if json_req is None or not 'data' in json_req or not 'vlist' in json_req['data']:
+            if can_retry(url):
+                self.load_av_lists()
             return
-        with open(history_csv_path, 'r', encoding='utf-8') as f:
-            csv = [ii.strip() for ii in f.readlines()]
-        history = [[int(jj) for jj in ii.split(',')[:-1]] for ii in csv[3:]]
-        self.history_map = {ii[0]: ii[1:] for ii in history}
-        self.history_title = csv[0].split(',')[1:-1]
-        self.history_check_list = [1, 3, 6, 12, 18, 24, 30, 36, 72, 144, 288, 432]
+        av_id_map = {ii['aid']: ii for ii in json_req['data']['vlist']}
+        if self.basic_av_id not in av_id_map:
+            if can_retry(url):
+                self.load_av_lists()
+            return
+        self.av_id_map = av_id_map
+
+    def load_history_file(self, av_id: int, av_info: dict):
+        data_path = '{}{}_new.csv'.format(history_data_dir, av_id)
+        history_list = read_file(data_path)[:2880]
+        if not len(history_list):
+            return
+        created, title = av_info['created'], av_info['title']
+        history_list = [ii.split(',') for ii in history_list]
+        time_map = {round((time_stamp(ii[0]) - created) / 120) * 2: ii for ii in history_list if ii[0] != ''}
+        last_data = [0] * 8
+        for ii in self.history_map.keys():
+            if ii in time_map:
+                self.history_map[ii][av_id] = time_map[ii]
+                last_data = time_map[ii] + last_data[len(time_map[ii]):]
+            else:
+                self.history_map[ii][av_id] = last_data
+
+    def load_history_data(self):
+        self.load_av_lists()
+        self.public = {**{ii: [jj['created'], jj['mid']]  for ii, jj in self.av_id_map.items()}, **self.public}
+        self.history_map = {ii * 2: {} for ii in range(0, 2880)}
         self.history_check_finish = []
-        self.history_time = csv[2].split(',')[1:-1] 
-        self.history_av = csv[1].split(',')[1:-1]
-        self.public = {**self.public, **{int(ii): [time_stamp(self.history_time[jj]), 0] for jj, ii in enumerate(self.history_av)}}
+        for av_id, av_info in self.av_id_map.items():
+            self.load_history_file(av_id, av_info)
 
     def basic_view(self, url: str, times: int, types: int):
         ''' press have no data input '''
@@ -236,42 +264,55 @@ class Up():
         if av_id in self.last_check and int(time.time()) - self.last_check[av_id] > one_day:
             self.del_map[av_id] = 1
             del self.rank_map[av_id]
+            if av_id == self.basic_av_id:
+                clean_csv(av_id)
         elif av_id not in self.last_check and int(time.time()) > one_day + self.begin_timestamp:
             self.del_map[av_id] = 1
             del self.rank_map[av_id]
+            if av_id == self.basic_av_id:
+                clean_csv(av_id)
         self.last_view[av_id] = data[1]
         now_time = time.time()
         echo(0, av_id, av_id == self.basic_av_id, av_id in self.public, (now_time - self.public[av_id][0]) < 3.1 * one_day * 60, self.public[av_id])
         if av_id == self.basic_av_id and av_id in self.public and (now_time - self.public[av_id][0]) < 3.1 * one_day * 60:
             time_gap = (now_time - self.public[av_id][0]) / 60
-            if int(time_gap // 10) in self.history_check_list and int(time_gap // 10) not in self.history_check_finish:
-                self.history_rank(time_gap, data[1], av_id)
-            
+            echo(3, 'Time Gap:', round(time_gap / 10))
+            if round(time_gap / 10) in self.history_check_list and round(time_gap / 10) not in self.history_check_finish:
+                self.history_rank(time_gap, data, av_id)
 
-    def history_rank(self, time_gap:int, now_view:int, av_id:int):
+    def history_rank(self, time_gap: int, now_info: list, av_id: int):
         echo(0, 'send history rank') 
-        time_gap = int(time_gap // 10) * 10
-        other_views = self.history_map[time_gap]
+        time_gap = round(time_gap / 10) * 10 
+        history_map = {ii: jj for ii, jj in self.history_map[time_gap].items() if jj[1]}
+        other_views = [int(ii[1]) for ii in history_map.values()]
         other_views_len = len(other_views)
-        other_views.append(now_view)
+        other_views.append(now_info[1])
         ov_sort_idx = np.argsort(-np.array(other_views))
+        av_ids = list(history_map.keys())
         now_sorted = [jj for jj, ii in enumerate(ov_sort_idx) if ii == other_views_len][0] + 1
-        other_result = [(self.history_title[ii], jj + 1, other_views[ii], self.history_av[ii], self.history_time[ii]) for jj, ii in enumerate(ov_sort_idx[:4]) if ii != other_views_len]
+        other_result = [(jj + 1, av_ids[ii]) for jj, ii in enumerate(ov_sort_idx[:4]) if ii != other_views_len]
         time_tt = self.get_time_str(time_gap)
-        email_title = 'av{}发布{}, 本年度排名No.{}, 访问人数: {}'.format(av_id, time_tt, now_sorted, now_view)
-        context = '{}\n'.format(email_title)
-        for title, no, view, av, tt in other_result[:3]:
-            context += '{}, av{}, 本年度No.{}, 访问人数: {}, 发布时间: {}\n'.format(title, av, no, view, tt)
+        email_title = 'av{}发布{}, 本年度排名No.{}/{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}'.format(av_id, time_tt, now_sorted, len(other_views), now_info[1], now_info[2], now_info[3], now_info[4], now_info[7])
+        email_title += self.get_history_rank(now_info)
+        context = '{}\n\n'.format(email_title)
+        for no, av in other_result[:3]:
+            data_info = history_map[av]
+            context += '{}, av{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}{}, 发布时间: {}\n'.format(self.av_id_map[av]['title'].split('|', 1)[0], av, no, data_info[1], data_info[2], data_info[3], data_info[4], data_info[7], self.get_history_rank(data_info), time_str(self.av_id_map[av]['created']))
         context += '\nBest wish for you\n--------\nSend from script by gunjianpan.'
         send_email(context, email_title)
-        self.history_check_finish.append(int(time_gap // 10))
+        self.history_check_finish.append(round(time_gap / 10))
+
+    def get_history_rank(self, data_info: list):
+        if len(data_info) <= 8:
+            return ''
+        return ', Rank: {}, Score: {}'.format(data_info[8], data_info[9])
 
     def get_time_str(self, time_gap:int):
         if time_gap < 60:
             return '{}min'.format(time_gap)
         if time_gap < 1440:
-            return '{}h'.format(int(time_gap // 60))
-        return '{}天'.format(int(time_gap // 1440))
+            return '{}h'.format(round(time_gap / 60))
+        return '{}天'.format(round(time_gap / 1440))
 
     def check_view(self, av_id: int, view: int) -> bool:
         ''' check view '''
@@ -428,18 +469,19 @@ class Up():
         except:
             pass
 
-    def check_rank_rose(self, av_id, rank_list):
+    def check_rank_rose(self, av_id: int, rank_list: list):
         ''' check rank rose '''
-        if self.check_rank_list(av_id, rank_list):
-            rank, score = rank_list[:2]
-            av_id_id = int(av_id) * 10 + int(rank_list[-1])
-            if av_id_id not in self.rank:
-                self.rank[av_id_id] = [rank_list[0] // 10]
-            else:
-                self.rank[av_id_id].append(rank_list[0] // 10)
-            self.last_rank[av_id_id] = rank_list[0]
-            send_email('%d day List || Rank: %d Score: %d' % (int(
-                rank_list[-1]), rank, score), '%d day List || Rank: %d Score: %d' % (int(rank_list[-1]), rank, score))
+        if not self.check_rank_list(av_id, rank_list):
+            return 
+        rank, score = rank_list[:2]
+        av_id_id = int(av_id) * 10 + int(rank_list[-1])
+        if av_id_id not in self.rank:
+            self.rank[av_id_id] = [rank_list[0] // 10]
+        else:
+            self.rank[av_id_id].append(rank_list[0] // 10)
+        self.last_rank[av_id_id] = rank_list[0]
+        send_email('%d day List || Rank: %d Score: %d' % (int(
+            rank_list[-1]), rank, score), '%d day List || Rank: %d Score: %d' % (int(rank_list[-1]), rank, score))
 
     def check_star(self, mid: int, star: int) -> bool:
         ''' check star '''
@@ -553,51 +595,55 @@ class Up():
         for index in range(num):
             threading_list = []
             if not index % 5:
-                work = threading.Thread(target=self.load_rank, args=())
-                threading_list.append(work)
-            if not index % 2:
-                check = threading.Thread(target=self.get_check, args=())
-                threading_list.append(check)
+                threading_list.append(threading.Thread(target=self.load_rank, args=()))
+                threading_list.append(threading.Thread(target=self.load_history_data, args=()))         
             if not index % 15:
-                work = threading.Thread(
-                    target=self.get_star_num, args=(self.assign_up_mid, 0, True))
-                threading_list.append(work)
+                threading_list.append(threading.Thread(target=self.get_star_num, args=(self.assign_up_mid, 0, True)))
+                threading_list.append(threading.Thread(target=self.update_proxy, args=()))
+            threading_list.append(threading.Thread(target=self.load_configure, args=()))
+            threading_list.append(threading.Thread(target=self.get_check, args=()))
             for av_id in self.rank_map:
-                work = threading.Thread(target=self.check_rank, args=(av_id,))
-                threading_list.append(work)
+                if av_id in self.av_id_list or av_id in self.assign_ids:
+                    threading_list.append(threading.Thread(target=self.check_rank, args=(av_id,)))
+                elif index % 3 == 2:
+                    threading_list.append(threading.Thread(target=self.check_rank, args=(av_id,)))
             for work in threading_list:
                 work.start()
             time.sleep(120)
-            self.load_configure()
+    
+    def update_proxy(self):
+        global proxy_req
+        proxy_req = GetFreeProxy().proxy_req
+    
+    def update_ini(self, av_id: int):
+        cfg = ConfigParser()
+        cfg.read(assign_path, 'utf-8')
+        cfg.set('basic', 'basic_av_id', str(av_id))
+        history_av_ids = cfg.get('assign', 'av_ids')
+        cfg.set('assign', 'av_ids', '{},{}'.format(history_av_ids, av_id))
+        cfg.write(open(assign_path, 'w'))
 
     def get_check(self):
         ''' check comment '''
-        url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
-        json_req = basic_req(url, 1)
-        if json_req is None or not 'data' in json_req or not 'vlist' in json_req['data']:
-            if can_retry(url):
-                self.get_check()
-            return
-        av_id_list = [[ii['aid'], ii['comment']]
-                      for ii in json_req['data']['vlist'] if not re.findall(self.ignore_list, str(ii['aid']))]
-        if self.basic_av_id not in [ii[0] for ii in av_id_list]:
-            if can_retry(url):
-                self.get_check()
-            return
-        self.comment_next = {ii: True for ii, _ in av_id_list}
+        self.load_av_lists()
+        av_id_list = [[ii['aid'], ii['comment']] for ii in self.av_id_map.values() if not re.findall(self.ignore_list, str(ii['aid']))]
+        av_map = {ii['aid']: ii for ii in self.av_id_map.values()}
+        self.comment_next = {ii: True for (ii, _) in av_id_list}
         if self.av_id_list and len(self.av_id_list) and len(self.av_id_list) != len(av_id_list):
             new_av_id = [ii for (ii, _) in av_id_list if not ii in self.av_id_list and not ii in self.del_map]
             self.rank_map = {**self.rank_map, **{ii:[] for ii in new_av_id}}
-            echo(2, new_av_id)
-            email_str = 'av:{} is release!!! Please check the auto pipeline.'.format(new_av_id)
-            email_str2 = '{}{} is release.\nPlease check the online & common program.\n\nBest wish for you\n--------\nSend from script by gunjianpan.'.format(self.BASIC_AV_URL, new_av_id) 
-            send_email(email_str2, email_str)
+            echo(1, new_av_id)
             for ii in new_av_id:
                 shell_str = 'nohup ipython3 bilibili/bsocket.py {} %d >> log.txt 2>&1 &'.format(ii)
-                echo(2, shell_str)
-                os.system(shell_str % 0)
+                echo(0, shell_str)
                 os.system(shell_str % 1)
-        
+                os.system(shell_str % 2)
+                email_str = '{} av:{} was releasing at {}!!! Please check the auto pipeline.'.format(av_map[ii]['title'], ii, time_str(av_map[ii]['created']))
+                email_str2 = '{} {} is release at {}.\nPlease check the online & common program.\n\nBest wish for you\n--------\nSend from script by gunjianpan.'.format(av_map[ii]['title'], time_str(av_map[ii]['created']), self.BASIC_AV_URL % ii) 
+                send_email(email_str2, email_str)
+                self.update_ini(ii)
+                self.public[ii] = [av_map[ii]['created'], av_map[ii]['mid']]
+
         self.av_id_list = [ii for (ii,_) in av_id_list]
         now_hour = int(time_str(time_format='%H'))
         now_min = int(time_str(time_format='%M'))
@@ -725,14 +771,43 @@ class Up():
         else:
             self.email_send_time[rpid_str] = 0
 
+def clean_csv(av_id: int):
+    ''' clean csv '''
+    csv_path = os.path.join(history_dir, '{}.csv'.format(av_id))
+    output_path = os.path.join(history_data_dir, '{}_new.csv'.format(av_id))
+    csv = read_file(csv_path)
+    last_time, last_view = csv[0].split(',')[:2]
+    result = [csv[0]]
+    last_time = time_stamp(last_time)
+    last_view = int(last_view)
+    empty_line = ','.join([' '] * (len(csv[0].split(',')) + 1))
+    for line in csv[1:]:
+        now_time, now_view = line.split(',')[:2]
+        now_time = time_stamp(now_time)
+        now_view = int(now_view)
+        time_gap = now_time - last_time
+
+        if now_view < last_view or now_view - last_view > 5000:
+            # echo(1, last_view, last_time, now_view, now_time)
+            continue
+        if abs(time_gap) > 150:
+            for ii in range(int((time_gap - 30) // 120)):
+                result.append(empty_line)
+        if abs(time_gap) > 90:
+            # echo(0, last_view, last_time, now_view, now_time)
+            result.append(line)
+            last_view, last_time = now_view, now_time
+        # else:
+        #     echo(2, last_view, last_time, now_view, now_time)
+    with open(output_path, 'w') as f:
+        f.write('\n'.join(result))
+
 
 if __name__ == '__main__':
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-    if not os.path.exists(comment_dir):
-        os.makedirs(comment_dir)
-    if not os.path.exists(history_dir):
-        os.makedirs(history_dir)
+    mkdir(data_dir)
+    mkdir(comment_dir)
+    mkdir(history_dir)
+    mkdir(history_data_dir)
     if not os.path.exists(assign_path):
         shutil.copy(assign_path + '.tmp', assign_path)
     bb = Up()

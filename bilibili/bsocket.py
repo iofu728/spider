@@ -2,8 +2,9 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-10 16:33:50
+# @Last Modified time: 2019-08-10 16:56:44
 
+import aiohttp
 import asyncio
 import codecs
 import json
@@ -19,8 +20,7 @@ from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
 
-import aiohttp
-
+sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
 from util.util import basic_req, can_retry, echo, mkdir, time_str
 

@@ -1,19 +1,23 @@
 [basic]
-basic_av_id:21061574
-basic_av_p:-1
-up_name:还有一天就放假了
-up_mid:
-rank_id:119
-tid:126
-view_abnormal:1000
-[assign]
-av_ids:21061574,11624347
+basic_av_id = 21061574
+basic_av_p = -1
+up_name = 还有一天就放假了
+up_mid = 
+rank_id = 119
+tid = 126
+view_abnormal = 1000
+history_check_list = 1,3,6
 ;split by ','
+
+[assign]
+av_ids = 21061574,11624347
+;split by ','
+
 [comment]
-keyword:死全家|草泥马|.{0,4}\$\$_.{0,4}
+keyword = 死全家|草泥马|.{0,4}\$\$_.{0,4}
 ;support re, use '|' split
-ignore_list:^[2-3].*
-ignore_rpid:{"21061574":["242-2"],"21062574":["1242"],"21061577":["1284"]}
-ignore_start:0.5
-ignore_end:8.5
-email_limit:5
+ignore_list = ^[2-3].*
+ignore_rpid = {"21061574":["242-2"],"21062574":["1242"],"21061577":["1284"]}
+ignore_start = 0.5
+ignore_end = 8.5
+email_limit = 5

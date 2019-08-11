@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-10 17:09:17
+# @Last Modified time: 2019-08-11 23:52:23
 
 
 import codecs
@@ -82,6 +82,7 @@ class Up():
         self.av_id_list = []
         self.ac_id_map = {}
         self.del_map = {}
+        self.history_check_finish = []
         self.load_configure()
         self.load_history_data()
 
@@ -144,9 +145,12 @@ class Up():
         self.load_av_lists()
         self.public = {**{ii: [jj['created'], jj['mid']]  for ii, jj in self.av_id_map.items()}, **self.public}
         self.history_map = {ii * 2: {} for ii in range(0, 2880)}
-        self.history_check_finish = []
         for av_id, av_info in self.av_id_map.items():
             self.load_history_file(av_id, av_info)
+    
+    def delay_load_history_data(self):
+        time.sleep(60)
+        self.load_history_data()
 
     def basic_view(self, url: str, times: int, types: int):
         ''' press have no data input '''
@@ -275,17 +279,21 @@ class Up():
                 clean_csv(av_id)
         self.last_view[av_id] = data[1]
         now_time = time.time()
+        if not av_id in self.public:
+            return
         echo(0, av_id, av_id == self.basic_av_id, av_id in self.public, (now_time - self.public[av_id][0]) < 3.1 * one_day * 60, self.public[av_id])
         if av_id == self.basic_av_id and av_id in self.public and (now_time - self.public[av_id][0]) < 3.1 * one_day * 60:
             time_gap = (now_time - self.public[av_id][0]) / 60
-            echo(3, 'Time Gap:', round(time_gap / 10))
-            if round(time_gap / 10) in self.history_check_list and round(time_gap / 10) not in self.history_check_finish:
+            echo(3, 'Time Gap:', int(time_gap / 10))
+            if int(time_gap / 10) in self.history_check_list and int(time_gap / 10) not in self.history_check_finish:
                 self.history_rank(time_gap, data, av_id)
 
     def history_rank(self, time_gap: int, now_info: list, av_id: int):
-        echo(0, 'send history rank') 
-        time_gap = round(time_gap / 10) * 10 
+        echo(0, 'send history rank')
+        time_gap = int(time_gap / 10) * 10
         history_map = {ii: jj for ii, jj in self.history_map[time_gap].items() if jj[1]}
+        if len(history_map) < 5:
+            self.load_history_data()
         other_views = [int(ii[1]) for ii in history_map.values()]
         other_views_len = len(other_views)
         other_views.append(now_info[1])
@@ -474,7 +482,7 @@ class Up():
     def check_rank_rose(self, av_id: int, rank_list: list):
         ''' check rank rose '''
         if not self.check_rank_list(av_id, rank_list):
-            return 
+            return
         rank, score = rank_list[:2]
         av_id_id = int(av_id) * 10 + int(rank_list[-1])
         if av_id_id not in self.rank:
@@ -598,8 +606,9 @@ class Up():
             threading_list = []
             if not index % 5:
                 threading_list.append(threading.Thread(target=self.load_rank, args=()))
-                threading_list.append(threading.Thread(target=self.load_history_data, args=()))         
-            if not index % 15:
+            if index % 7 == 3:
+                threading_list.append(threading.Thread(target=self.delay_load_history_data, args=()))
+            if index % 15 == 2:
                 threading_list.append(threading.Thread(target=self.get_star_num, args=(self.assign_up_mid, 0, True)))
                 threading_list.append(threading.Thread(target=self.update_proxy, args=()))
             threading_list.append(threading.Thread(target=self.load_configure, args=()))
@@ -607,16 +616,16 @@ class Up():
             for av_id in self.rank_map:
                 if av_id in self.av_id_list or av_id in self.assign_ids:
                     threading_list.append(threading.Thread(target=self.check_rank, args=(av_id,)))
-                elif index % 3 == 2:
+                elif index % 5 == 2:
                     threading_list.append(threading.Thread(target=self.check_rank, args=(av_id,)))
             for work in threading_list:
                 work.start()
             time.sleep(120)
-    
+
     def update_proxy(self):
         global proxy_req
         proxy_req = GetFreeProxy().proxy_req
-    
+
     def update_ini(self, av_id: int):
         cfg = ConfigParser()
         cfg.read(assign_path, 'utf-8')
@@ -636,15 +645,16 @@ class Up():
             self.rank_map = {**self.rank_map, **{ii:[] for ii in new_av_id}}
             echo(1, new_av_id)
             for ii in new_av_id:
-                shell_str = 'nohup ipython3 bilibili/bsocket.py {} %d >> log.txt 2>&1 &'.format(ii)
+                shell_str = 'nohup python3 bilibili/bsocket.py {} %d >> log.txt 2>&1 &'.format(ii)
                 echo(0, shell_str)
                 os.system(shell_str % 1)
                 os.system(shell_str % 2)
                 email_str = '{} av:{} was releasing at {}!!! Please check the auto pipeline.'.format(av_map[ii]['title'], ii, time_str(av_map[ii]['created']))
-                email_str2 = '{} {} is release at {}.\nPlease check the online & common program.\n\nBest wish for you\n--------\nSend from script by gunjianpan.'.format(av_map[ii]['title'], time_str(av_map[ii]['created']), self.BASIC_AV_URL % ii) 
+                email_str2 = '{} {} is release at {}.\nPlease check the online & common program.\n\nBest wish for you\n--------\nSend from script by gunjianpan.'.format(av_map[ii]['title'], time_str(av_map[ii]['created']), self.BASIC_AV_URL % ii)
                 send_email(email_str2, email_str)
                 self.update_ini(ii)
                 self.public[ii] = [av_map[ii]['created'], av_map[ii]['mid']]
+                self.last_check[ii] = int(time.time())
 
         self.av_id_list = [ii for (ii,_) in av_id_list]
         now_hour = int(time_str(time_format='%H'))
@@ -725,7 +735,7 @@ class Up():
             self.comment[av_id][rpid] = info
         wait_check = [ii for ii in wait_check if not ii['rpid'] in self.comment[av_id]]
         self.comment_next[av_id] = len(wait_check) >= 20
-        echo(3, int(self.comment_next[av_id]), 'av_id:', av_id,'len of wait_check:', len(wait_check))
+        echo(1, int(self.comment_next[av_id]), 'av_id:', av_id,'len of wait_check:', len(wait_check))
 
 
     def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_rpid=None) -> List:
@@ -758,7 +768,7 @@ class Up():
         if str(av_id) in self.ignore_rpid and rpid in self.ignore_rpid[str(av_id)]:
             return True
         if self.email_limit < 1 or (rpid_str in self.email_send_time and self.email_send_time[rpid_str] > self.email_limit):
-            return True 
+            return True
 
         email_content = '%s\nUrl: %s Page: %d #%d@%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s\nlike: %d' % (ctime, url, pn, idx, rpid, uname, sex, content, sign, like)
         email_subject = '(%s)av_id: %s || #%s Comment Warning !!!' % (ctime, av_id, rpid)

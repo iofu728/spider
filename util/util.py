@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-10 16:45:10
+# @Last Modified time: 2019-08-13 01:32:50
 
 
 import codecs
@@ -261,20 +261,19 @@ def can_retry(url: str, time: int = 3) -> bool:
         return False
 
 
-def send_email(context: str, subject: str) -> bool:
+def send_email(context: str, subject: str, add_rec=None) -> bool:
     ''' send email '''
 
     if not os.path.exists('{}emailSend'.format(data_dir)) or not os.path.exists('{}emailRec'.format(data_dir)):
         echo(0, 'email send/Rec list not exist!!!')
         return
-    with codecs.open('{}emailSend'.format(data_dir), 'r', encoding='utf-8') as f:
-        email_send = [ii.strip().split(',') for ii in f.readlines()]
-    with codecs.open(data_dir + 'emailRec', 'r', encoding='utf-8') as f:
-        origin_file = f.readlines()
-        email_rec = [ii.strip().split(',')[0]
-                     for ii in origin_file if ii.strip().split(',')[1] == '0']
-        email_cc = [ii.strip().split(',')[0]
-                    for ii in origin_file if ii.strip().split(',')[1] == '1']
+    email_send = [ii.split(',') for ii in read_file('{}emailSend'.format(data_dir))]
+    origin_file = [ii.split(',') for ii in read_file('{}emailRec'.format(data_dir))]
+    email_rec = [ii for ii, jj in origin_file if jj == '0']
+    email_cc = [ii for ii, jj in origin_file if jj == '1']
+    if not add_rec is None:
+        email_rec += add_rec
+    
     send_len = len(email_send)
     send_index = random.randint(0, send_len - 1)
     mail_host = 'smtp.163.com'

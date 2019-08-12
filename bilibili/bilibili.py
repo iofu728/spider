@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-11 23:52:23
+# @Last Modified time: 2019-08-13 01:49:45
 
 
 import codecs
@@ -82,7 +82,7 @@ class Up():
         self.av_id_list = []
         self.ac_id_map = {}
         self.del_map = {}
-        self.history_check_finish = []
+        self.history_check_finish = {}
         self.load_configure()
         self.load_history_data()
 
@@ -110,6 +110,7 @@ class Up():
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
         self.history_check_list = [int(ii) for ii in cfg.get('basic', 'history_check_list').split(',')]
+        self.special_info_email = cfg.get('basic', 'special_info_email')
 
     def load_av_lists(self):
         url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
@@ -279,13 +280,15 @@ class Up():
                 clean_csv(av_id)
         self.last_view[av_id] = data[1]
         now_time = time.time()
-        if not av_id in self.public:
+        if not av_id in self.public or av_id not in self.av_id_list:
             return
-        echo(0, av_id, av_id == self.basic_av_id, av_id in self.public, (now_time - self.public[av_id][0]) < 3.1 * one_day * 60, self.public[av_id])
-        if av_id == self.basic_av_id and av_id in self.public and (now_time - self.public[av_id][0]) < 3.1 * one_day * 60:
-            time_gap = (now_time - self.public[av_id][0]) / 60
+        time_gap = (now_time - self.public[av_id][0]) / 60
+        echo(0, av_id, time_gap < (4 * one_day / 60), self.public[av_id])
+        if time_gap < (4 * one_day / 60):
+            if not av_id in self.history_check_finish:
+                self.history_check_finish[av_id] = []
             echo(3, 'Time Gap:', int(time_gap / 10))
-            if int(time_gap / 10) in self.history_check_list and int(time_gap / 10) not in self.history_check_finish:
+            if int(time_gap / 10) in self.history_check_list and int(time_gap / 10) not in self.history_check_finish[av_id]:
                 self.history_rank(time_gap, data, av_id)
 
     def history_rank(self, time_gap: int, now_info: list, av_id: int):
@@ -310,7 +313,7 @@ class Up():
             context += '{}, av{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}{}, 发布时间: {}\n'.format(self.av_id_map[av]['title'].split('|', 1)[0], av, no, data_info[1], data_info[2], data_info[3], data_info[4], data_info[7], self.get_history_rank(data_info), time_str(self.av_id_map[av]['created']))
         context += '\nBest wish for you\n--------\nSend from script by gunjianpan.'
         send_email(context, email_title)
-        self.history_check_finish.append(round(time_gap / 10))
+        self.history_check_finish[av_id].append(round(time_gap / 10))
 
     def get_history_rank(self, data_info: list):
         if len(data_info) <= 8:
@@ -318,11 +321,20 @@ class Up():
         return ', Rank: {}, Score: {}'.format(data_info[8], data_info[9])
 
     def get_time_str(self, time_gap:int):
-        if time_gap < 60:
-            return '{}min'.format(time_gap)
-        if time_gap < 1440:
-            return '{}h'.format(round(time_gap / 60))
-        return '{}天'.format(round(time_gap / 1440))
+        day = int(time_gap / 1440) 
+        hour = int(time_gap / 60) % 24
+        min_num = time_gap % 60
+        result = ''
+        if day:
+            result += '{}天 '.format(day)
+        if hour:
+            result += '{}h '.format(hour)
+        if min_num:
+            if day and not hour:
+                result += '{}h '.format(hour) 
+            result += '{}min'.format(min_num)
+        
+        return result.strip()
 
     def check_view(self, av_id: int, view: int) -> bool:
         ''' check view '''
@@ -651,7 +663,7 @@ class Up():
                 os.system(shell_str % 2)
                 email_str = '{} av:{} was releasing at {}!!! Please check the auto pipeline.'.format(av_map[ii]['title'], ii, time_str(av_map[ii]['created']))
                 email_str2 = '{} {} is release at {}.\nPlease check the online & common program.\n\nBest wish for you\n--------\nSend from script by gunjianpan.'.format(av_map[ii]['title'], time_str(av_map[ii]['created']), self.BASIC_AV_URL % ii)
-                send_email(email_str2, email_str)
+                send_email(email_str2, email_str, self.special_info_email)
                 self.update_ini(ii)
                 self.public[ii] = [av_map[ii]['created'], av_map[ii]['mid']]
                 self.last_check[ii] = int(time.time())

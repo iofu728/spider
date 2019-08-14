@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-13 01:49:45
+# @Last Modified time: 2019-08-15 00:21:15
 
 
 import codecs
@@ -61,6 +61,7 @@ class Up():
     BASIC_RANKING_URL = 'https://www.bilibili.com/ranking/all/%d/'
     MEMBER_SUBMIT_URL = 'http://space.bilibili.com/ajax/member/getSubmitVideos?mid=%s&page=1&pagesize=50'
     REPLY_V2_URL = 'http://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=2'
+    NO_RANK_CONSTANT = 'No rank.....No Rank......No Rank.....'
 
     def __init__(self):
         self.finish = 0
@@ -70,7 +71,7 @@ class Up():
         self.public_list = []
         self.star = {}
         self.data_v2 = {}
-        self.have_assign = False
+        self.have_assign = []
         self.last_rank = {}
         self.last_check = {}
         self.last_view = {}
@@ -110,7 +111,7 @@ class Up():
         self.AV_URL = self.BASIC_AV_URL % self.basic_av_id
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
         self.history_check_list = [int(ii) for ii in cfg.get('basic', 'history_check_list').split(',')]
-        self.special_info_email = cfg.get('basic', 'special_info_email')
+        self.special_info_email = cfg.get('basic', 'special_info_email').split(',')
 
     def load_av_lists(self):
         url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
@@ -311,7 +312,6 @@ class Up():
         for no, av in other_result[:3]:
             data_info = history_map[av]
             context += '{}, av{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}{}, 发布时间: {}\n'.format(self.av_id_map[av]['title'].split('|', 1)[0], av, no, data_info[1], data_info[2], data_info[3], data_info[4], data_info[7], self.get_history_rank(data_info), time_str(self.av_id_map[av]['created']))
-        context += '\nBest wish for you\n--------\nSend from script by gunjianpan.'
         send_email(context, email_title)
         self.history_check_finish[av_id].append(round(time_gap / 10))
 
@@ -355,7 +355,7 @@ class Up():
         if av_id_id not in self.rank:
             return True
         first_rank = rank_list[0] // 10
-        if first_rank not in self.rank[av_id_id] or first_rank == 0 or first_rank == 1:
+        if first_rank not in self.rank[av_id_id] or first_rank == 0 or (first_rank == 1 and not rank_list[0] % 3):
             if self.last_rank[av_id_id] != rank_list[0]:
                 return True
         return False
@@ -502,8 +502,12 @@ class Up():
         else:
             self.rank[av_id_id].append(rank_list[0] // 10)
         self.last_rank[av_id_id] = rank_list[0]
-        send_email('%d day List || Rank: %d Score: %d' % (int(
-            rank_list[-1]), rank, score), '%d day List || Rank: %d Score: %d' % (int(rank_list[-1]), rank, score))
+        rank_str = 'Av: {} {} day List || Rank: {} Score: {}'.format(av_id, rank_list[-1], rank, score)
+        if av_id in self.public:
+            rank_context ='{}, Public Time: {}'.format(rank_str, time_str(self.public[av_id][0]))
+        else:
+            rank_context = rank_str
+        send_email(rank_context, rank_str)
 
     def check_star(self, mid: int, star: int) -> bool:
         ''' check star '''
@@ -550,7 +554,7 @@ class Up():
                 wait_check_public.append(ii)
             if not ii in self.last_view and not ii in self.rank_map:
                 self.rank_map[ii] = []
-        have_assign = len([0 for ii in self.assign_ids if ii in now_av_id]) > 0
+        have_assign = [ii for ii in self.assign_ids if ii in now_av_id]
 
         ''' check tid type '''
         threading_public = []
@@ -595,12 +599,17 @@ class Up():
         ''' load rank '''
         assign_1 = self.load_rank_index(1, 1)
         assign_2 = self.load_rank_index(1, 3)
-        have_assign = assign_1 or assign_2
+        have_assign = assign_1 + assign_2
         print(assign_1, assign_2, have_assign)
+        not_rank_list = [ii for ii in self.have_assign if not ii in have_assign]
 
-        if self.have_assign and not have_assign:
-            send_email('No rank.....No Rank......No Rank.....',
-                       'No rank.....No Rank......No Rank.....')
+        if len(not_rank_list):
+            for not_rank_av_id in not_rank_list:
+                no_rank_warning = 'Time: {}, Av: {}, {}'.format(time_str(), not_rank_av_id, self.NO_RANK_CONSTANT)
+                send_email(no_rank_warning, no_rank_warning, self.special_info_email)
+                time.sleep(pow(np.pi, 2))
+                send_email(no_rank_warning, no_rank_warning, self.special_info_email)
+                print(no_rank_warning)
         self.have_assign = have_assign
 
         print('Rank_map_len:', len(self.rank_map.keys()), 'Empty:',
@@ -662,7 +671,7 @@ class Up():
                 os.system(shell_str % 1)
                 os.system(shell_str % 2)
                 email_str = '{} av:{} was releasing at {}!!! Please check the auto pipeline.'.format(av_map[ii]['title'], ii, time_str(av_map[ii]['created']))
-                email_str2 = '{} {} is release at {}.\nPlease check the online & common program.\n\nBest wish for you\n--------\nSend from script by gunjianpan.'.format(av_map[ii]['title'], time_str(av_map[ii]['created']), self.BASIC_AV_URL % ii)
+                email_str2 = '{} {} is release at {}.\nPlease check the online & common program.'.format(av_map[ii]['title'], time_str(av_map[ii]['created']), self.BASIC_AV_URL % ii)
                 send_email(email_str2, email_str, self.special_info_email)
                 self.update_ini(ii)
                 self.public[ii] = [av_map[ii]['created'], av_map[ii]['mid']]
@@ -782,8 +791,8 @@ class Up():
         if self.email_limit < 1 or (rpid_str in self.email_send_time and self.email_send_time[rpid_str] > self.email_limit):
             return True
 
-        email_content = '%s\nUrl: %s Page: %d #%d@%s,\nUser: %s,\nSex: %s,\nconetnt: %s,\nsign: %s\nlike: %d' % (ctime, url, pn, idx, rpid, uname, sex, content, sign, like)
-        email_subject = '(%s)av_id: %s || #%s Comment Warning !!!' % (ctime, av_id, rpid)
+        email_content = '{}\nUrl: {} Page: {} #{}@{},\nUser: {},\nSex: {},\nconetnt: {},\nsign: {}\nlike: {}'.format(ctime, url, pn, idx, rpid, uname, sex, content, sign, like)
+        email_subject = '({})av_id: {} || #{} Comment Warning !!!'.format(ctime, av_id, rpid)
         print(email_content, email_subject)
         send_email_time = 0
         send_email_result = False

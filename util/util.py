@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-13 01:32:50
+# @Last Modified time: 2019-08-15 00:29:32
 
 
 import codecs
@@ -48,6 +48,7 @@ start = []
 spend_list = []
 failure_map = {}
 is_service = False
+EMAIL_SIGN = '\n\n\nBest wish!!\n%s\n\n————————————————————\n• Send from script designed by gunjianpan.'
 
 
 def basic_req(url: str, types: int, proxies=None, data=None, header=None, need_cookie: bool = False):
@@ -267,21 +268,26 @@ def send_email(context: str, subject: str, add_rec=None) -> bool:
     if not os.path.exists('{}emailSend'.format(data_dir)) or not os.path.exists('{}emailRec'.format(data_dir)):
         echo(0, 'email send/Rec list not exist!!!')
         return
-    email_send = [ii.split(',') for ii in read_file('{}emailSend'.format(data_dir))]
-    origin_file = [ii.split(',') for ii in read_file('{}emailRec'.format(data_dir))]
+    origin_file = [ii.split(',')
+                   for ii in read_file('{}emailRec'.format(data_dir))]
     email_rec = [ii for ii, jj in origin_file if jj == '0']
     email_cc = [ii for ii, jj in origin_file if jj == '1']
+    send_email_once(email_rec, email_cc, context, subject)
     if not add_rec is None:
-        email_rec += add_rec
-    
-    send_len = len(email_send)
-    send_index = random.randint(0, send_len - 1)
+        send_email_once(add_rec, [], context, subject)
+
+
+def send_email_once(email_rec: list, email_cc: list, context: str, subject: str):
+    email_send = [ii.split(',')
+                  for ii in read_file('{}emailSend'.format(data_dir))]
+    send_index = random.randint(0, len(email_send) - 1)
     mail_host = 'smtp.163.com'
     mail_user = email_send[send_index][0]
     mail_pass = email_send[send_index][1]
-    sender = mail_user + '@163.com'
+    sender = '{}@163.com'.format(mail_user)
 
-    message = MIMEText(context, 'plain', 'utf-8')
+    sign = EMAIL_SIGN % time_str(time_format='%B %d')
+    message = MIMEText('{}{}'.format(context, sign), 'plain', 'utf-8')
     message['Subject'] = subject
     message['From'] = sender
     message['To'] = ', '.join(email_rec)
@@ -289,7 +295,6 @@ def send_email(context: str, subject: str, add_rec=None) -> bool:
 
     try:
         smtpObj = smtplib.SMTP_SSL(mail_host)
-
         smtpObj.connect(mail_host, 465)
         smtpObj.login(mail_user, mail_pass)
         smtpObj.sendmail(sender, email_rec + email_cc, message.as_string())

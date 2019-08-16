@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-15 00:21:15
+# @Last Modified time: 2019-08-16 18:48:28
 
 
 import codecs
@@ -64,7 +64,6 @@ class Up():
     NO_RANK_CONSTANT = 'No rank.....No Rank......No Rank.....'
 
     def __init__(self):
-        self.finish = 0
         self.rank = {}
         self.rank_type = {}
         self.public = {}
@@ -72,6 +71,7 @@ class Up():
         self.star = {}
         self.data_v2 = {}
         self.have_assign = []
+        self.have_assign_now = {1: [], 3: []}
         self.last_rank = {}
         self.last_check = {}
         self.last_view = {}
@@ -129,7 +129,7 @@ class Up():
 
     def load_history_file(self, av_id: int, av_info: dict):
         data_path = '{}{}_new.csv'.format(history_data_dir, av_id)
-        history_list = read_file(data_path)[:2880]
+        history_list = read_file(data_path)[:3660]
         if not len(history_list):
             return
         created, title = av_info['created'], av_info['title']
@@ -146,101 +146,13 @@ class Up():
     def load_history_data(self):
         self.load_av_lists()
         self.public = {**{ii: [jj['created'], jj['mid']]  for ii, jj in self.av_id_map.items()}, **self.public}
-        self.history_map = {ii * 2: {} for ii in range(0, 2880)}
+        self.history_map = {ii * 2: {} for ii in range(0, 3660)}
         for av_id, av_info in self.av_id_map.items():
             self.load_history_file(av_id, av_info)
-    
+
     def delay_load_history_data(self):
         time.sleep(60)
         self.load_history_data()
-
-    def basic_view(self, url: str, times: int, types: int):
-        ''' press have no data input '''
-        url = self.AV_URL
-        if types == 1:
-            html = proxy_req(url, 0)
-        else:
-            html = basic_req(url, 0)
-
-        if html == False and times < 5:
-            self.basic_view(url, times + 1, types)
-
-    def one_click_bilibili(self, url: str, times: int, types: int):
-        ''' press have no data input '''
-        url = self.AV_URL
-        if types == 1:
-            html = proxy_req(url, 0)
-        else:
-            html = basic_req(url, 0)
-
-        if html == False:
-            if times < 5:
-                self.basic_view(url, times + 1, types)
-            return
-        times = 0
-        url_1 = self.CLICK_NOW_URL
-        if types == 1:
-            json_1 = proxy_req(url_1, 1)
-        else:
-            json_1 = basic_req(url_1, 1)
-        if not json_1 is None:
-            print(json_1)
-
-        if not self.have_error(json_1, 1):
-            if times < 2:
-                self.one_click_bilibili(url, times + 1, types)
-            return
-        times = 0
-        url = self.CLICK_WEB_URL
-        data = {
-            'aid': self.basic_av_id,
-            'cid': '',
-            'part': '1',
-            'mid': str(random.randint(10000000, 19999999)),
-            'lv': '2',
-            'ftime': '',
-            'stime': json_1['data']['now'],
-            'jsonp': 'jsonp',
-            'type': '3',
-            'sub_type': '0'
-        }
-        if types == 1:
-            json_req = proxy_req(url, 11, data)
-        else:
-            json_req = basic_req(url, 11, data=data)
-        if not json_req is None:
-            print(json_req)
-
-        if not self.have_error(json_req):
-            if times < 2:
-                self.one_click_bilibili(url, times + 1, types)
-            return
-        times = 0
-        url_3 = self.REPORT_HEARTBEAT_URL
-        data_3 = {
-            'aid': self.basic_av_id,
-            'cid': '',
-            'mid': data['mid'],
-            'csrf': '',
-            'played_time': '0',
-            'realtime': '0',
-            'start_ts': json_1['data']['now'],
-            'type': '3',
-            'dt': '2',
-            'play_type': '1'
-        }
-
-        if types == 1:
-            json_3 = proxy_req(url_3, 11, data_3)
-        else:
-            json_3 = basic_req(url_3, 11, data=data_3)
-        if not json_3 is None:
-            print(json_3)
-
-        if not self.have_error(json_3) and times < 2:
-            self.one_click_bilibili(url, times + 1, types)
-        print('finish.')
-        self.finish += 1
 
     def check_rank(self, av_id: int, times=0):
         rank_list = self.rank_map[av_id] if av_id in self.rank_map else []
@@ -284,16 +196,17 @@ class Up():
         if not av_id in self.public or av_id not in self.av_id_list:
             return
         time_gap = (now_time - self.public[av_id][0]) / 60
-        echo(0, av_id, time_gap < (4 * one_day / 60), self.public[av_id])
-        if time_gap < (4 * one_day / 60):
-            if not av_id in self.history_check_finish:
-                self.history_check_finish[av_id] = []
-            echo(3, 'Time Gap:', int(time_gap / 10))
-            if int(time_gap / 10) in self.history_check_list and int(time_gap / 10) not in self.history_check_finish[av_id]:
-                self.history_rank(time_gap, data, av_id)
+        echo('0|debug', av_id, time_gap < (4.5 * one_day / 60), self.public[av_id])
+        if time_gap >= (4.5 * one_day / 60):
+            return
+        if not av_id in self.history_check_finish:
+            self.history_check_finish[av_id] = []
+        echo('3|info', 'Time Gap:', int(time_gap / 10))
+        if int(time_gap / 10) in self.history_check_list and int(time_gap / 10) not in self.history_check_finish[av_id]:
+            self.history_rank(time_gap, data, av_id)
 
     def history_rank(self, time_gap: int, now_info: list, av_id: int):
-        echo(0, 'send history rank')
+        echo('0|info', 'send history rank')
         time_gap = int(time_gap / 10) * 10
         history_map = {ii: jj for ii, jj in self.history_map[time_gap].items() if jj[1]}
         if len(history_map) < 5:
@@ -320,10 +233,10 @@ class Up():
             return ''
         return ', Rank: {}, Score: {}'.format(data_info[8], data_info[9])
 
-    def get_time_str(self, time_gap:int):
+    def get_time_str(self, time_gap: int):
         day = int(time_gap / 1440) 
         hour = int(time_gap / 60) % 24
-        min_num = time_gap % 60
+        min_num = int(time_gap % 60)
         result = ''
         if day:
             result += '{}天 '.format(day)
@@ -441,7 +354,7 @@ class Up():
         sleep_time = data_time + one_day - int(time.time())
         if sleep_time < 0:
             return
-        print('Monitor Begin %d' % (av_id))
+        echo('4|debug', 'Monitor Begin %d' % (av_id))
         time.sleep(sleep_time)
         self.get_star_num(mid, 0)
         self.check_rank_v2(av_id, 0)
@@ -504,6 +417,8 @@ class Up():
         self.last_rank[av_id_id] = rank_list[0]
         rank_str = 'Av: {} {} day List || Rank: {} Score: {}'.format(av_id, rank_list[-1], rank, score)
         if av_id in self.public:
+            time_gap = (time.time() - self.public[av_id][0]) / 60
+            rank_str += ', Public: {}'.format(self.get_time_str(time_gap))
             rank_context ='{}, Public Time: {}'.format(rank_str, time_str(self.public[av_id][0]))
         else:
             rank_context = rank_str
@@ -522,6 +437,7 @@ class Up():
 
     def load_rank_index(self, index: int, day_index: int):
         ''' load rank '''
+        self.have_assign_now[day_index] = []
         changeHeaders({'Referer': self.AV_URL})
         url = self.RANKING_URL % (index, day_index)
         text = basic_req(url, 3)
@@ -529,7 +445,7 @@ class Up():
         if not len(rank_str):
             if can_retry(url):
                 self.load_rank_index(index, day_index)
-            return False
+            return
         rank_map = json.loads(rank_str[0])
         rank_list = rank_map['rankList']
 
@@ -593,14 +509,15 @@ class Up():
                 threading_list.append(work)
         for work in threading_list:
             work.start()
-        return have_assign
+        self.have_assign_now[day_index] = have_assign
 
     def load_rank(self):
         ''' load rank '''
-        assign_1 = self.load_rank_index(1, 1)
-        assign_2 = self.load_rank_index(1, 3)
+        self.load_rank_index(1, 1)
+        self.load_rank_index(1, 3)
+        assign_1, assign_2 = self.have_assign_now[1], self.have_assign_now[3]
         have_assign = assign_1 + assign_2
-        print(assign_1, assign_2, have_assign)
+        echo('4|debug', assign_1, assign_2, have_assign)
         not_rank_list = [ii for ii in self.have_assign if not ii in have_assign]
 
         if len(not_rank_list):
@@ -609,10 +526,10 @@ class Up():
                 send_email(no_rank_warning, no_rank_warning, self.special_info_email)
                 time.sleep(pow(np.pi, 2))
                 send_email(no_rank_warning, no_rank_warning, self.special_info_email)
-                print(no_rank_warning)
+                echo('4|error', no_rank_warning)
         self.have_assign = have_assign
 
-        print('Rank_map_len:', len(self.rank_map.keys()), 'Empty:',
+        echo('4|debug', 'Rank_map_len:', len(self.rank_map.keys()), 'Empty:',
               len([1 for ii in self.rank_map.values() if not len(ii)]))
         youshan = [','.join([str(kk) for kk in [ii, *jj]])
                    for ii, jj in self.rank_map.items()]
@@ -664,10 +581,10 @@ class Up():
         if self.av_id_list and len(self.av_id_list) and len(self.av_id_list) != len(av_id_list):
             new_av_id = [ii for (ii, _) in av_id_list if not ii in self.av_id_list and not ii in self.del_map]
             self.rank_map = {**self.rank_map, **{ii:[] for ii in new_av_id}}
-            echo(1, new_av_id)
+            echo('1|error','New Av id:', new_av_id)
             for ii in new_av_id:
                 shell_str = 'nohup python3 bilibili/bsocket.py {} %d >> log.txt 2>&1 &'.format(ii)
-                echo(0, shell_str)
+                echo('0|error', 'Shell str:', shell_str)
                 os.system(shell_str % 1)
                 os.system(shell_str % 2)
                 email_str = '{} av:{} was releasing at {}!!! Please check the auto pipeline.'.format(av_map[ii]['title'], ii, time_str(av_map[ii]['created']))
@@ -710,7 +627,7 @@ class Up():
         for pn in range(1, (comment - 1) // 20 + 2):
             if not self.comment_next[av_id]:
                 return
-            echo(2, 'Comment check, av_id:', av_id, 'pn:', pn)
+            echo('2|debug', 'Comment check, av_id:', av_id, 'pn:', pn)
             self.check_comment_once(av_id, pn)
         comment = [self.comment[av_id][k] for k in sorted(self.comment[av_id].keys())]
         basic = [','.join([str(jj) for jj in ii['basic']])
@@ -756,7 +673,7 @@ class Up():
             self.comment[av_id][rpid] = info
         wait_check = [ii for ii in wait_check if not ii['rpid'] in self.comment[av_id]]
         self.comment_next[av_id] = len(wait_check) >= 20
-        echo(1, int(self.comment_next[av_id]), 'av_id:', av_id,'len of wait_check:', len(wait_check))
+        echo('1|debug', int(self.comment_next[av_id]), 'av_id:', av_id,'len of wait_check:', len(wait_check))
 
 
     def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_rpid=None) -> List:
@@ -786,14 +703,14 @@ class Up():
 
         url = self.BASIC_AV_URL % av_id
         rpid_str = '{}-{}'.format(av_id, rpid)
-        if str(av_id) in self.ignore_rpid and rpid in self.ignore_rpid[str(av_id)]:
+        if rpid in [kk for ii in self.ignore_rpid.values() for kk in ii]:
             return True
-        if self.email_limit < 1 or (rpid_str in self.email_send_time and self.email_send_time[rpid_str] > self.email_limit):
+        if self.email_limit < 1 or (rpid_str in self.email_send_time and self.email_send_time[rpid_str] >= self.email_limit):
             return True
 
         email_content = '{}\nUrl: {} Page: {} #{}@{},\nUser: {},\nSex: {},\nconetnt: {},\nsign: {}\nlike: {}'.format(ctime, url, pn, idx, rpid, uname, sex, content, sign, like)
         email_subject = '({})av_id: {} || #{} Comment Warning !!!'.format(ctime, av_id, rpid)
-        print(email_content, email_subject)
+        echo('4|warning', email_content, email_subject)
         send_email_time = 0
         send_email_result = False
         while not send_email_result and send_email_time < 4:
@@ -802,7 +719,7 @@ class Up():
         if rpid_str in self.email_send_time:
             self.email_send_time[rpid_str] += 1
         else:
-            self.email_send_time[rpid_str] = 0
+            self.email_send_time[rpid_str] = 1
 
 def clean_csv(av_id: int):
     ''' clean csv '''
@@ -821,17 +738,13 @@ def clean_csv(av_id: int):
         time_gap = now_time - last_time
 
         if now_view < last_view or now_view - last_view > 5000:
-            # echo(1, last_view, last_time, now_view, now_time)
             continue
         if abs(time_gap) > 150:
             for ii in range(int((time_gap - 30) // 120)):
                 result.append(empty_line)
         if abs(time_gap) > 90:
-            # echo(0, last_view, last_time, now_view, now_time)
             result.append(line)
             last_view, last_time = now_view, now_time
-        # else:
-        #     echo(2, last_view, last_time, now_view, now_time)
     with open(output_path, 'w') as f:
         f.write('\n'.join(result))
 

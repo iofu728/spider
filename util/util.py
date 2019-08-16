@@ -2,14 +2,17 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-15 00:29:32
+# @Last Modified time: 2019-08-16 18:44:55
 
 
 import codecs
+import datetime
+import logging
 import os
 import pickle
 import platform
 import random
+import re
 import smtplib
 import threading
 import time
@@ -47,7 +50,8 @@ json_timeout = 4
 start = []
 spend_list = []
 failure_map = {}
-is_service = False
+is_service = True
+LOG_DIR = 'log/'
 EMAIL_SIGN = '\n\n\nBest wish!!\n%s\n\n————————————————————\n• Send from script designed by gunjianpan.'
 
 
@@ -74,7 +78,7 @@ def basic_req(url: str, types: int, proxies=None, data=None, header=None, need_c
     elif types == 13:
         result = post_text(url, proxies, data, header, need_cookie)
     else:
-        echo(0, types, ' type is not supported!!!')
+        echo('0|warning', types, ' type is not supported!!!')
     if need_cookie and result is None:
         return None, {}
     return result
@@ -231,14 +235,14 @@ def begin_time() -> int:
 def end_time_aver(version: int):
     time_spend = time.time() - start[version]
     spend_list.append(time_spend)
-    echo(2, 'Last spend: {:.3f}s, Average spend: {:.3f}s.'.format(
+    echo('2|info', 'Last spend: {:.3f}s, Average spend: {:.3f}s.'.format(
         time_spend, sum(spend_list) / len(spend_list)))
 
 
 def end_time(version: int, mode: int = 1):
     time_spend = time.time() - start[version]
     if mode:
-        echo(2, '{:.3f}s'.format(time_spend))
+        echo('2|info', '{:.3f}s'.format(time_spend))
     else:
         return time_spend
 
@@ -266,7 +270,7 @@ def send_email(context: str, subject: str, add_rec=None) -> bool:
     ''' send email '''
 
     if not os.path.exists('{}emailSend'.format(data_dir)) or not os.path.exists('{}emailRec'.format(data_dir)):
-        echo(0, 'email send/Rec list not exist!!!')
+        echo('0|warning', 'email send/Rec list not exist!!!')
         return
     origin_file = [ii.split(',')
                    for ii in read_file('{}emailRec'.format(data_dir))]
@@ -299,11 +303,10 @@ def send_email_once(email_rec: list, email_cc: list, context: str, subject: str)
         smtpObj.login(mail_user, mail_pass)
         smtpObj.sendmail(sender, email_rec + email_cc, message.as_string())
         smtpObj.quit()
-
-        echo(1, 'Send email success!!')
+        echo('1|warning', 'Send email success!!')
         return True
     except smtplib.SMTPException as e:
-        echo(0, 'Send email error', e)
+        echo('0|warning', 'Send email error', e)
         return False
 
 
@@ -339,16 +342,28 @@ def time_stamp(time_str: str, time_format: str = '%Y-%m-%d %H:%M:%S'):
     return time.mktime(time.strptime(time_str, time_format))
 
 
-def echo(color: int, *args):
-    ''' echo log @param: color: 0 -> red, 1 -> green, 2 -> yellow, 3 -> blue '''
+def echo(types, *args):
+    '''
+    echo log -> stdout / log file
+        @param: color: 0 -> red, 1 -> green, 2 -> yellow, 3 -> blue, 4 -> gray
+        @param: log_type: info, warning, debug, error
+        @param: is_service: bool
+    '''
     args = ' '.join([str(ii) for ii in args])
+    types = str(types)
+    re_num = re.findall('\d', types)
+    re_word = re.findall('[a-zA-Z]+', types)
+    color = int(re_num[0]) if len(re_num) else 4
+    log_type = re_word[0] if len(re_word) else 'info'
+
     if is_service:
-        with open(log_path, 'a') as f:
-            f.write('{}\n'.format(args))
+        log(log_type, args)
         return
     colors = {'red': '\033[91m', 'green': '\033[92m',
-              'yellow': '\033[93m', 'blue': '\033[94m'}
-    if type(color) != int or not color in list(range(len(colors.keys()))) or platform.system() == 'Windows':
+              'yellow': '\033[93m', 'blue': '\033[94m', 'gray': '\033[90m'}
+    if not color in list(range(len(colors.keys()))):
+        color = 4
+    if platform.system() == 'Windows':
         print(args)
     else:
         print(list(colors.values())[color], args, '\033[0m')
@@ -370,7 +385,7 @@ def shuffle_batch_run_thread(threading_list: list, batch_size: int = 24, is_awai
                 ii.join()
         else:
             time.sleep(min(max(5, batch_size * 2 / 210), 10))
-        echo(1, time_str(), '{}/{}'.format(total_block, block), 'epochs finish.',
+        echo('1|info', time_str(), '{}/{}'.format(total_block, block), 'epochs finish.',
              'One Block {} Thread '.format(batch_size))
 
 
@@ -387,3 +402,30 @@ def read_file(read_path: str) -> list:
     with open(read_path, 'r', encoding='utf-8') as f:
         data = [ii.strip() for ii in f.readlines()]
     return data
+
+
+def log(types: str, *log_args: list):
+    ''' log record @param: type: {'critical', 'error', 'warning', 'info', 'debug'} '''
+    mkdir(LOG_DIR)
+    LOG_PATH = '{}{}.log'.format(LOG_DIR, time_str(time_format='%Y%m%d'))
+    logging.basicConfig(level=logging.DEBUG,
+                        filename=LOG_PATH,
+                        filemode='a',
+                        format='[%(asctime)s] [%(levelname)s] %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("chardet").setLevel(logging.WARNING)
+    log_str = ' '.join([str(ii) for ii in log_args])
+    if types == 'critical':
+        logging.critical(log_str)
+    elif types == 'error':
+        logging.error(log_str)
+    elif types == 'warning':
+        logging.warning(log_str)
+    elif types == 'info':
+        logging.info(log_str)
+    elif types == 'debug':
+        logging.debug(log_str)
+    else:
+        logging.info("{} {}".format(types, log_str))

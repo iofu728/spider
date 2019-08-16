@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-06-06 17:15:37
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-26 21:56:43
+# @Last Modified time: 2019-08-16 19:08:02
 
 
 import argparse
@@ -79,7 +79,7 @@ class GetFreeProxy:
 
         if not len(proxylist):
             if self.Db.db:
-                echo(0, 'Proxy pool empty!!! Please check the db conn & db dataset!!!')
+                echo('0|critical', 'Proxy pool empty!!! Please check the db conn & db dataset!!!')
             proxies = {}
         else:
             index = random.randint(0, len(proxylist) - 1)
@@ -142,7 +142,7 @@ class GetFreeProxy:
         """
         results = self.Db.insert_db(self.insert_sql % str(insertlist)[1:-1])
         if results:
-            echo(2, 'Insert ' + str(len(insertlist)) + ' items Success!')
+            echo('2|info', 'Insert ' + str(len(insertlist)) + ' items Success!')
         else:
             pass
 
@@ -154,7 +154,7 @@ class GetFreeProxy:
         results = self.Db.update_db(self.replace_ip % str(updatelist)[1:-1])
         typemap = {0: 'can use ', 1: 'can not use '}
         if results:
-            echo(2, 'Update', typemap[types],str(len(updatelist)),' items Success!')
+            echo('2|info', 'Update', typemap[types],str(len(updatelist)),' items Success!')
         else:
             pass
 
@@ -177,7 +177,7 @@ class GetFreeProxy:
 
         results = self.selectproxy([ii[0] for ii in self.canuseip.values()])
         ss_len = len([1 for ii in self.canuseip.values() if ii[1] > 1])
-        echo(2, "SS proxies %d"%ss_len)
+        echo('2|info', "SS proxies %d"%ss_len)
 
         insertlist = []
         updatelist = []
@@ -237,7 +237,7 @@ class GetFreeProxy:
         self.proxylist_ss = []
         self.proxylists_ss = []
         if not results:
-            echo(0, 'Please check db configure!!! The proxy pool cant use!!!>>>')
+            echo('0|error', 'Please check db configure!!! The proxy pool cant use!!!>>>')
             return
         for index in results:
             if index[1] == 1:
@@ -250,10 +250,10 @@ class GetFreeProxy:
                 self.proxylists_ss.append(index[0])
             else:
                 self.proxylist.append(index[0])
-        echo(2, len(self.proxylist), ' http proxy can use.')
-        echo(2, len(self.proxylists), ' https proxy can use.')
-        echo(2, len(self.proxylist_ss), ' ss http proxy can use.')
-        echo(2, len(self.proxylists_ss), ' ss https proxy can use.')
+        echo('2|info', len(self.proxylist), ' http proxy can use.')
+        echo('2|info', len(self.proxylists), ' https proxy can use.')
+        echo('2|info', len(self.proxylist_ss), ' ss http proxy can use.')
+        echo('2|info', len(self.proxylists_ss), ' ss https proxy can use.')
             
 
     def judgeurl(self, urls, index, times, ss_test=False):
@@ -276,7 +276,7 @@ class GetFreeProxy:
                 if times < 0:
                     self.judgeurl(urls, index, times + 1)
                 else:
-                    echo(1, urls, proxies, 'Proxies can use.')
+                    echo('1|debug', urls, proxies, 'Proxies can use.')
                     self.canuse_proxies.append(urls)
                     self.canuseip[index] = [urls, int(http_type)]
                     if ss_test:
@@ -284,10 +284,10 @@ class GetFreeProxy:
                         if len(str(data)) > 5000:
                             self.canuseip[index] = [urls, int(http_type) + 2]
             else:
-                echo(0, urls, proxies, 'Tracks len error ^--<^>--^ ')
+                echo('0|debug', urls, proxies, 'Tracks len error ^--<^>--^ ')
                 self.cannotuseip[index] = urls
         except:
-            echo(0, urls, proxies, 'return error [][][][][][]')
+            echo('0|debug', urls, proxies, 'return error [][][][][][]')
             if not index in self.canuseip:
                 self.cannotuseip[index] = urls
             pass
@@ -345,7 +345,7 @@ class GetFreeProxy:
         """
 
         if not str(page).isdigit():
-            echo(0, "Please input num!")
+            echo('0|warning', "Please input num!")
             return []
 
         version = begin_time()
@@ -368,7 +368,7 @@ class GetFreeProxy:
         http://www.gatherproxy.com/zh/proxylist/country/?c=China
         """
         if not os.path.exists('{}gatherproxy'.format(data_dir)):
-            echo(0, 'Gather file not exist!!!')
+            echo('0|warning', 'Gather file not exist!!!')
             return
         with codecs.open('{}gatherproxy'.format(data_dir), 'r', encoding='utf-8') as f:
             file_d = [ii.strip() for ii in f.readlines()]
@@ -382,7 +382,7 @@ class GetFreeProxy:
             self.waitjudge += (waitjudge_http + waitjudge_https)
         else:
             self.waitjudge += file_d
-        echo(2, 'load gather over!')
+        echo('2|warning', 'load gather over!')
 
 
     def goubanjia(self):
@@ -453,7 +453,7 @@ class GetFreeProxy:
         threadings = []
         for index in range(1, area + 1):
             for pageindex in range(1, page + 1):
-                echo(2,str(index) + ' ' + str(pageindex))
+                echo('2|debug', '{} {}'.format(index, pageindex))
                 work = threading.Thread(
                     target=self.sixsixthread, args=(index, pageindex))
                 threadings.append(work)
@@ -537,7 +537,7 @@ class GetFreeProxy:
             elif num in num_map:
                 verify_num[index] = num_map[num]
             else:
-                echo(0, 'Error', index)
+                echo('0|error', 'Error', index)
                 # return False
         verify_code = 0
         error = True
@@ -553,9 +553,9 @@ class GetFreeProxy:
             verify_code = verify_num[0] * verify_num[1]
             error = False
         if error:
-            echo(0, 'Error', operation)
+            echo('0|error', 'Error', operation)
         if not os.path.exists('%spassage'%data_dir):
-            echo(0, 'gather passage not exist!!!')
+            echo('0|warning', 'gather passage not exist!!!')
             return
         with codecs.open('%spassage'%data_dir, 'r', encoding='utf-8') as f:
             passage = [index[:-1] for index in f.readlines()]
@@ -591,7 +591,7 @@ class GetFreeProxy:
         sid_url_html = BeautifulSoup(sid_url_req.text, 'html.parser')
         sid_url = sid_url_html.find_all('div', class_='wrapper')[1].find_all('a')[0]['href']
         if len(sid_url.split('sid=')) < 2:
-            echo(0, 'cookie error')
+            echo('0|warning', 'cookie error')
             self.get_cookie()
             self.load_gather()
             return
@@ -621,19 +621,19 @@ class GetFreeProxy:
             self.waitjudge = waitjudge_https
         else:
             self.waitjudge = (waitjudge_http + waitjudge_https)
-        echo(1, '-_-_-_-_-_-_-', len(waitjudge), 'Proxies wait to judge -_-_-_-_-_-_-')
+        echo('1|info', '-_-_-_-_-_-_-', len(waitjudge), 'Proxies wait to judge -_-_-_-_-_-_-')
 
     def request_text(self, url):
         ''' requests text '''
         req = basic_req(url, 2)
         if req is None:
-            echo(0, url)
+            echo('0|debug', url)
             if can_retry(url):
                 self.request_text(url)
             else:
                 return ''
         else:
-            echo(1, url)
+            echo('1|debug', url)
             return req.text
 
     def get_other_proxies(self, url):
@@ -641,7 +641,7 @@ class GetFreeProxy:
         text = self.request_text(url)
         pages = re.findall(r'<h3[\s\S]*?<a.*?(http.*?\.html).*?</a>', '' if text is None else text)
         if not len(pages ):
-            echo(0, 'Please do not frequently request {}!!!'.format(url))
+            echo('0|warning', 'Please do not frequently request {}!!!'.format(url))
         else:
             proxies = [re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}', self.request_text(ii)) for ii in pages]
             self.waitjudge = [*self.waitjudge, *sum(proxies, [])]
@@ -653,7 +653,7 @@ class GetFreeProxy:
         proxies_len = len(self.waitjudge)
         self.threadjude()
         canuse_len = len(self.canuse_proxies)
-        echo(1, '\nTotal Proxies num: {}\nCan use num: {}\nTime spend: {:.2f}s\n'.format(proxies_len, canuse_len,time.time() - start))
+        echo('1|info', '\nTotal Proxies num: {}\nCan use num: {}\nTime spend: {:.2f}s\n'.format(proxies_len, canuse_len,time.time() - start))
         with open('{}canuse_proxies.txt'.format(data_dir), 'w') as f:
             f.write('\n'.join(self.canuse_proxies))
 
@@ -671,5 +671,6 @@ if __name__ == '__main__':
         a.load_gather()
     elif model == 0:
         a.load_proxies_test()
+        a.testdb(2)
     else:
         a.testdb(2)

@@ -2,8 +2,10 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-10 16:56:44
+# @Last Modified time: 2019-08-25 18:14:08
 
+from util.util import basic_req, can_retry, echo, mkdir, time_str
+from proxy.getproxy import GetFreeProxy
 import aiohttp
 import asyncio
 import codecs
@@ -21,8 +23,6 @@ from enum import IntEnum
 from ssl import _create_unverified_context
 
 sys.path.append(os.getcwd())
-from proxy.getproxy import GetFreeProxy
-from util.util import basic_req, can_retry, echo, mkdir, time_str
 
 logger = logging.getLogger(__name__)
 proxy_req = GetFreeProxy().proxy_req
@@ -94,6 +94,7 @@ class BWebsocketClient:
         if not len(pages):
             if can_retry(url, 5):
                 self._getroom_id(proxy=proxy)
+            return
         cid = re.findall('"cid":(.*?),', pages[0])
         assert len(cid) >= self._p, 'Actual Page len: {} <=> Need Pages Num: {}'.format(
             len(cid), self._p)

@@ -10,7 +10,7 @@ import json
 import os
 import pickle
 import random
-import re
+import regex
 import shutil
 import sys
 import threading
@@ -441,7 +441,7 @@ class Up():
         changeHeaders({'Referer': self.AV_URL})
         url = self.RANKING_URL % (index, day_index)
         text = basic_req(url, 3)
-        rank_str = re.findall('window.__INITIAL_STATE__=(.*?);', text)
+        rank_str = regex.findall('window.__INITIAL_STATE__=(.*?);', text)
         if not len(rank_str):
             if can_retry(url):
                 self.load_rank_index(index, day_index)
@@ -575,7 +575,7 @@ class Up():
     def get_check(self):
         ''' check comment '''
         self.load_av_lists()
-        av_id_list = [[ii['aid'], ii['comment']] for ii in self.av_id_map.values() if not re.findall(self.ignore_list, str(ii['aid']))]
+        av_id_list = [[ii['aid'], ii['comment']] for ii in self.av_id_map.values() if not regex.findall(self.ignore_list, str(ii['aid']))]
         av_map = {ii['aid']: ii for ii in self.av_id_map.values()}
         self.comment_next = {ii: True for (ii, _) in av_id_list}
         if self.av_id_list and len(self.av_id_list) and len(self.av_id_list) != len(av_id_list):
@@ -697,7 +697,7 @@ class Up():
         ''' check comment and send warning email if error '''
         rpid, ctime, like, _, _, uname, sex, content, sign, idx = req_list
 
-        if not len(re.findall(self.keyword, content)):
+        if not len(regex.findall(self.keyword, content)):
             return True
         rpid = '{}{}'.format(rpid, '' if not parent_rpid else '-{}'.format(rpid))
 

@@ -10,3 +10,4 @@ aiohttp
 apscheduler
 PyExecJS
 fonttools
+regex

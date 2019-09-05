@@ -2,17 +2,16 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-25 18:14:08
+# @Last Modified time: 2019-08-26 22:13:48
 
-from util.util import basic_req, can_retry, echo, mkdir, time_str
-from proxy.getproxy import GetFreeProxy
+
 import aiohttp
 import asyncio
 import codecs
 import json
 import logging
 import os
-import re
+import regex
 import shutil
 import struct
 import sys
@@ -23,6 +22,8 @@ from enum import IntEnum
 from ssl import _create_unverified_context
 
 sys.path.append(os.getcwd())
+from util.util import basic_req, can_retry, echo, mkdir, time_str
+from proxy.getproxy import GetFreeProxy
 
 logger = logging.getLogger(__name__)
 proxy_req = GetFreeProxy().proxy_req
@@ -89,13 +90,13 @@ class BWebsocketClient:
         ''' get av room id '''
         url = self.ROOM_INIT_URL % self._av_id
         text = proxy_req(url, 3) if proxy else basic_req(url, 3)
-        pages = re.findall('"pages":\[(.*?)\],', text)
+        pages = regex.findall('"pages":\[(.*?)\],', text)
 
         if not len(pages):
             if can_retry(url, 5):
                 self._getroom_id(proxy=proxy)
             return
-        cid = re.findall('"cid":(.*?),', pages[0])
+        cid = regex.findall('"cid":(.*?),', pages[0])
         assert len(cid) >= self._p, 'Actual Page len: {} <=> Need Pages Num: {}'.format(
             len(cid), self._p)
         self._room_id = int(cid[self._p - 1])

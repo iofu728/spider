@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-06-06 17:15:37
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-16 19:08:02
+# @Last Modified time: 2019-09-02 22:14:13
 
 
 import argparse
@@ -634,13 +634,20 @@ class GetFreeProxy:
                 return ''
         else:
             echo('1|debug', url)
-            return req.text
+            text = req.text
+            if type(text) == str:
+                return text
+            elif type(text) == bytes:
+                return text.decode()
+            else:
+                return ''
 
     def get_other_proxies(self, url):
         ''' get other proxies '''
         text = self.request_text(url)
         pages = re.findall(r'<h3[\s\S]*?<a.*?(http.*?\.html).*?</a>', '' if text is None else text)
-        if not len(pages ):
+        print(len(pages))
+        if not len(pages):
             echo('0|warning', 'Please do not frequently request {}!!!'.format(url))
         else:
             proxies = [re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}', self.request_text(ii)) for ii in pages]

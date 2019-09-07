@@ -2,17 +2,24 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-16 18:44:55
+# @Last Modified time: 2019-09-07 19:20:05
 
+from __future__ import with_statement
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import division
 
 import codecs
 import datetime
+import json
 import logging
 import os
 import pickle
 import platform
 import random
 import re
+import urllib
 import smtplib
 import threading
 import time
@@ -50,7 +57,7 @@ json_timeout = 4
 start = []
 spend_list = []
 failure_map = {}
-is_service = True
+is_service = False
 LOG_DIR = 'log/'
 EMAIL_SIGN = '\n\n\nBest wish!!\n%s\n\n————————————————————\n• Send from script designed by gunjianpan.'
 
@@ -61,7 +68,7 @@ def basic_req(url: str, types: int, proxies=None, data=None, header=None, need_c
     @types XY: X=0.->get;   =1.->post;
                Y=0.->html;  =1.->json; =2.->basic; =3.->text;
     """
-    req_set(url)
+    header = req_set(url, header)
     result = None
     if not types:
         result = get_html(url, proxies, header, need_cookie)
@@ -84,12 +91,15 @@ def basic_req(url: str, types: int, proxies=None, data=None, header=None, need_c
     return result
 
 
-def req_set(url: str):
+def req_set(url: str, header):
     ''' req headers set '''
     global headers
     headers['Host'] = url.split('/')[2]
     index = random.randint(0, agent_len)
     headers['User-Agent'] = agent_lists[index]
+    if not header is None and 'User-Agent' not in header:
+        header['User-Agent'] = agent_lists[index]
+    return header
 
 
 def get_html(url: str, proxies=None, header=None, need_cookie: bool = False):
@@ -141,7 +151,7 @@ def post_json(url: str, proxies=None, data=None, header=None, need_cookie: bool 
         if need_cookie:
             return json_req.json(), json_req.cookies.get_dict()
         return json_req.json()
-    except:
+    except Exception as e:
         return
 
 
@@ -429,3 +439,26 @@ def log(types: str, *log_args: list):
         logging.debug(log_str)
     else:
         logging.info("{} {}".format(types, log_str))
+
+
+def decoder_url(url: str) -> dict:
+    if '?' not in url:
+        return {}
+    return {ii.split('=', 1)[0]: ii.split('=', 1)[1] for ii in url.split('?', 1)[1].split('&') if ii != ''}
+
+
+def encoder_url(url_dict: {}, origin_url: str) -> str:
+    return '{}?{}'.format(origin_url, '&'.join(['{}={}'.format(ii, urllib.parse.quote(str(jj))) for ii, jj in url_dict.items()]))
+
+
+def json_str(data: dict):
+    ''' equal to JSON.stringify in javascript '''
+    return json.dumps(data, separators=(',', ':'))
+
+
+def decoder_cookie(cookie: str) -> dict:
+    return {ii.split('=', 1)[0]: ii.split('=', 1)[1] for ii in cookie.split('; ')}
+
+
+def encoder_cookie(cookie_dict: {}) -> str:
+    return '; '.join(['{}={}'.format(ii, jj)for ii, jj in cookie_dict.items()])

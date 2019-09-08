@@ -24,7 +24,7 @@ sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
 from util.util import (basic_req, begin_time, can_retry, changeHeaders, echo,
                        end_time, headers, mkdir, read_file, send_email,
-                       time_stamp, time_str)
+                       time_stamp, time_str, get_time_str)
 
 proxy_req = GetFreeProxy().proxy_req
 one_day = 86400
@@ -218,7 +218,7 @@ class Up():
         av_ids = list(history_map.keys())
         now_sorted = [jj for jj, ii in enumerate(ov_sort_idx) if ii == other_views_len][0] + 1
         other_result = [(jj + 1, av_ids[ii]) for jj, ii in enumerate(ov_sort_idx[:4]) if ii != other_views_len]
-        time_tt = self.get_time_str(time_gap)
+        time_tt = get_time_str(time_gap * 60)
         email_title = 'av{}发布{}, 本年度排名No.{}/{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}'.format(av_id, time_tt, now_sorted, len(other_views), now_info[1], now_info[2], now_info[3], now_info[4], now_info[7])
         email_title += self.get_history_rank(now_info)
         context = '{}\n\n'.format(email_title)
@@ -232,22 +232,6 @@ class Up():
         if len(data_info) <= 8:
             return ''
         return ', Rank: {}, Score: {}'.format(data_info[8], data_info[9])
-
-    def get_time_str(self, time_gap: int):
-        day = int(time_gap / 1440) 
-        hour = int(time_gap / 60) % 24
-        min_num = int(time_gap % 60)
-        result = ''
-        if day:
-            result += '{}天 '.format(day)
-        if hour:
-            result += '{}h '.format(hour)
-        if min_num:
-            if day and not hour:
-                result += '{}h '.format(hour) 
-            result += '{}min'.format(min_num)
-        
-        return result.strip()
 
     def check_view(self, av_id: int, view: int) -> bool:
         ''' check view '''
@@ -417,8 +401,8 @@ class Up():
         self.last_rank[av_id_id] = rank_list[0]
         rank_str = 'Av: {} {} day List || Rank: {} Score: {}'.format(av_id, rank_list[-1], rank, score)
         if av_id in self.public:
-            time_gap = (time.time() - self.public[av_id][0]) / 60
-            rank_str += ', Public: {}'.format(self.get_time_str(time_gap))
+            time_gap = (time.time() - self.public[av_id][0])
+            rank_str += ', Public: {}'.format(get_time_str(time_gap))
             rank_context ='{}, Public Time: {}'.format(rank_str, time_str(self.public[av_id][0]))
         else:
             rank_context = rank_str

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-08 02:12:13
+# @Last Modified time: 2019-09-09 01:50:43
 
 import hashlib
 import json
@@ -15,15 +15,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from configparser import ConfigParser
 
 import regex
+
 sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
+from util.db import Db
 from util.util import (basic_req, begin_time, can_retry, changeHeaders,
                        changeJsonTimeout, decoder_url, echo, encoder_cookie,
                        encoder_url, end_time, headers, json_str, mkdir,
                        read_file, send_email, time_stamp, time_str)
 
+
 proxy_req = GetFreeProxy().proxy_req
-root_dir = os.path.abspath('buildmd')
+root_dir = os.path.abspath('buildmd/')
 assign_path = os.path.join(root_dir, 'tbk.ini')
 
 
@@ -38,24 +41,30 @@ class ActivateArticle(object):
     ULAND_URL = 'https://uland.taobao.com/coupon/edetail?e=07BoqTjt6FoGQASttHIRqReJUgbXBbJr2j5o6AqsuM5Um%2Fg8xRLmNu9y76MhKVDMLu9BHulqqhbAiOpWRpNCvQeVsp3llNhDDfqEFBOhTcw%2BMyFk2I2hI7MVuRZAQ2GQ6KS1OlRFp695PSSvs%2FN10Z%2FOC1D%2Bu8PCBJnqsdjteNeeSq6h8MKodLCSyLFw4qsuJ47rYvIjaE20%2Bc5Gzwi6gW5us6IkMHWUriP63lKgYyrom9kMiklcP%2FMgbS%2F5f07N&scm=20140618.1.01010001.s101c6'
     DECODER_TPWD_URL = 'http://www.taokouling.com/index/taobao_tkljm'
     MTOP_URL = 'https://h5api.m.taobao.com/h5/mtop.alimama.union.xt.en.api.entry/1.0/'
+    S_ARTICLE_SQL = 'SELECT `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, expire_at, created_at from article_tpwd WHERE `article_id` = "%s";'
+    I_ARTICLE_SQL = 'INSERT INTO article_tpwd (article_id, tpwd_id, item_id, tpwd, domain, content, url, expire_at) VALUES %s;'
+    R_ARTICLE_SQL = 'REPLACE INTO article_tpwd (article_id, tpwd_id, item_id, tpwd, domain, content, url, expire_at, created_at) VALUES %s;'
     JSON_KEYS = ['p', 'ct', 'su', 'pr', 'au', 'pv',
                  'mt', 'sz', 'domain', 'tl', 'content']
-    URL_DOMAIN = {5: 'uland.taobao.com',
-                  0: 's.click.taobao.com',
-                  10: 'taoquan.taobao.com',
-                  1: 'item.taobao.com'}
+    URL_DOMAIN = {0: 's.click.taobao.com',
+                  1: 'item.taobao.com',
+                  5: 'uland.taobao.com',
+                  10: 'taoquan.taobao.com'}
     NEED_KEY = ['content', 'url', 'validDate']
     ONE_HOURS = 3600
     ONE_DAY = 24
     M = '_m_h5_tk'
+    ZERO_STAMP = '0天0小时0分0秒'
     BASIC_STAMP = time_stamp(time_format='%d天%H小时%M分%S秒',
                              time_str='1天0小时0分0秒') - ONE_DAY * ONE_HOURS
 
     def __init__(self):
+        self.Db = Db('tbk')
+        self.Db.create_table(os.path.join(root_dir, 'tpwd.sql'))
         self.tpwd_map = {}
         self.tpwds = {}
         self.cookies = {}
-        self.tpwd_exec = ThreadPoolExecutor(max_workers=10)
+        self.tpwd_exec = ThreadPoolExecutor(max_workers=50)
         self.load_configure()
         self.load_ids()
         self.get_m_h5_tk()
@@ -118,7 +127,23 @@ class ActivateArticle(object):
             thread_list = [self.tpwd_exec.submit(self.decoder_tpwd_once,
                                                  article_id, ii) for ii in thread_list]
             list(as_completed(thread_list))
+            au_list = [self.tpwd_exec.submit(self.decoder_tpwd_url,
+                                             article_id, ii) for ii, jj in self.tpwd_map[article_id].items() if not 'type' in jj or jj['item_id'] is None]
+            list(as_completed(au_list))
             time += 1
+        self.load_article2db(article_id)
+
+    def load_article2db(self, article_id: str):
+        m = self.tpwd_map[article_id]
+        ##exist_list = self.db.select_db(self.S_ARTICLE_SQL % article_id)
+        data = [(article_id, ii, m[jj]['item_id'], jj, m[jj]['type'], m[jj]['content'], m[jj]['url'], str(int(m[jj]['validDate']))) for ii, jj in enumerate(self.tpwds[article_id])]
+        i_sql = self.I_ARTICLE_SQL % str(data)[1:-1]
+        insert_re = self.Db.insert_db(i_sql)
+        if insert_re:
+            echo(1, 'Insert article_id {} {} info  Success'.format(
+                article_id, len(data)))
+        else:
+            echo(0, 'Insert article_id {} failed'.format(article_id))
 
     def decoder_tpwd_once(self, article_id: str, tpwd: str):
         req = self.decoder_tpwd(tpwd)
@@ -126,25 +151,36 @@ class ActivateArticle(object):
             return
         req = req['data']
         temp_map = {ii: req[ii] for ii in self.NEED_KEY}
-        temp_map['validDate'] = time_stamp(time_format='%d天%H小时%M分%S秒',
-                                           time_str=req['validDate']) - self.BASIC_STAMP + time.time()
+        if temp_map['validDate'] == self.ZERO_STAMP or '-' in temp_map['validDate']:
+            temp_map['validDate'] = time.time()
+        else:
+            temp_map['validDate'] = time_stamp(time_format='%d天%H小时%M分%S秒',
+                                               time_str=req['validDate']) - self.BASIC_STAMP + time.time()
         self.tpwd_map[article_id][tpwd] = temp_map
+        self.decoder_tpwd_url(article_id, tpwd)
+
+    def decoder_tpwd_url(self, article_id: str, tpwd: str):
+        temp_map = self.tpwd_map[article_id][tpwd]
         tpwd_type, item_id = self.analysis_tpwd_url(temp_map['url'])
+        if item_id is None:
+            if can_retry(temp_map['url']):
+                self.decoder_tpwd_url(article_id, tpwd)
+            return
         temp_map['type'] = tpwd_type
         temp_map['item_id'] = item_id
         if tpwd_type < 20:
-            echo(2, 'Domain:', self.URL_DOMAINR[tpwd_type],
+            echo(2, 'Domain:', self.URL_DOMAIN[tpwd_type],
                  'item id:', item_id)
         self.tpwd_map[article_id][tpwd] = temp_map
 
     def analysis_tpwd_url(self, url: str):
-        if self.URL_DOMAIN[0] in url:
+        if self.URL_DOMAIN[5] in url:
             return 5, self.get_uland_url(url)
-        elif self.URL_DOMAIN[1] in url:
+        elif self.URL_DOMAIN[0] in url:
             return 0, self.get_s_click_url(url)
-        elif self.URL_DOMAIN[2] in url:
+        elif self.URL_DOMAIN[10] in url:
             return 10, 0
-        elif self.URL_DOMAIN[3] in url:
+        elif self.URL_DOMAIN[1] in url:
             return 1, self.get_item_detail(url)
         echo('0|warning', 'New Domain:',
              regex.findall('https://(.*?)/', url), url)
@@ -158,8 +194,6 @@ class ActivateArticle(object):
         }
         text = {'text': '￥{}￥'.format(tpwd)}
         req = proxy_req(self.DECODER_TPWD_URL, 11, data=text, header=headers)
-        if req is None or not '!DOCTYPE html' in req:
-            print(req)
         if req is None or not 'data' in req or '!DOCTYPE html' in req:
             if can_retry(tpwd):
                 return self.decoder_tpwd(tpwd)
@@ -177,6 +211,8 @@ class ActivateArticle(object):
                 return
         tu_url = req.url
         qso = decoder_url(tu_url)
+        if 'tu' not in qso:
+            echo(0, s_click_url, tu_url)
         redirect_url = urllib.parse.unquote(qso['tu'])
         return self.get_s_click_detail(redirect_url, tu_url)
 
@@ -193,8 +229,11 @@ class ActivateArticle(object):
                 return
         return self.get_item_detail(req.url)
 
-    def get_item_detail(self, item_url: str):
+    def get_item_detail(self, item_url: str) -> str:
         item = decoder_url(item_url)
+        if not 'id' in item:
+            echo(0, 'id not found:', item_url)
+            return ''
         return item['id']
 
     def get_uland_url(self, uland_url: str):

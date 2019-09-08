@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-07 19:20:05
+# @Last Modified time: 2019-09-08 17:33:32
 
 from __future__ import with_statement
 from __future__ import unicode_literals
@@ -251,10 +251,12 @@ def end_time_aver(version: int):
 
 def end_time(version: int, mode: int = 1):
     time_spend = time.time() - start[version]
-    if mode:
-        echo('2|info', '{:.3f}s'.format(time_spend))
-    else:
+    if not mode:
         return time_spend
+    time_spend = get_time_str(time_spend)
+    if mode == 2:
+        echo('2|info', time_spend)
+    return time_spend
 
 
 def empty():
@@ -405,10 +407,10 @@ def mkdir(origin_dir: str):
         os.mkdir(origin_dir)
 
 
-def read_file(read_path: str) -> list:
+def read_file(read_path: str, mode: int=0):
     ''' read file '''
     if not os.path.exists(read_path):
-        return []
+        return [] if not mode else ''
     with open(read_path, 'r', encoding='utf-8') as f:
         data = [ii.strip() for ii in f.readlines()]
     return data
@@ -462,3 +464,20 @@ def decoder_cookie(cookie: str) -> dict:
 
 def encoder_cookie(cookie_dict: {}) -> str:
     return '; '.join(['{}={}'.format(ii, jj)for ii, jj in cookie_dict.items()])
+
+
+def get_time_str(time_gap: int) -> str:
+    time_gap = time_gap // 60
+    day = time_gap // 1440
+    hour = int(time_gap / 60) % 24
+    minute = int(time_gap % 60)
+    result = ''
+    if day:
+        result += '{}Day '.format(day)
+    if hour:
+        result += '{}h '.format(hour)
+    if minute:
+        if day and not hour:
+            result += '{}h '.format(hour)
+        result += '{}min'.format(minute)
+    return result.strip()

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-25 14:31:07
+# @Last Modified time: 2019-09-08 16:19:39
 
 import argparse
 import codecs
@@ -96,7 +96,7 @@ class TitleViews(object):
         ]
         url = ''.join(url_basic)
 
-        json = self.get_request('{}{}'.format(url, ii), 1, lambda i: not i)
+        json = self.get_request('{}{}'.format(url, 0), 1, lambda i: not i)
         if not json:
             return
         if not 'data' in json:
@@ -151,22 +151,6 @@ class TitleViews(object):
                 self.get_request(url, types, functs, header)
             return
         return req
-
-    def get_request_v2(self, url: str, types: int, header: dict):
-        result = proxy_req(url, 0, header=header)
-        if not result or not len(result.find_all('div', class_='content')):
-            if can_retry(url):
-                self.get_request_v2(url, types, header)
-            return
-        return result
-
-    def get_request_v3(self, url: str, types: int):
-        result = basic_req(url, 0)
-        if:
-            if can_retry(url):
-                self.get_request_v3(url, types)
-            return
-        return result
 
     def getJianshuViews(self):
         ''' get jianshu views '''

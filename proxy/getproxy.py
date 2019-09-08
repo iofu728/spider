@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-06-06 17:15:37
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-02 22:14:13
+# @Last Modified time: 2019-09-08 15:02:39
 
 
 import argparse
@@ -13,6 +13,7 @@ import os
 import random
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import requests
 import sys
@@ -292,25 +293,17 @@ class GetFreeProxy:
                 self.cannotuseip[index] = urls
             pass
 
-    def threadjude(self, batch_size=500):
-        """
-        threading to judge proxy
-        """
+    def threadjude(self, batch_size:int=500):
+        ''' threading to judge proxy '''
         changeJsonTimeout(2)
         changeHtmlTimeout(3)
 
+        proxy_exec = ThreadPoolExecutor(max_workers=batch_size // 2)
         text = self.waitjudge
         num = len(text)
         for block in range(num // batch_size + 1):
-            blockthreads = []
-            for index in range(block * batch_size, min(num, batch_size * (block + 1))):
-                work = threading.Thread(
-                    target=self.judgeurl, args=(text[index],index, 0,))
-                blockthreads.append(work)
-            for work in blockthreads:
-                work.start()
-            for work in blockthreads:
-                work.join()
+            proxy_th = [proxy_exec.submit(self.judgeurl, jj, ii, 0) for ii, jj in enumerate(text[block * batch_size:batch_size * (block + 1)])]
+            list(as_completed(proxy_th))
             self.dbcanuseproxy()
             self.cleancannotuse()
         self.waitjudge = []

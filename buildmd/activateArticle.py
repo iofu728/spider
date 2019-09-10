@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-10 21:13:44
+# @Last Modified time: 2019-09-11 01:58:59
 
 import hashlib
 import json
@@ -18,20 +18,69 @@ import numpy as np
 import regex
 
 sys.path.append(os.getcwd())
-from proxy.getproxy import GetFreeProxy
-from util.db import Db
+import top
 from util.util import (basic_req, begin_time, can_retry, changeHeaders,
                        changeJsonTimeout, decoder_url, echo, encoder_cookie,
                        encoder_url, end_time, headers, json_str, mkdir,
                        read_file, send_email, time_stamp, time_str)
-
+from util.db import Db
+from proxy.getproxy import GetFreeProxy
 
 proxy_req = GetFreeProxy().proxy_req
 root_dir = os.path.abspath('buildmd/')
 assign_path = os.path.join(root_dir, 'tbk.ini')
 
 
-class ActivateArticle(object):
+class TBK(object):
+    ''' tbk info class '''
+
+    def __init__(self):
+        super(TBK, self).__init__()
+        self.items = {}
+        self.load_configure()
+        self.load_tbk_info()
+
+    def load_configure(self):
+        cfg = ConfigParser()
+        cfg.read(assign_path, 'utf-8')
+        self.appkey = cfg.get('basic', 'appkey')
+        self.secret = cfg.get('basic', 'secret')
+        self.user_id = cfg.getint('basic', 'user_id')
+        self.site_id = cfg.getint('basic', 'site_id')
+        self.adzone_id = cfg.getint('basic', 'adzone_id')
+        top.setDefaultAppInfo(self.appkey, self.secret)
+
+    def load_tbk_info(self):
+        favorites = self.get_uatm_favor()
+        for ii in favorites:
+            self.get_uatm_detail(ii)
+
+    def get_uatm_favor(self):
+        req = top.api.TbkUatmFavoritesGetRequest()
+        req.page_no = 1
+        req.page_size = 30
+        req.fields = 'favorites_id'
+        uatm_favor = req.getResponse()
+        favorites = uatm_favor['tbk_uatm_favorites_get_response']['results']['tbk_favorites']
+        favorites = [ii['favorites_id'] for ii in favorites]
+        return favorites
+
+    def get_uatm_detail(self, favorites_id: int):
+        req = top.api.TbkUatmFavoritesItemGetRequest()
+        req.adzone_id = self.adzone_id
+        req.favorites_id = favorites_id
+        req.page_size = 200
+        req.fields = 'num_iid,title,pict_url,small_images,reserve_price,zk_final_price,user_type,provcity,item_url,seller_id,volume,nick,shop_title,zk_final_price_wap,event_start_time,event_end_time,tk_rate,status,type'
+        try:
+            item = req.getResponse()
+            item = item['tbk_uatm_favorites_item_get_response']['results']['uatm_tbk_item']
+            items = {ii['num_iid']: ii for ii in item}
+            self.items = {**self.items, **items}
+        except Exception as e:
+            echo(0, favorites_id, 'favorite error', e)
+
+
+class ActivateArticle(TBK):
     ''' activate article in youdao Cloud'''
     HOME_ID = '3bb0c25eca85e764b6d55a281faf7195'
     UNLOGGED_ID = '8ce21d52-5f01-a247-bb7e-3263ecd8c272'
@@ -61,6 +110,7 @@ class ActivateArticle(object):
                              time_str='1天0小时0分0秒') - ONE_DAY * ONE_HOURS
 
     def __init__(self):
+        super(ActivateArticle, self).__init__()
         self.Db = Db('tbk')
         self.Db.create_table(os.path.join(root_dir, 'tpwd.sql'))
         self.tpwd_map = {}
@@ -68,18 +118,8 @@ class ActivateArticle(object):
         self.tpwds = {}
         self.cookies = {}
         self.tpwd_exec = ThreadPoolExecutor(max_workers=50)
-        self.load_configure()
         self.load_ids()
         self.get_m_h5_tk()
-
-    def load_configure(self):
-        cfg = ConfigParser()
-        cfg.read(assign_path, 'utf-8')
-        self.appkey = cfg.get('basic', 'appkey')
-        self.secret = cfg.get('basic', 'secret')
-        self.user_id = cfg.get('basic', 'user_id')
-        self.site_id = cfg.get('basic', 'site_id')
-        self.adzone_id = cfg.get('basic', 'adzone_id')
 
     def load_ids(self):
         changeJsonTimeout(5)
@@ -134,14 +174,17 @@ class ActivateArticle(object):
                            if not ii in self.tpwd_map[article_id]]
             echo(1, article_id, 'tpwds len:', len(tpwds),
                  'need load', len(thread_list))
-            thread_list = [self.tpwd_exec.submit(self.decoder_tpwd_once,
-                                                 article_id, ii) for ii in thread_list]
-            list(as_completed(thread_list))
-            au_list.extend([self.tpwd_exec.submit(self.decoder_tpwd_url,
-                                                  article_id, ii) for ii, jj in self.tpwd_map[article_id].items()
-                            if not 'type' in jj or jj['item_id'] is None])
+            # thread_list = [self.tpwd_exec.submit(self.decoder_tpwd_once,
+            #                                      article_id, ii) for ii in thread_list]
+            # list(as_completed(thread_list))
+            # au_list.extend([self.tpwd_exec.submit(self.decoder_tpwd_url,
+            #                                       article_id, ii) for ii, jj in self.tpwd_map[article_id].items()
+            #                 if not 'type' in jj or jj['item_id'] is None])
+            list(as_completed(au_list))
             time += 1
-        list(as_completed(au_list))
+        for ii in au_list:
+            ii.join()
+        # list(as_completed(au_list))
         self.load_article2db(article_id)
 
     def load_article2db(self, article_id: str):

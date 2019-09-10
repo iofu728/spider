@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-16 18:48:28
+# @Last Modified time: 2019-09-10 20:57:44
 
 
 import codecs
@@ -15,6 +15,7 @@ import shutil
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from configparser import ConfigParser
 from typing import List
 
@@ -61,7 +62,10 @@ class Up():
     BASIC_RANKING_URL = 'https://www.bilibili.com/ranking/all/%d/'
     MEMBER_SUBMIT_URL = 'http://space.bilibili.com/ajax/member/getSubmitVideos?mid=%s&page=1&pagesize=50'
     REPLY_V2_URL = 'http://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=2'
+    PLAYLIST_URL = 'https://api.bilibili.com/x/player/pagelist?aid=%d&jsonp=jsonp'
+    DM_URL = 'https://api.bilibili.com/x/v1/dm/list.so?oid=%d'
     NO_RANK_CONSTANT = 'No rank.....No Rank......No Rank.....'
+    JSON_KEYS = ['code', 'message', 'ttl', 'data']
 
     def __init__(self):
         self.rank = {}
@@ -704,6 +708,46 @@ class Up():
             self.email_send_time[rpid_str] += 1
         else:
             self.email_send_time[rpid_str] = 1
+
+    def get_cid(self, av_id: int):
+        playlist_url = self.PLAYLIST_URL % av_id
+        headers = {
+            'Accept': '*/*',
+            'Referer': self.BASIC_AV_URL % av_id
+        }
+        req = proxy_req(playlist_url, 1, header=headers)
+        if req is None or list(req.keys()) != self.JSON_KEYS:
+            if can_retry(playlist_url):
+                return self.get_cid(av_id)
+            else:
+                return
+        cid = [ii['cid'] for ii in req['data']]
+        return cid
+
+    def get_danmaku_once(self, oid: int):
+        dm_url = self.DM_URL % oid
+        req = proxy_req(dm_url, 2)
+        if req is None:
+            if can_retry(dm_url):
+                return self.get_danmaku_once(oid)
+            else:
+                return
+        req.encoding = 'utf-8'
+        dm = regex.findall('">(.*?)</d>', req.text)
+        echo(3, 'oid {} have {} dm'.format(oid, len(dm)))
+        return dm
+
+    def get_danmuk(self, av_id: int):
+        cid_list = self.get_cid(av_id)
+        if cid_list is None:
+            return
+        dm_exec = ThreadPoolExecutor(max_workers=10)
+        dm_thread = [dm_exec.submit(self.get_danmaku_once, ii) for ii in cid_list]
+        echo(2, 'Begin {} dm thread'.format(len(dm_thread)))
+        dm_list = [ii.result() for ii in as_completed(dm_thread)]
+
+        return dm_list
+
 
 def clean_csv(av_id: int):
     ''' clean csv '''

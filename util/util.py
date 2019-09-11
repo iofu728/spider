@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-08 17:33:32
+# @Last Modified time: 2019-09-11 15:26:45
 
 from __future__ import with_statement
 from __future__ import unicode_literals
@@ -407,7 +407,7 @@ def mkdir(origin_dir: str):
         os.mkdir(origin_dir)
 
 
-def read_file(read_path: str, mode: int=0):
+def read_file(read_path: str, mode: int = 0):
     ''' read file '''
     if not os.path.exists(read_path):
         return [] if not mode else ''
@@ -467,17 +467,24 @@ def encoder_cookie(cookie_dict: {}) -> str:
 
 
 def get_time_str(time_gap: int) -> str:
-    time_gap = time_gap // 60
-    day = time_gap // 1440
+    time_gap = int(time_gap // 60)
+    day = int(time_gap // 1440)
     hour = int(time_gap / 60) % 24
     minute = int(time_gap % 60)
     result = ''
     if day:
         result += '{}Day '.format(day)
     if hour:
-        result += '{}h '.format(hour)
+        result += '{:02d}h '.format(hour)
     if minute:
         if day and not hour:
-            result += '{}h '.format(hour)
-        result += '{}min'.format(minute)
+            result += '{:02d}h '.format(hour)
+        result += '{:02d}min'.format(minute)
     return result.strip()
+
+
+def get_min_s(t: str) -> str:
+    t = float(t)
+    m = int(t // 60)
+    s = int(t % 60)
+    return '{:02d}:{:02d}'.format(m, s)

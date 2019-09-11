@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-10 20:57:44
+# @Last Modified time: 2019-09-11 20:24:55
 
 
 import codecs
@@ -10,7 +10,6 @@ import json
 import os
 import pickle
 import random
-import regex
 import shutil
 import sys
 import threading
@@ -20,12 +19,14 @@ from configparser import ConfigParser
 from typing import List
 
 import numpy as np
+import regex
 
 sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
 from util.util import (basic_req, begin_time, can_retry, changeHeaders, echo,
-                       end_time, headers, mkdir, read_file, send_email,
-                       time_stamp, time_str, get_time_str)
+                       end_time, get_min_s, get_time_str, headers, mkdir,
+                       read_file, send_email, time_stamp, time_str)
+
 
 proxy_req = GetFreeProxy().proxy_req
 one_day = 86400
@@ -33,6 +34,7 @@ data_dir = 'bilibili/data/'
 history_data_dir = '{}history_data/'.format(data_dir)
 history_dir = '{}history/'.format(data_dir)
 comment_dir = '{}comment/'.format(data_dir)
+dm_dir = '{}dm/'.format(data_dir)
 assign_path = 'bilibili/assign_up.ini'
 
 """
@@ -53,9 +55,6 @@ class Up():
     ''' some spider application in bilibili '''
     BILIBILI_URL = 'https://www.bilibili.com'
     BASIC_AV_URL = 'http://www.bilibili.com/video/av%d'
-    CLICK_NOW_URL = 'http://api.bilibili.com/x/report/click/now?jsonp=jsonp'
-    CLICK_WEB_URL = 'http://api.bilibili.com/x/report/click/web/h5'
-    REPORT_HEARTBEAT_URL = 'http://api.bilibili.com/x/report/web/heartbeat'
     ARCHIVE_STAT_URL = 'http://api.bilibili.com/x/web-interface/archive/stat?aid=%d'
     VIEW_URL = 'http://api.bilibili.com/x/web-interface/view?aid=%d'
     RELATION_STAT_URL = 'http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=%d'
@@ -88,6 +87,8 @@ class Up():
         self.ac_id_map = {}
         self.del_map = {}
         self.history_check_finish = {}
+        self.dm_map = {}
+        self.dm_exec = ThreadPoolExecutor(max_workers=100)
         self.load_configure()
         self.load_history_data()
 
@@ -158,24 +159,17 @@ class Up():
         time.sleep(60)
         self.load_history_data()
 
-    def check_rank(self, av_id: int, times=0):
+    def check_rank(self, av_id: int):
         rank_list = self.rank_map[av_id] if av_id in self.rank_map else []
-        changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
-
-        url = self.ARCHIVE_STAT_URL % av_id
-        json_req = proxy_req(url, 1)
-
-        if not self.have_error(json_req):
-            if (av_id not in self.av_id_list and times < 3) or (av_id in self.av_id_list and times < 6):
-                self.check_rank(av_id, times + 1)
+        stat = self.get_stat_info(av_id)
+        if stat is None:
             return
-        json_req = json_req['data']
         need = ['view', 'like', 'coin', 'favorite',
                 'reply', 'share', 'danmaku']
-        data = [json_req[index] for index in need]
+        data = [stat[index] for index in need]
         if not self.check_view(av_id, data[0]):
-            if times < 3:
-                self.check_rank(av_id, times + 1)
+            if can_retry(av_id):
+                self.check_rank(av_id)
             return
         if len(rank_list):
             data = [time_str(), *data, *rank_list[:2], *rank_list[-2:]]
@@ -261,41 +255,18 @@ class Up():
                 return True
         return False
 
-    def check_rank_v2(self, av_id: int, times=0):
+    def check_rank_v2(self, av_id: int):
         rank_list = self.rank_map[av_id] if av_id in self.rank_map else []
-        changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
-
-        url = self.ARCHIVE_STAT_URL % av_id
-        json_req = proxy_req(url, 1)
-
-        if not self.have_error(json_req):
-            if times < 3:
-                self.check_rank_v2(av_id, times + 1)
+        stat = self.get_star_info(av_id)
+        if stat is None:
             return
-        json_req = json_req['data']
-        need = ['view', 'like', 'coin', 'favorite',
-                'reply', 'share', 'danmaku']
-        data = [json_req[index] for index in need]
+        need = ['view', 'like', 'coin', 'favorite', 'reply', 'share', 'danmaku']
+        data = [stat[index] for index in need]
         if len(rank_list):
             data = [time_str(), *data, *rank_list[:2], *rank_list[-2:]]
         else:
             data = [time_str(), *data]
         self.data_v2[av_id] = data
-
-    def have_error(self, json_req: dict, types=None) -> bool:
-        ''' check json_req'''
-        if json_req is None:
-            return False
-        if 'code' not in json_req or json_req['code'] != 0:
-            return False
-        if 'message' not in json_req or json_req['message'] != '0':
-            return False
-        if 'ttl' not in json_req or json_req['ttl'] != 1:
-            return False
-        if not types is None:
-            if 'data' not in json_req or 'now' not in json_req['data']:
-                return False
-        return True
 
     def check_type(self, av_id: int):
         ''' check type '''
@@ -307,16 +278,10 @@ class Up():
         return 2
 
     def check_type_req(self, av_id: int):
-        changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
-        url = self.VIEW_URL % av_id
-
-        json_req = proxy_req(url, 1)
-
-        if json_req is None or 'data' not in json_req or 'tid' not in json_req['data']:
-            if can_retry(url):
-                self.check_type_req(av_id)
+        view_data = self.get_view_detail(av_id)
+        if view_data is None:
             return
-        self.rank_type[av_id] = json_req['data']['tid'] == self.assign_tid
+        self.rank_type[av_id] = view_data['tid'] == self.assign_tid
 
     def add_av(self, av_id: int, rank: int, score: int) -> bool:
         ''' decide add av '''
@@ -330,12 +295,12 @@ class Up():
                     return True
                 return score - self.rank_map[av_id][1] > 200
 
-    def public_monitor(self, av_id: int, times: int):
+    def public_monitor(self, av_id: int):
         ''' a monitor '''
         self.public_list.append(av_id)
         data_time, mid = self.public[av_id]
-        self.get_star_num(mid, 0)
-        self.check_rank_v2(av_id, 0)
+        self.get_star_num(mid)
+        self.check_rank_v2(av_id)
         time.sleep(5)
         follower = self.star[mid] if mid in self.star else 0
         origin_data = self.data_v2[av_id] if av_id in self.data_v2 else []
@@ -344,8 +309,8 @@ class Up():
             return
         echo('4|debug', 'Monitor Begin %d' % (av_id))
         time.sleep(sleep_time)
-        self.get_star_num(mid, 0)
-        self.check_rank_v2(av_id, 0)
+        self.get_star_num(mid)
+        self.check_rank_v2(av_id)
 
         time.sleep(5)
         follower_2 = self.star[mid] if mid in self.star else 0
@@ -356,39 +321,35 @@ class Up():
         with codecs.open(data_dir + 'public.csv', 'a', encoding='utf-8') as f:
             f.write(','.join([str(ii) for ii in data]) + '\n')
 
-    def public_data(self, av_id: int, times: int):
+    def public_data(self, av_id: int):
         ''' get public basic data '''
-        changeHeaders({'Referer': self.BASIC_AV_URL % av_id})
-        url = self.VIEW_URL % av_id
-        json_req = proxy_req(url, 1)
-        if json_req is None or not 'data' in json_req or not 'pubdate' in json_req['data']:
-            if times < 3:
-                self.public_data(av_id, times + 1)
+        view_data = self.get_view_detail(av_id)
+        if view_data is None:
             return
-        data_time = json_req['data']['pubdate']
-        mid = json_req['data']['owner']['mid']
-        self.get_star_num(mid, 0)
+        data_time = view_data['pubdate']
+        mid = view_data['owner']['mid']
+        self.get_star_num(mid)
         self.public[av_id] = [data_time, mid]
 
-    def get_star_num(self, mid: int, times: int, load_disk=False):
+    def get_star_num(self, mid: int, load_disk: bool = False):
         ''' get star num'''
         url = self.RELATION_STAT_URL % mid
-        header = {**headers, **
-                  {'Origin': self.BILIBILI_URL, 'Referer': self.AV_URL}}
-        if 'Host' in header:
-            del header['Host']
-        req = proxy_req(url, 2, header=header)
-        if req is None or req.status_code != 200 or len(req.text) < 8 or not '{' in req.text:
-            if times < 3:
-                self.get_star_num(mid, times + 1, load_disk)
+        star = proxy_req(url, 2, header=self.get_api_headers(self.basic_av_id))
+        if star is None or star.status_code != 200 or len(star.text) < 8 or not '{' in star.text:
+            if can_retry(url):
+                self.get_star_num(mid, load_disk)
             return
         try:
-            json_req = json.loads(req.text[7:-1])
-            self.star[mid] = json_req['data']['follower']
-            if load_disk and self.check_star(mid, self.star[mid]):
-                self.last_star[mid] = self.star[mid]
-                with open('{}star.csv'.format(data_dir), 'a') as f:
-                    f.write('%s,%d\n' % (time_str(), self.star[mid]))
+            star = star.text
+            star_begin = star.find('{')
+            star_json = star[star_begin:-1]
+            star_json = json.loads(star_json)
+            self.star[mid] = star_json['data']['follower']
+            if not load_disk or not self.check_star(mid, self.star[mid]):
+                return
+            self.last_star[mid] = self.star[mid]
+            with open('{}star.csv'.format(data_dir), 'a') as f:
+                f.write('{},{}\n'.format(time_str(), self.star[mid]))
         except:
             pass
 
@@ -481,7 +442,7 @@ class Up():
         ''' load public basic data '''
         threading_public = []
         for ii in wait_check_public:
-            work = threading.Thread(target=self.public_data, args=(ii, 0,))
+            work = threading.Thread(target=self.public_data, args=(ii,))
             threading_public.append(work)
         for work in threading_public:
             work.start()
@@ -492,8 +453,7 @@ class Up():
         threading_list = []
         for ii, jj in self.public.items():
             if not ii in self.public_list and jj[0] + one_day > int(time.time()):
-                work = threading.Thread(
-                    target=self.public_monitor, args=(ii, 0,))
+                work = threading.Thread(target=self.public_monitor, args=(ii,))
                 threading_list.append(work)
         for work in threading_list:
             work.start()
@@ -535,7 +495,7 @@ class Up():
             if index % 7 == 3:
                 threading_list.append(threading.Thread(target=self.delay_load_history_data, args=()))
             if index % 15 == 2:
-                threading_list.append(threading.Thread(target=self.get_star_num, args=(self.assign_up_mid, 0, True)))
+                threading_list.append(threading.Thread(target=self.get_star_num, args=(self.assign_up_mid, True)))
                 threading_list.append(threading.Thread(target=self.update_proxy, args=()))
             threading_list.append(threading.Thread(target=self.load_configure, args=()))
             threading_list.append(threading.Thread(target=self.get_check, args=()))
@@ -635,15 +595,11 @@ class Up():
 
     def check_comment_once(self, av_id: int, pn: int):
         ''' check comment once '''
-        url = self.REPLY_V2_URL % (pn, av_id)
-        json_req = proxy_req(url, 1)
-        if json_req is None or not 'data' in json_req or not 'hots' in json_req['data']:
-            if can_retry(url):
-                self.check_comment_once(av_id, pn)
+        comment = self.get_comment_info(av_id, pn)
+        if comment is None:
             return
-
-        hots = json_req['data']['hots']
-        replies = json_req['data']['replies']
+        hots = comment['hots']
+        replies = comment['replies']
         if pn > 1:
             wait_check = replies
         else:
@@ -666,7 +622,6 @@ class Up():
 
     def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_rpid=None) -> List:
         ''' get comment detail '''
-        # print(comment)
         ctime = time_str(comment['ctime'])
         wait_list = ['rpid', 'member', 'content', 'like', 'idx']
         wait_list_mem = ['uname', 'sex', 'sign', 'level_info']
@@ -711,18 +666,7 @@ class Up():
 
     def get_cid(self, av_id: int):
         playlist_url = self.PLAYLIST_URL % av_id
-        headers = {
-            'Accept': '*/*',
-            'Referer': self.BASIC_AV_URL % av_id
-        }
-        req = proxy_req(playlist_url, 1, header=headers)
-        if req is None or list(req.keys()) != self.JSON_KEYS:
-            if can_retry(playlist_url):
-                return self.get_cid(av_id)
-            else:
-                return
-        cid = [ii['cid'] for ii in req['data']]
-        return cid
+        return self.get_api_req(playlist_url, av_id)
 
     def get_danmaku_once(self, oid: int):
         dm_url = self.DM_URL % oid
@@ -733,20 +677,82 @@ class Up():
             else:
                 return
         req.encoding = 'utf-8'
-        dm = regex.findall('">(.*?)</d>', req.text)
+        dm = regex.findall('p="(.*?)">(.*?)</d>', req.text)
         echo(3, 'oid {} have {} dm'.format(oid, len(dm)))
-        return dm
+        return dm, oid
 
-    def get_danmuk(self, av_id: int):
-        cid_list = self.get_cid(av_id)
-        if cid_list is None:
+    def get_view_detail(self, av_id: int, cid: int = -1):
+        view_url = self.VIEW_URL % av_id
+        if cid >= 0:
+            view_url += '&cid={}'.format(cid)
+        return self.get_api_req(view_url, av_id)
+
+    def get_stat_info(self, av_id: int):
+        stat_url = self.ARCHIVE_STAT_URL % av_id
+        return self.get_api_req(stat_url, av_id)
+
+    def get_comment_info(self, av_id: int, pn: int):
+        comment_url = self.REPLY_V2_URL % (pn, av_id)
+        return self.get_api_req(comment_url, av_id)
+
+    def get_api_req(self, url: str, av_id:int):
+        req = proxy_req(url, 1, header=self.get_api_headers(av_id))
+        if req is None or list(req.keys()) != self.JSON_KEYS:
+            if can_retry(url):
+                return self.get_api_req(url, av_id)
+            else:
+                return
+        return req['data']
+    
+    def get_api_headers(self, av_id: int) -> dict:
+        return {
+            'Accept': '*/*',
+            'Referer': self.BASIC_AV_URL % av_id
+        }
+
+    def get_danmaku(self, av_id: int):
+        mkdir(dm_dir)
+        output_path = '{}{}_dm.csv'.format(dm_dir, av_id)
+
+        view_data = self.get_view_detail(av_id)
+        if view_data is None:
             return
-        dm_exec = ThreadPoolExecutor(max_workers=10)
-        dm_thread = [dm_exec.submit(self.get_danmaku_once, ii) for ii in cid_list]
-        echo(2, 'Begin {} dm thread'.format(len(dm_thread)))
-        dm_list = [ii.result() for ii in as_completed(dm_thread)]
 
-        return dm_list
+        cid_list = [ii['cid'] for ii in view_data['pages']]
+        dm_map = self.dm_map[av_id] if av_id in self.dm_map else {}
+        cid_list = [ii for ii in cid_list if ii not in dm_map or len(dm_map[ii]) == 0]
+        dm_thread = [self.dm_exec.submit(self.get_danmaku_once, ii) for ii in cid_list]
+        need_dm = view_data['stat']['danmaku']
+        need_p = len(view_data['pages'])
+        echo(2, 'Begin {} p thread, need {} dm'.format(need_p, need_dm))
+
+        dm_list = list(as_completed(dm_thread))
+        dm_list = [ii.result() for ii in as_completed(dm_thread)]
+        dm_list = [ii for ii in dm_list if ii is not None]
+        dm_map = {**dm_map, **{jj: ii for ii, jj in dm_list}}
+        dm_num = sum([len(ii) for ii in dm_map.values()])
+        p_num = len(dm_map)
+        self.dm_map[av_id] = dm_map
+
+        title = '{} {} Total {} p {} dm, Actual {} p {} dm'.format(view_data['title'], self.BASIC_AV_URL % av_id, need_p, need_dm, p_num, dm_num)
+        result = [title, '']
+        for cid in view_data['pages']:
+            if cid['cid'] not in dm_map:
+                continue
+            dm = dm_map[cid['cid']]
+            dm = [[float(ii.split(',')[0]), time_str(time_stamp=int(ii.split(',')[4])), jj] for ii, jj in dm]
+            dm = sorted(dm, key=lambda i: i[0])
+            dm = [','.join([get_min_s(str(ii)), jj, kk]) for ii, jj, kk in dm]
+            p_title = 'p{} {} Total {} dm'.format(cid['page'], cid['part'], len(dm))
+            result.extend([p_title, *dm, ''])
+        
+        with open(output_path, 'w') as f:
+            f.write('\n'.join(result))
+        print_str = 'Load {} p {} dm to {}, except {} p {} m'.format(output_path, len(dm_list), dm_num, need_p, need_dm)
+        if need_dm == dm_num:
+            echo(1, print_str, 'success')
+        else:
+            echo(0, print_str, 'error')
 
 
 def clean_csv(av_id: int):

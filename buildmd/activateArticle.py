@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-11 01:58:59
+# @Last Modified time: 2019-09-13 18:01:52
 
 import hashlib
 import json
@@ -19,15 +19,16 @@ import regex
 
 sys.path.append(os.getcwd())
 import top
+from proxy.getproxy import GetFreeProxy
+from util.db import Db
 from util.util import (basic_req, begin_time, can_retry, changeHeaders,
                        changeJsonTimeout, decoder_url, echo, encoder_cookie,
                        encoder_url, end_time, headers, json_str, mkdir,
                        read_file, send_email, time_stamp, time_str)
-from util.db import Db
-from proxy.getproxy import GetFreeProxy
+
 
 proxy_req = GetFreeProxy().proxy_req
-root_dir = os.path.abspath('buildmd/')
+root_dir = os.path.abspath('buildmd')
 assign_path = os.path.join(root_dir, 'tbk.ini')
 
 
@@ -70,7 +71,7 @@ class TBK(object):
         req.adzone_id = self.adzone_id
         req.favorites_id = favorites_id
         req.page_size = 200
-        req.fields = 'num_iid,title,pict_url,small_images,reserve_price,zk_final_price,user_type,provcity,item_url,seller_id,volume,nick,shop_title,zk_final_price_wap,event_start_time,event_end_time,tk_rate,status,type'
+        req.fields = 'num_iid, title, reserve_price, zk_final_price, user_type, provcity, item_url, click_url, volume, tk_rate, zk_final_price_wap, shop_title, event_start_time, event_end_time, type, status, coupon_click_url, coupon_end_time, coupon_info, coupon_start_time, coupon_total_count, coupon_remain_count'
         try:
             item = req.getResponse()
             item = item['tbk_uatm_favorites_item_get_response']['results']['uatm_tbk_item']
@@ -174,23 +175,19 @@ class ActivateArticle(TBK):
                            if not ii in self.tpwd_map[article_id]]
             echo(1, article_id, 'tpwds len:', len(tpwds),
                  'need load', len(thread_list))
-            # thread_list = [self.tpwd_exec.submit(self.decoder_tpwd_once,
-            #                                      article_id, ii) for ii in thread_list]
-            # list(as_completed(thread_list))
-            # au_list.extend([self.tpwd_exec.submit(self.decoder_tpwd_url,
-            #                                       article_id, ii) for ii, jj in self.tpwd_map[article_id].items()
-            #                 if not 'type' in jj or jj['item_id'] is None])
-            list(as_completed(au_list))
+            thread_list = [self.tpwd_exec.submit(self.decoder_tpwd_once,
+                                                 article_id, ii) for ii in thread_list]
+            list(as_completed(thread_list))
+            au_list.extend([self.tpwd_exec.submit(self.decoder_tpwd_url,
+                                                  article_id, ii) for ii, jj in self.tpwd_map[article_id].items()
+                            if not 'type' in jj or jj['item_id'] is None])
             time += 1
-        for ii in au_list:
-            ii.join()
-        # list(as_completed(au_list))
+        list(as_completed(au_list))
         self.load_article2db(article_id)
 
     def load_article2db(self, article_id: str):
         m = self.tpwd_map[article_id]
-        exist_list = [ii for ii in self.Db.select_db(
-            self.S_ARTICLE_SQL % article_id)]
+        exist_list = self.get_article_db(article_id)
         for ii, jj in enumerate(exist_list):
             t = jj[-1].strftime('%Y-%m-%d %H:%M:%S')
             exist_list[ii] = (*jj[:-1], t)
@@ -210,6 +207,9 @@ class ActivateArticle(TBK):
                 update_list.append((*jj, 1))
         self.update_db(article_id, insert_list, 'Insert')
         self.update_db(article_id, update_list, 'Update')
+
+    def get_article_db(self, article_id: str):
+        return [ii for ii in self.Db.select_db(self.S_ARTICLE_SQL % article_id)]
 
     def update_db(self, article_id: str, data: list, types: str):
         if not len(data):

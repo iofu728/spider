@@ -11,3 +11,4 @@ apscheduler
 PyExecJS
 fonttools
 regex
+rsa

@@ -2,18 +2,21 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-11 20:24:55
+# @Last Modified time: 2019-09-13 18:11:02
 
 
+import base64
 import codecs
 import json
 import os
 import pickle
 import random
+import rsa
 import shutil
 import sys
 import threading
 import time
+import urllib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from configparser import ConfigParser
 from typing import List
@@ -24,18 +27,20 @@ import regex
 sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
 from util.util import (basic_req, begin_time, can_retry, changeHeaders, echo,
-                       end_time, get_min_s, get_time_str, headers, mkdir,
-                       read_file, send_email, time_stamp, time_str)
+                       encoder_cookie, end_time, get_min_s, get_time_str,
+                       headers, mkdir, read_file, send_email, time_stamp,
+                       time_str)
 
 
 proxy_req = GetFreeProxy().proxy_req
 one_day = 86400
-data_dir = 'bilibili/data/'
-history_data_dir = '{}history_data/'.format(data_dir)
-history_dir = '{}history/'.format(data_dir)
-comment_dir = '{}comment/'.format(data_dir)
-dm_dir = '{}dm/'.format(data_dir)
-assign_path = 'bilibili/assign_up.ini'
+root_dir = os.path.abspath('bilibili')
+data_dir = os.path.join(root_dir, 'data/')
+history_data_dir = os.path.join(data_dir, 'history_data/')
+history_dir = os.path.join(data_dir, 'history/')
+comment_dir = os.path.join(data_dir, 'comment/')
+dm_dir = os.path.join(data_dir, 'dm/')
+assign_path = os.path.join(root_dir, 'assign_up.ini')
 
 """
   * bilibili @http
@@ -63,6 +68,11 @@ class Up():
     REPLY_V2_URL = 'http://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=2'
     PLAYLIST_URL = 'https://api.bilibili.com/x/player/pagelist?aid=%d&jsonp=jsonp'
     DM_URL = 'https://api.bilibili.com/x/v1/dm/list.so?oid=%d'
+    GET_KEY_URL = 'http://passport.bilibili.com/login?act=getkey&r=%f'
+    LOGIN_URL = 'https://passport.bilibili.com/login'
+    LOGIN_V2_URL = 'https://passport.bilibili.com/web/login/v2'
+    LOGIN_OAUTH_URL = 'https://passport.bilibili.com/api/v2/oauth2/login'
+    CAPTCHA_URL = 'https://passport.bilibili.com/web/captcha/combine?plat=11'
     NO_RANK_CONSTANT = 'No rank.....No Rank......No Rank.....'
     JSON_KEYS = ['code', 'message', 'ttl', 'data']
 
@@ -89,6 +99,7 @@ class Up():
         self.history_check_finish = {}
         self.dm_map = {}
         self.dm_exec = ThreadPoolExecutor(max_workers=100)
+        self.access_key = ''
         self.load_configure()
         self.load_history_data()
 
@@ -97,14 +108,14 @@ class Up():
         cfg = ConfigParser()
         cfg.read(assign_path, 'utf-8')
         self.assign_up_name = cfg.get('basic', 'up_name')
-        self.assign_up_mid = cfg.getint('basic', 'up_mid') if len(
-            cfg['basic']['up_mid']) else -1
+        mid = cfg['basic']['up_mid'] 
+        self.assign_up_mid = int(mid) if len(mid) else -1
         self.assign_rank_id = cfg.getint('basic', 'rank_id')
         self.assign_tid = cfg.getint('basic', 'tid')
         self.basic_av_id = cfg.getint('basic', 'basic_av_id')
         self.view_abnormal = cfg.getint('basic', 'view_abnormal')
-        self.assign_ids = [int(ii)
-                           for ii in cfg.get('assign', 'av_ids').split(',')]
+        assign_id = cfg.get('assign', 'av_ids').split(',')
+        self.assign_ids = [int(ii) for ii in assign_id]
         rank_map = {ii: [] for ii in self.assign_ids if ii not in self.del_map}
         self.rank_map = {**rank_map, **self.rank_map}
         self.keyword = cfg.get('comment', 'keyword')
@@ -117,15 +128,17 @@ class Up():
         self.RANKING_URL = self.BASIC_RANKING_URL % self.assign_rank_id + '%d/%d'
         self.history_check_list = [int(ii) for ii in cfg.get('basic', 'history_check_list').split(',')]
         self.special_info_email = cfg.get('basic', 'special_info_email').split(',')
-
+        self.username = urllib.parse.quote_plus(cfg.get('login', 'username'))
+        self.password = cfg.get('login', 'password')
+        
     def load_av_lists(self):
         url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
-        json_req = basic_req(url, 1)
-        if json_req is None or not 'data' in json_req or not 'vlist' in json_req['data']:
+        av_list = basic_req(url, 1)
+        if av_list is None or list(av_list.keys()) != ['status', 'data']:
             if can_retry(url):
                 self.load_av_lists()
             return
-        av_id_map = {ii['aid']: ii for ii in json_req['data']['vlist']}
+        av_id_map = {ii['aid']: ii for ii in av_list['data']['vlist']}
         if self.basic_av_id not in av_id_map:
             if can_retry(url):
                 self.load_av_lists()
@@ -164,19 +177,17 @@ class Up():
         stat = self.get_stat_info(av_id)
         if stat is None:
             return
-        need = ['view', 'like', 'coin', 'favorite',
-                'reply', 'share', 'danmaku']
+        need = ['view', 'like', 'coin', 'favorite', 'reply', 'share', 'danmaku']
         data = [stat[index] for index in need]
         if not self.check_view(av_id, data[0]):
             if can_retry(av_id):
                 self.check_rank(av_id)
             return
+        data = [time_str(), *data]
         if len(rank_list):
-            data = [time_str(), *data, *rank_list[:2], *rank_list[-2:]]
-        else:
-            data = [time_str(), *data]
+            data = [*data, *rank_list[:2], *rank_list[-2:]]
 
-        with codecs.open('%s%d.csv' % (history_dir, av_id), 'a', encoding='utf-8') as f:
+        with codecs.open('{}{}.csv'.format(history_dir, av_id), 'a', encoding='utf-8') as f:
             f.write(','.join([str(index) for index in data]) + '\n')
 
         if av_id in self.last_check and int(time.time()) - self.last_check[av_id] > one_day:
@@ -226,7 +237,7 @@ class Up():
         send_email(context, email_title)
         self.history_check_finish[av_id].append(round(time_gap / 10))
 
-    def get_history_rank(self, data_info: list):
+    def get_history_rank(self, data_info: list) -> str:
         if len(data_info) <= 8:
             return ''
         return ', Rank: {}, Score: {}'.format(data_info[8], data_info[9])
@@ -262,10 +273,9 @@ class Up():
             return
         need = ['view', 'like', 'coin', 'favorite', 'reply', 'share', 'danmaku']
         data = [stat[index] for index in need]
+        data = [time_str(), *data]
         if len(rank_list):
-            data = [time_str(), *data, *rank_list[:2], *rank_list[-2:]]
-        else:
-            data = [time_str(), *data]
+            data = [*data, *rank_list[:2], *rank_list[-2:]]
         self.data_v2[av_id] = data
 
     def check_type(self, av_id: int):
@@ -387,9 +397,8 @@ class Up():
     def load_rank_index(self, index: int, day_index: int):
         ''' load rank '''
         self.have_assign_now[day_index] = []
-        changeHeaders({'Referer': self.AV_URL})
         url = self.RANKING_URL % (index, day_index)
-        text = basic_req(url, 3)
+        text = proxy_req(url, 3, header=self.get_api_headers(self.basic_av_id))
         rank_str = regex.findall('window.__INITIAL_STATE__=(.*?);', text)
         if not len(rank_str):
             if can_retry(url):
@@ -409,7 +418,8 @@ class Up():
             now_av_id.append(av_id)
             if not self.check_type(av_id):
                 continue
-            self.check_rank_rose(av_id, temp_rank_list)
+            if day_index < 5:
+                self.check_rank_rose(av_id, temp_rank_list)
             if self.add_av(av_id, ii, temp_rank_list[1]):
                 rank_map[av_id] = temp_rank_list
 
@@ -753,6 +763,73 @@ class Up():
             echo(1, print_str, 'success')
         else:
             echo(0, print_str, 'error')
+
+    def get_access_key(self):
+        captcha, cookie = self.get_captcha()
+        hash_salt, key, cookie = self.get_hash_salt(cookie)
+
+
+    def get_hash_salt(self, cookie: dict = {}):
+        url = self.GET_KEY_URL % np.random.random()
+        headers = {
+            'Accept': '*/*',
+            'Referer': self.LOGIN_URL,
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        if len(cookie):
+            headers['Cookie'] = encoder_cookie(cookie)
+        hash_salt, cookies = proxy_req(url, 1, header=headers, need_cookie=True)
+        if hash_salt is None or list(hash_salt.keys()) != ['hash', 'key']:
+            if can_retry(url):
+                return self.get_hash_salt()
+            else:
+                return
+        return hash_salt['hash'], hash_salt['key'], cookies
+
+    def get_captcha(self, cookie: dict = {}):
+        url = self.CAPTCHA_URL
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': self.LOGIN_URL,
+        }
+        if len(cookie):
+            headers['Cookie'] = encoder_cookie(cookie)
+        captcha, cookies = proxy_req(url, 1, header=headers, need_cookie=True)
+        if captcha is None or list(captcha.keys()) != ['data', 'code']:
+            if can_retry(url):
+                return self.get_captcha()
+            else:
+                return
+        return captcha['data']['result'], cookies
+        
+
+    def get_access_key_req(self, hash_salt: str, key: str, challenge: str, validate: str, cookie: dict = {}):
+        data = {
+            'captchaType': 11,
+            'username': self.username,
+            'password': self.encoder_login_info(hash_salt, key),
+            'keep': True,
+            'key': key,
+            'goUrl': self.AV_URL,
+            'challenge': challenge,
+            'validate': validate,
+            'seccode': f'{validate}|jordan'
+        }
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Referer': self.LOGIN_URL
+        }
+        if len(cookie):
+            headers['Cookie'] = encoder_cookie(cookie)
+        login = proxy_req(self.LOGIN_V2_URL, 12, header=headers)
+
+    def encode_login_info(self, hash_salt: str, key: str):
+        public_key = rsa.PublicKey.load_pkcs1_openssl_pem(key.encode())
+        concate = rsa.encrypt(hash_salt + self.password).encode('utf-8')
+        s = base64.b64encode(concate, public_key)
+        s = urllib.parse.quote_plus(s)
+        return s
 
 
 def clean_csv(av_id: int):

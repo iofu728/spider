@@ -2,13 +2,10 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-11 15:26:45
+# @Last Modified time: 2019-09-13 17:57:08
 
-from __future__ import with_statement
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals, with_statement)
 
 import codecs
 import datetime
@@ -19,10 +16,10 @@ import pickle
 import platform
 import random
 import re
-import urllib
 import smtplib
 import threading
 import time
+import urllib
 from email.mime.text import MIMEText
 
 import numpy as np
@@ -411,8 +408,13 @@ def read_file(read_path: str, mode: int = 0):
     ''' read file '''
     if not os.path.exists(read_path):
         return [] if not mode else ''
-    with open(read_path, 'r', encoding='utf-8') as f:
-        data = [ii.strip() for ii in f.readlines()]
+    with open(read_path, 'r', encoding='utf-8', newline='\n') as f:
+        if not mode:
+            data = [ii.strip() for ii in f.readlines()]
+        elif mode == 1:
+            data = f.read()
+        elif mode == 2:
+            data = list(f.readlines())
     return data
 
 
@@ -488,3 +490,30 @@ def get_min_s(t: str) -> str:
     m = int(t // 60)
     s = int(t % 60)
     return '{:02d}:{:02d}'.format(m, s)
+
+
+def replace_params(origin_str: str, reg: str) -> str:
+    ''' replace params '''
+    params_re = re.findall(reg, origin_str)
+    params = {}
+    for ii in params_re:
+        if not ii in params:
+            params[ii] = len(params)
+    for ii in sorted(list(params.keys()), key=lambda i: -len(i)):
+        origin_str = origin_str.replace(ii, f'a{params[ii]}')
+    return origin_str
+
+
+def decoder_fuzz(reg: str, file_path: str, replace_func=replace_params):
+    ''' simple decoder of fuzz file '''
+    file_dir, file_name = os.path.split(file_path)
+    origin_str = read_file(file_path, mode=1)
+    origin_str = codecs.unicode_escape_decode(origin_str)[0]
+    origin_str = replace_func(origin_str, reg)
+    name1, name2 = file_name.split('.', 1)
+    output_path = f'{file_dir}/{name1}_decoder.{name2}'
+    echo(1, 'decoder fuzz file {} -> {}, total {} line.'.format(file_name,
+                                                                output_path,
+                                                                origin_str.count('\n')))
+    with open(output_path, 'w') as f:
+        f.write(origin_str)

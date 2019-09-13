@@ -2,24 +2,30 @@
 # @Author: gunjianpan
 # @Date:   2019-04-20 10:57:55
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-07-28 02:15:51
+# @Last Modified time: 2019-09-13 17:59:26
 
 import codecs
 import datetime
-import execjs
-import js2py
 import json
-import numpy as np
 import os
 import random
 import re
 import shutil
-import time
+import sys
 import threading
-import tzlocal
+import time
 
+import numpy as np
+import tzlocal
 from bs4 import BeautifulSoup
-from util.util import basic_req, changeHeaders, echo, begin_time, end_time, time_str
+
+import execjs
+import js2py
+
+sys.path.append(os.getcwd())
+from util.util import (basic_req, begin_time, changeHeaders, decoder_fuzz,
+                       echo, end_time, time_str)
+
 
 data_dir = 'ctrip/data/'
 cookie_path = 'ctrip/cookie.txt'
@@ -77,30 +83,21 @@ def load_ocean():
 
 def load_ocean_v2():
     ''' load ocean ball v2 @2019.6.9 '''
-    decoder_file('(_\w{3,7}_\w{5})', 'oceanballv2_july.js')
-
-
-def decoder_file(reg: str, file_name: str):
-    ''' decoder file '''
-    with open(f'{data_dir}{file_name}', 'r') as f:
-        origin_js = [ii.strip() for ii in f.readlines()]
-    origin_str = '|||'.join(origin_js)
-    origin_str = replace_params(origin_str, reg)
-    file_name_split = file_name.split('.', 1)
-    with open(f'{data_dir}{file_name_split[0]}_decoder.{file_name_split[1]}', 'w') as f:
-        f.write(origin_str.replace('|||', '\n'))
+    decoder_fuzz('(_\w{3,7}_\w{5})',
+                 '{}oceanballv2_july.js'.format(data_dir),
+                 replace_func=replace_params)
 
 
 def replace_params(origin_str: str, reg: str) -> str:
     ''' replace params '''
     params_re = re.findall(reg, origin_str)
     echo(1, "You're", re.findall('_(.*?)_', params_re[0])[0])
-    params = []
+    params = {}
     for ii in params_re:
         if not ii in params:
-            params.append(ii)
-    for ii, jj in enumerate(params):
-        origin_str = origin_str.replace(jj, f'a{ii}')
+            params[ii] = len(params)
+    for ii in sorted(list(params.keys()), key=lambda i: -len(i)):
+        origin_str = origin_str.replace(ii, f'a{params[ii]}')
     return origin_str
 
 
@@ -207,7 +204,7 @@ class HotelDetail:
         url = f'{OCEANBALL_URL}?callback={callback}&_={now_time}'
         oj, cookie = basic_req(url, 3, need_cookie=True, header=self.header)
         print(cookie)
-        oj = replace_params(oj, '(_\w{3,7}_\w{5})')
+        oj = replace_params(oj, '(_\w{3,7}_\w{5,6})')
         oj = oj.replace('"this"', 'this').replace('\'', '"').replace('\n', '')
         ooj = oj
 

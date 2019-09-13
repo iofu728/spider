@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-13 18:11:02
+# @Last Modified time: 2019-09-14 01:42:33
 
 
 import base64
@@ -56,8 +56,35 @@ assign_path = os.path.join(root_dir, 'assign_up.ini')
 """
 
 
-class Up():
-    ''' some spider application in bilibili '''
+def clean_csv(av_id: int):
+    ''' clean csv '''
+    csv_path = os.path.join(history_dir, '{}.csv'.format(av_id))
+    output_path = os.path.join(history_data_dir, '{}_new.csv'.format(av_id))
+    csv = read_file(csv_path)
+    last_time, last_view = csv[0].split(',')[:2]
+    result = [csv[0]]
+    last_time = time_stamp(last_time)
+    last_view = int(last_view)
+    empty_line = ','.join([' '] * (len(csv[0].split(',')) + 1))
+    for line in csv[1:]:
+        now_time, now_view = line.split(',')[:2]
+        now_time = time_stamp(now_time)
+        now_view = int(now_view)
+        time_gap = now_time - last_time
+
+        if now_view < last_view or now_view - last_view > 5000:
+            continue
+        if abs(time_gap) > 150:
+            for ii in range(int((time_gap - 30) // 120)):
+                result.append(empty_line)
+        if abs(time_gap) > 90:
+            result.append(line)
+            last_view, last_time = now_view, now_time
+    with open(output_path, 'w') as f:
+        f.write('\n'.join(result))
+
+
+class BasicBilibili(object):
     BILIBILI_URL = 'https://www.bilibili.com'
     BASIC_AV_URL = 'http://www.bilibili.com/video/av%d'
     ARCHIVE_STAT_URL = 'http://api.bilibili.com/x/web-interface/archive/stat?aid=%d'
@@ -77,31 +104,8 @@ class Up():
     JSON_KEYS = ['code', 'message', 'ttl', 'data']
 
     def __init__(self):
-        self.rank = {}
-        self.rank_type = {}
-        self.public = {}
-        self.public_list = []
-        self.star = {}
-        self.data_v2 = {}
-        self.have_assign = []
-        self.have_assign_now = {1: [], 3: []}
-        self.last_rank = {}
-        self.last_check = {}
-        self.last_view = {}
-        self.last_star = {}
-        self.rank_map = {}
-        self.comment = {}
-        self.email_send_time = {}
-        self.begin_timestamp = int(time.time())
-        self.av_id_list = []
-        self.ac_id_map = {}
-        self.del_map = {}
-        self.history_check_finish = {}
-        self.dm_map = {}
-        self.dm_exec = ThreadPoolExecutor(max_workers=100)
-        self.access_key = ''
+        super(BasicBilibili, self).__init__()
         self.load_configure()
-        self.load_history_data()
 
     def load_configure(self):
         ''' load assign configure '''
@@ -130,6 +134,51 @@ class Up():
         self.special_info_email = cfg.get('basic', 'special_info_email').split(',')
         self.username = urllib.parse.quote_plus(cfg.get('login', 'username'))
         self.password = cfg.get('login', 'password')
+
+    def get_api_req(self, url: str, av_id:int):
+        req = proxy_req(url, 1, header=self.get_api_headers(av_id))
+        if req is None or list(req.keys()) != self.JSON_KEYS:
+            if can_retry(url):
+                return self.get_api_req(url, av_id)
+            else:
+                return
+        return req['data']
+    
+    def get_api_headers(self, av_id: int) -> dict:
+        return {
+            'Accept': '*/*',
+            'Referer': self.BASIC_AV_URL % av_id
+        }
+
+
+class Up(BasicBilibili):
+    ''' some business layer application about bilibili'''
+
+    def __init__(self):
+        super(Up, self).__init__()
+        self.rank = {}
+        self.rank_type = {}
+        self.public = {}
+        self.public_list = []
+        self.star = {}
+        self.data_v2 = {}
+        self.have_assign = []
+        self.have_assign_now = {1: [], 3: []}
+        self.last_rank = {}
+        self.last_check = {}
+        self.last_view = {}
+        self.last_star = {}
+        self.rank_map = {}
+        self.comment = {}
+        self.email_send_time = {}
+        self.begin_timestamp = int(time.time())
+        self.av_id_list = []
+        self.ac_id_map = {}
+        self.del_map = {}
+        self.history_check_finish = {}
+        self.dm_map = {}
+        self.dm_exec = ThreadPoolExecutor(max_workers=100)
+        self.load_history_data()
         
     def load_av_lists(self):
         url = self.MEMBER_SUBMIT_URL % self.assign_up_mid
@@ -705,21 +754,6 @@ class Up():
         comment_url = self.REPLY_V2_URL % (pn, av_id)
         return self.get_api_req(comment_url, av_id)
 
-    def get_api_req(self, url: str, av_id:int):
-        req = proxy_req(url, 1, header=self.get_api_headers(av_id))
-        if req is None or list(req.keys()) != self.JSON_KEYS:
-            if can_retry(url):
-                return self.get_api_req(url, av_id)
-            else:
-                return
-        return req['data']
-    
-    def get_api_headers(self, av_id: int) -> dict:
-        return {
-            'Accept': '*/*',
-            'Referer': self.BASIC_AV_URL % av_id
-        }
-
     def get_danmaku(self, av_id: int):
         mkdir(dm_dir)
         output_path = '{}{}_dm.csv'.format(dm_dir, av_id)
@@ -764,10 +798,23 @@ class Up():
         else:
             echo(0, print_str, 'error')
 
+
+class Login(BasicBilibili):
+    ''' bilibili login module '''
+
+    def __init__(self):
+        self.access_key = ''
+        self.aes_key = ''
+
     def get_access_key(self):
         captcha, cookie = self.get_captcha()
         hash_salt, key, cookie = self.get_hash_salt(cookie)
 
+    def wl(self):
+        return hex(int(65536 * (1 + np.random.random())))[3:]
+
+    def get_aes_key(self):
+        return self.wl() + self.wl() + self.wl() + self.wl()
 
     def get_hash_salt(self, cookie: dict = {}):
         url = self.GET_KEY_URL % np.random.random()
@@ -830,34 +877,6 @@ class Up():
         s = base64.b64encode(concate, public_key)
         s = urllib.parse.quote_plus(s)
         return s
-
-
-def clean_csv(av_id: int):
-    ''' clean csv '''
-    csv_path = os.path.join(history_dir, '{}.csv'.format(av_id))
-    output_path = os.path.join(history_data_dir, '{}_new.csv'.format(av_id))
-    csv = read_file(csv_path)
-    last_time, last_view = csv[0].split(',')[:2]
-    result = [csv[0]]
-    last_time = time_stamp(last_time)
-    last_view = int(last_view)
-    empty_line = ','.join([' '] * (len(csv[0].split(',')) + 1))
-    for line in csv[1:]:
-        now_time, now_view = line.split(',')[:2]
-        now_time = time_stamp(now_time)
-        now_view = int(now_view)
-        time_gap = now_time - last_time
-
-        if now_view < last_view or now_view - last_view > 5000:
-            continue
-        if abs(time_gap) > 150:
-            for ii in range(int((time_gap - 30) // 120)):
-                result.append(empty_line)
-        if abs(time_gap) > 90:
-            result.append(line)
-            last_view, last_time = now_view, now_time
-    with open(output_path, 'w') as f:
-        f.write('\n'.join(result))
 
 
 if __name__ == '__main__':

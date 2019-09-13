@@ -22,3 +22,7 @@ ignore_rpid = {"21061574":["242-2"],"21062574":["1242"],"21061577":["1284"]}
 ignore_start = 0.5
 ignore_end = 8.5
 email_limit = 5
+
+[login]
+username = 123
+password = 123

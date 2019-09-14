@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-04 10:57:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-10 14:47:13
+# @Last Modified time: 2019-09-14 15:20:25
 
 import pandas as pd
 import numpy as np
@@ -10,9 +10,10 @@ import time
 import os
 from util.util import time_stamp, echo, read_file
 
-data_dir = 'bilibili/data/'
-history_data_dir = '{}history_data/'.format(data_dir)
-history_dir = '{}history/'.format(data_dir)
+root_dir = os.path.abspath('bilibili')
+data_dir = os.path.join(root_dir, 'data/')
+history_data_dir = os.path.join(data_dir, 'history_data/')
+history_dir = os.path.join(data_dir, 'history/')
 
 
 def analysis_csv():
@@ -63,16 +64,12 @@ def clean_csv(av_id: int):
         time_gap = now_time - last_time
 
         if now_view < last_view or now_view - last_view > 5000:
-            # echo(1, last_view, last_time, now_view, now_time)
             continue
         if abs(time_gap) > 150:
             for ii in range(int((time_gap - 30) // 120)):
                 result.append(empty_line)
         if abs(time_gap) > 90:
-            # echo(0, last_view, last_time, now_view, now_time)
             result.append(line)
             last_view, last_time = now_view, now_time
-        # else:
-        #     echo(2, last_view, last_time, now_view, now_time)
     with open(output_path, 'w') as f:
         f.write('\n'.join(result))

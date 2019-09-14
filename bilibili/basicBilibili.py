@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-14 15:21:28
+# @Last Modified time: 2019-09-14 17:48:18
 
 import json
 import os
@@ -13,6 +13,7 @@ from configparser import ConfigParser
 sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
 from util.util import can_retry
+
 
 one_day = 86400
 root_dir = os.path.abspath('bilibili')
@@ -42,6 +43,8 @@ class BasicBilibili(object):
     def __init__(self):
         super(BasicBilibili, self).__init__()
         self.proxy_req = GetFreeProxy().proxy_req
+        self.del_map = {}
+        self.rank_map = {}
         self.load_configure()
 
     def load_configure(self):

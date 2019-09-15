@@ -2,12 +2,13 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:47:48
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-14 17:46:04
+# @Last Modified time: 2019-09-15 23:17:49
 
 import base64
 import os
 import rsa
 import sys
+import time
 import urllib
 
 import numpy as np
@@ -15,40 +16,16 @@ import regex
 
 sys.path.append(os.getcwd())
 from util.util import can_retry, echo, encoder_cookie, send_email
+
 from .basicBilibili import BasicBilibili
+from .geetestE import BrowserStyle, E, S
 
 
 proxy_req = 0
 one_day = 86400
 root_dir = os.path.abspath('bilibili')
 data_dir = os.path.join(root_dir, 'data/')
-
-
-class S(object):
-    def __init__(self):
-        e = [(255 & int(65536 * np.random.random())) for _ in range(256)]
-        S = [ii for ii in range(256)]
-        n = 0
-        for t in range(256):
-            n = (n + S[t] + e[t % len(e)]) & 255
-            S[t], S[n] = S[n], S[t]
-        self.S = S
-        self.i = 0
-        self.j = 0
-
-    def __call__(self):
-        if not len(self.S):
-            self.get_S()
-        self.i = (self.i + 1) & 255
-        self.j = (self.j + self.S[self.i]) & 255
-        self.S[self.i], self.S[self.j] = self.S[self.j], self.S[self.i]
-        return self.S[(self.S[self.i] + self.S[self.j]) & 255]
-
-
-class E(object):
-    def __init__(self, e: list, t: int = 256):
-        self.t = 0
-        self.s = 0
+PUBLIC = '00C1E3934D1614465B33053E7F48EE4EC87B14B95EF88947713D25EECBFF7E74C7977D02DC1D9451F79DD5D1C10C29ACB6A9B4D6FB7D0A0279B6719E1772565F09AF627715919221AEF91899CAE08C0D686D748B20A3603BE2318CA6BC2B59706592A9219D0BF05C9F65023A21D2330807252AE0066D59CEEFA5F2748EA80BAB81'
 
 
 class Login(BasicBilibili):
@@ -59,10 +36,7 @@ class Login(BasicBilibili):
         self.update_proxy(1)
         self.access_key = ''
         self.aes_key = ''
-        self.S = []
-        self.i = 0
-        self.j = 0
-        self.E = {}
+        self.T = E(list(PUBLIC), 16)
 
     def get_access_key(self):
         captcha, cookie = self.get_captcha()
@@ -74,31 +48,23 @@ class Login(BasicBilibili):
     def get_aes_key(self):
         return self.wl() + self.wl() + self.wl() + self.wl()
 
-    def get_rsa_key(self, aes_key: str, t: int = 128):
-        r = len(aes_key) - 1
+    def get_t(self, aes_key: str, t: int = 128):
         n = np.zeros(t).astype(np.int)
-        for r in range(r, -1, -1):
-            o = ord(aes_key[r])
-            if o < 128:
-                n[t - 1] = o
-                t -= 1
-            else:
-                n[t - 1] = (63 & 0 | 128)
-                t -= 1
-                if o > 127 and o < 2048:
-                    n[t - 1] = (o >> 6 | 192)
-                    t -= 1
-                else:
-                    n[t - 1] = (o >> 6 & 63 | 128)
-                    t -= 1
-                    n[t - 1] = (o >> 12 | 224)
-                    t -= 1
+        for ii, jj in enumerate(aes_key):
+            n[ii + 112] = ord(jj)
         i = S()
         for ii in range(t - 2, 1, -1):
             n[ii] = i()
         n[1] = 2
+        return n
 
-    # def get_E(self):
+    def doPublic(self):
+        n = self.get_t(self.get_aes_key())
+        self.N = E(n, 256)
+        n = self.N.modPowInt(65537, self.T)
+        r = n.tostring(16)
+        add = '' if not (1 & len(r)) else '0'
+        return '{}{}'.format(add, r)
 
     def get_hash_salt(self, cookie: dict = {}):
         url = self.GET_KEY_URL % np.random.random()

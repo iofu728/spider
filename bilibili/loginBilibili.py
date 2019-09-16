@@ -2,23 +2,24 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:47:48
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-15 23:17:49
+# @Last Modified time: 2019-09-17 01:52:52
 
 import base64
+import json
 import os
-import rsa
 import sys
 import time
 import urllib
 
 import numpy as np
 import regex
+import rsa
 
 sys.path.append(os.getcwd())
-from util.util import can_retry, echo, encoder_cookie, send_email
+from util.util import can_retry, echo, encoder_cookie, send_email, time_stamp
 
 from .basicBilibili import BasicBilibili
-from .geetestE import BrowserStyle, E, S
+from .geetestE import E, O, S
 
 
 proxy_req = 0
@@ -42,11 +43,10 @@ class Login(BasicBilibili):
         captcha, cookie = self.get_captcha()
         hash_salt, key, cookie = self.get_hash_salt(cookie)
 
-    def wl(self):
-        return hex(int(65536 * (1 + np.random.random())))[3:]
-
     def get_aes_key(self):
-        return self.wl() + self.wl() + self.wl() + self.wl()
+        def wl():
+            return hex(int(65536 * (1 + np.random.random())))[3:]
+        return wl() + wl() + wl() + wl()
 
     def get_t(self, aes_key: str, t: int = 128):
         n = np.zeros(t).astype(np.int)
@@ -68,15 +68,9 @@ class Login(BasicBilibili):
 
     def get_hash_salt(self, cookie: dict = {}):
         url = self.GET_KEY_URL % np.random.random()
-        headers = {
-            'Accept': '*/*',
-            'Referer': self.LOGIN_URL,
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-        if len(cookie):
-            headers['Cookie'] = encoder_cookie(cookie)
-        hash_salt, cookies = proxy_req(
-            url, 1, header=headers, need_cookie=True)
+        headers = self.get_login_headers(2, cookie)
+        hash_salt, cookies = proxy_req(url, 1, header=headers,
+                                       need_cookie=True)
         if hash_salt is None or list(hash_salt.keys()) != ['hash', 'key']:
             if can_retry(url):
                 return self.get_hash_salt()
@@ -86,12 +80,7 @@ class Login(BasicBilibili):
 
     def get_captcha(self, cookie: dict = {}):
         url = self.CAPTCHA_URL
-        headers = {
-            'Accept': 'application/json, text/plain, */*',
-            'Referer': self.LOGIN_URL,
-        }
-        if len(cookie):
-            headers['Cookie'] = encoder_cookie(cookie)
+        headers = self.get_login_headers(0, cookie)
         captcha, cookies = proxy_req(url, 1, header=headers, need_cookie=True)
         if captcha is None or list(captcha.keys()) != ['data', 'code']:
             if can_retry(url):
@@ -112,14 +101,21 @@ class Login(BasicBilibili):
             'validate': validate,
             'seccode': f'{validate}|jordan'
         }
-        headers = {
-            'Accept': 'application/json, text/plain, */*',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Referer': self.LOGIN_URL
-        }
-        if len(cookie):
-            headers['Cookie'] = encoder_cookie(cookie)
+        headers = self.get_login_headers(1, cookie)
         login = proxy_req(self.LOGIN_V2_URL, 12, header=headers)
+
+    def get_type(self, gt: str, cookies: dict = {}) -> dict:
+        url = self.GETTYPE_URL % (gt, int(time_stamp() * 1000))
+        headers = self.get_login_headers(3, cookies)
+        req, cookie = proxy_req(url, 3, header=headers, need_cookie=True)
+        j_begin = req.find('{')
+        if req == '' or j_begin == -1:
+            if can_retry(self.GETTYPE_URL):
+                return self.get_type(gt, cookies)
+            else:
+                return
+        type_json = json.loads(req[j_begin:-1])
+        return type_json['data']
 
     def encode_login_info(self, hash_salt: str, key: str):
         public_key = rsa.PublicKey.load_pkcs1_openssl_pem(key.encode())
@@ -127,6 +123,20 @@ class Login(BasicBilibili):
         s = base64.b64encode(concate, public_key)
         s = urllib.parse.quote_plus(s)
         return s
+
+    def get_login_headers(self, mode: int = 0, cookie: dict = {}):
+        headers = {
+            'Referer': self.LOGIN_URL,
+        }
+        if mode != 3:
+            headers['Accept'] = '*/*' if mode == 2 else 'application/json, text/plain, */*',
+        if mode == 1:
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+        elif mode == 2:
+            headers['X-Requested-With'] = 'XMLHttpRequest'
+        if len(cookie):
+            headers['Cookie'] = encoder_cookie(cookie)
+        return headers
 
     def update_proxy(self, mode: int = 0):
         global proxy_req

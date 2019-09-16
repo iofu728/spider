@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-13 17:57:08
+# @Last Modified time: 2019-09-17 01:13:43
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals, with_statement)
@@ -235,19 +235,19 @@ def changeJsonTimeout(timeout: int):
 def begin_time() -> int:
     ''' multi-version time manage '''
     global start
-    start.append(time.time())
+    start.append(time_stamp())
     return len(start) - 1
 
 
 def end_time_aver(version: int):
-    time_spend = time.time() - start[version]
+    time_spend = time_stamp() - start[version]
     spend_list.append(time_spend)
     echo('2|info', 'Last spend: {:.3f}s, Average spend: {:.3f}s.'.format(
         time_spend, sum(spend_list) / len(spend_list)))
 
 
 def end_time(version: int, mode: int = 1):
-    time_spend = time.time() - start[version]
+    time_spend = time_stamp() - start[version]
     if not mode:
         return time_spend
     time_spend = get_time_str(time_spend)
@@ -343,11 +343,13 @@ def time_str(time_stamp: int = -1, time_format: str = '%Y-%m-%d %H:%M:%S'):
     ''' time stamp -> time str '''
     if time_stamp > 0:
         return time.strftime(time_format, time.localtime(time_stamp))
-    return time.strftime(time_format, time.localtime(time.time()))
+    return time.strftime(time_format, time.localtime(time_stamp()))
 
 
-def time_stamp(time_str: str, time_format: str = '%Y-%m-%d %H:%M:%S'):
+def time_stamp(time_str: str = '', time_format: str = '%Y-%m-%d %H:%M:%S') -> float:
     ''' time str -> time stamp '''
+    if not len(time_str):
+        return time.time()
     return time.mktime(time.strptime(time_str, time_format))
 
 

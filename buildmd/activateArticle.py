@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-13 18:01:52
+# @Last Modified time: 2019-09-17 01:08:07
 
 import hashlib
 import json
@@ -232,10 +232,10 @@ class ActivateArticle(TBK):
         req = req['data']
         temp_map = {ii: req[ii] for ii in self.NEED_KEY}
         if temp_map['validDate'] == self.ZERO_STAMP or '-' in temp_map['validDate']:
-            temp_map['validDate'] = time.time()
+            temp_map['validDate'] = time_stamp()
         else:
             temp_map['validDate'] = time_stamp(time_format='%d天%H小时%M分%S秒',
-                                               time_str=req['validDate']) - self.BASIC_STAMP + time.time()
+                                               time_str=req['validDate']) - self.BASIC_STAMP + time_stamp()
         self.tpwd_map[article_id][tpwd] = temp_map
         self.decoder_tpwd_url(article_id, tpwd)
 
@@ -335,7 +335,7 @@ class ActivateArticle(TBK):
         return item['id']
 
     def get_uland_url(self, uland_url: str):
-        if not self.M in self.cookies or time.time() - self.m_time > self.ONE_HOURS / 2:
+        if not self.M in self.cookies or time_stamp() - self.m_time > self.ONE_HOURS / 2:
             self.get_m_h5_tk()
         s_req = self.get_uland_url_once(uland_url, self.cookies)
         req_text = s_req.text
@@ -343,7 +343,7 @@ class ActivateArticle(TBK):
         return re_json['data']['resultList'][0]['itemId']
 
     def get_m_h5_tk(self):
-        self.m_time = time.time()
+        self.m_time = time_stamp()
         req = self.get_uland_url_once(self.ULAND_URL)
         self.cookies = req.cookies.get_dict()
 
@@ -364,7 +364,7 @@ class ActivateArticle(TBK):
         appkey = '12574478'
 
         token = cookies[self.M].split('_')[0] if step else ''
-        t = int(time.time() * 1000)
+        t = int(time_stamp() * 1000)
         data = {
             'jsv': '2.4.0',
             'appKey': appkey,

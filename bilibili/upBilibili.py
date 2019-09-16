@@ -2,13 +2,12 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-14 15:17:50
+# @Last Modified time: 2019-09-17 01:10:58
 
 
 import codecs
 import os
 import pickle
-import shutil
 import sys
 import threading
 import time
@@ -69,7 +68,7 @@ class Up(BasicBilibili):
         self.last_star = {}
         self.comment = {}
         self.email_send_time = {}
-        self.begin_timestamp = int(time.time())
+        self.begin_timestamp = int(time_stamp())
         self.av_id_list = []
         self.ac_id_map = {}
         self.history_check_finish = {}
@@ -139,18 +138,18 @@ class Up(BasicBilibili):
         with codecs.open('{}{}.csv'.format(history_dir, av_id), 'a', encoding='utf-8') as f:
             f.write(','.join([str(index) for index in data]) + '\n')
 
-        if av_id in self.last_check and int(time.time()) - self.last_check[av_id] > one_day:
+        if av_id in self.last_check and int(time_stamp()) - self.last_check[av_id] > one_day:
             self.del_map[av_id] = 1
             del self.rank_map[av_id]
             if av_id == self.basic_av_id:
                 clean_csv(av_id)
-        elif av_id not in self.last_check and int(time.time()) > one_day + self.begin_timestamp:
+        elif av_id not in self.last_check and int(time_stamp()) > one_day + self.begin_timestamp:
             self.del_map[av_id] = 1
             del self.rank_map[av_id]
             if av_id == self.basic_av_id:
                 clean_csv(av_id)
         self.last_view[av_id] = data[1]
-        now_time = time.time()
+        now_time = time_stamp()
         if not av_id in self.public or av_id not in self.av_id_list:
             return
         time_gap = (now_time - self.public[av_id][0]) / 60
@@ -271,7 +270,7 @@ class Up(BasicBilibili):
         time.sleep(5)
         follower = self.star[mid] if mid in self.star else 0
         origin_data = self.data_v2[av_id] if av_id in self.data_v2 else []
-        sleep_time = data_time + one_day - int(time.time())
+        sleep_time = data_time + one_day - int(time_stamp())
         if sleep_time < 0:
             return
         echo('4|debug', 'Monitor Begin %d' % (av_id))
@@ -334,7 +333,7 @@ class Up(BasicBilibili):
         rank_str = 'Av: {} {} day List || Rank: {} Score: {}'.format(
             av_id, rank_list[-1], rank, score)
         if av_id in self.public:
-            time_gap = (time.time() - self.public[av_id][0])
+            time_gap = (time_stamp() - self.public[av_id][0])
             rank_str += ', Public: {}'.format(get_time_str(time_gap))
             rank_context = '{}, Public Time: {}'.format(
                 rank_str, time_str(self.public[av_id][0]))
@@ -407,7 +406,7 @@ class Up(BasicBilibili):
                 continue
             if not ii in self.public:
                 wait_check_public.append(ii)
-            self.last_check[ii] = int(time.time())
+            self.last_check[ii] = int(time_stamp())
             self.rank_map[ii] = jj
 
         ''' load public basic data '''
@@ -423,7 +422,7 @@ class Up(BasicBilibili):
         ''' begin monitor '''
         threading_list = []
         for ii, jj in self.public.items():
-            if not ii in self.public_list and jj[0] + one_day > int(time.time()):
+            if not ii in self.public_list and jj[0] + one_day > int(time_stamp()):
                 work = threading.Thread(target=self.public_monitor, args=(ii,))
                 threading_list.append(work)
         for work in threading_list:
@@ -522,7 +521,7 @@ class Up(BasicBilibili):
                 send_email(email_str2, email_str, self.special_info_email)
                 self.update_ini(ii)
                 self.public[ii] = [av_map[ii]['created'], av_map[ii]['mid']]
-                self.last_check[ii] = int(time.time())
+                self.last_check[ii] = int(time_stamp())
 
         self.av_id_list = [ii for (ii, _) in av_id_list]
         now_hour = int(time_str(time_format='%H'))
@@ -741,7 +740,5 @@ if __name__ == '__main__':
     mkdir(comment_dir)
     mkdir(history_dir)
     mkdir(history_data_dir)
-    if not os.path.exists(assign_path):
-        shutil.copy(assign_path + '.tmp', assign_path)
     bb = Up()
     bb.load_click()

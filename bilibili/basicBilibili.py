@@ -2,10 +2,11 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-14 17:48:18
+# @Last Modified time: 2019-09-17 01:13:57
 
 import json
 import os
+import shutil
 import sys
 import urllib
 from configparser import ConfigParser
@@ -19,6 +20,8 @@ one_day = 86400
 root_dir = os.path.abspath('bilibili')
 data_dir = os.path.join(root_dir, 'data/')
 assign_path = os.path.join(root_dir, 'assign_up.ini')
+if not os.path.exists(assign_path):
+    shutil.copy(assign_path + '.tmp', assign_path)
 
 
 class BasicBilibili(object):

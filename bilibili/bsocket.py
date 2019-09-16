@@ -2,16 +2,14 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-10 21:07:27
+# @Last Modified time: 2019-09-17 01:14:28
 
 
-import aiohttp
 import asyncio
 import codecs
 import json
 import logging
 import os
-import regex
 import shutil
 import struct
 import sys
@@ -21,9 +19,12 @@ from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
 
+import aiohttp
+import regex
+
 sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
-from util.util import basic_req, can_retry, echo, mkdir, time_str
+from util.util import basic_req, can_retry, echo, mkdir, time_stamp, time_str
 
 logger = logging.getLogger(__name__)
 proxy_req = GetFreeProxy().proxy_req
@@ -70,7 +71,7 @@ class BWebsocketClient:
         self._room_id = None
         self._count = 1
         self._types = types
-        self._begin_time = int(time.time())
+        self._begin_time = int(time_stamp())
         self._loop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
         self._is_running = False
@@ -113,7 +114,7 @@ class BWebsocketClient:
 
     def parse_struct(self, data: dict, operation: int):
         ''' parse struct '''
-        assert int(time.time()) < self._begin_time + \
+        assert int(time_stamp()) < self._begin_time + \
             7 * one_day, 'Excess Max RunTime!!!'
 
         if operation == 7:
@@ -183,7 +184,7 @@ class BWebsocketClient:
 
     async def _heartbeat_loop(self):
         ''' heart beat every 30s '''
-        if self._types and int(time.time()) > self._begin_time + one_day:
+        if self._types and int(time_stamp()) > self._begin_time + one_day:
             self.close()
         for _ in range(int(one_day * 7 / 30)):
             try:

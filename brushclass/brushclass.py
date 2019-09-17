@@ -2,14 +2,17 @@
 # @Author: gunjianpan
 # @Date:   2019-02-25 21:13:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-18 00:14:38
+# @Last Modified time: 2019-09-18 00:39:14
 
 import time
 import random
 import os
+import sys
 
+sys.path.append(os.getcwd())
+from collections import Counter
 from proxy.getproxy import GetFreeProxy
-from util.util import begin_time, end_time, send_email, can_retry, echo
+from util.util import begin_time, end_time, send_email, can_retry, echo, basic_req
 
 proxy_req = GetFreeProxy().proxy_req
 data_path = 'brushclass/data/'
@@ -100,7 +103,7 @@ def get_score(cookie: str):
         'Cookie': cookie,
 
     }
-    req = proxy_req(SCORE_URL, 11, header=headers)
+    req = basic_req(SCORE_URL, 11, header=headers)
     if req is None or list(req.keys()) != ['success', 'xslb', 'xh', 'xm', 'scoreLists']:
         if can_retry(SCORE_URL):
             return get_score(cookie)
@@ -122,8 +125,15 @@ def get_gpa(cookie: str):
     grade_list = [(ii, get_grade_point(jj)) for ii, jj in score_list]
     TG = sum([ii * jj for ii, jj in grade_list])
     TC = sum([ii for ii, _ in grade_list])
+    level = [ii[0] for _, ii in score_list]
+    level_count = Counter(level)
     gpa = TG / TC
     echo(1, f'{name}, Congratulations u get {TC} credits and {gpa:.3f} gpa in this university.')
+    for ii in need_cj:
+        if ii not in level_count:
+            continue
+        count = level_count[ii]
+        echo(2, f'U have {count} class get {ii}.')
 
 
 def get_grade_point(score: str):

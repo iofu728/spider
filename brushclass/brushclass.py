@@ -2,14 +2,14 @@
 # @Author: gunjianpan
 # @Date:   2019-02-25 21:13:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-27 23:44:02
+# @Last Modified time: 2019-09-18 00:14:38
 
 import time
 import random
 import os
 
 from proxy.getproxy import GetFreeProxy
-from util.util import begin_time, end_time, send_email
+from util.util import begin_time, end_time, send_email, can_retry, echo
 
 proxy_req = GetFreeProxy().proxy_req
 data_path = 'brushclass/data/'
@@ -88,6 +88,52 @@ class Brush(object):
         print(ca['electedNum'])
         self.laster_timestamp = round(time.time())
         return int(ca['electedNum']) < 120
+
+
+def get_score(cookie: str):
+    SCORE_URL = 'https://portal.w.pku.edu.cn/portal2017/bizcenter/score/retrScores.do'
+    headers = {
+        'Accept': 'application/json, text/plain, */*',
+        'Host': 'portal.w.pku.edu.cn',
+        'Origin': 'https://portal.w.pku.edu.cn',
+        'Referer': 'https://portal.w.pku.edu.cn/portal2017/',
+        'Cookie': cookie,
+
+    }
+    req = proxy_req(SCORE_URL, 11, header=headers)
+    if req is None or list(req.keys()) != ['success', 'xslb', 'xh', 'xm', 'scoreLists']:
+        if can_retry(SCORE_URL):
+            return get_score(cookie)
+        else:
+            return
+    return req
+
+
+def get_gpa(cookie: str):
+    score = get_score(cookie)
+    if score is None:
+        return
+    need_cj = ['A', 'B', 'C', 'D', 'F']
+    name = score['xm']
+    student_id = score['xh']
+    score_list = score['scoreLists']
+    score_list = [(int(ii['xf']), ii['cj'])
+                  for ii in score_list if ii['cj'][0] in need_cj]
+    grade_list = [(ii, get_grade_point(jj)) for ii, jj in score_list]
+    TG = sum([ii * jj for ii, jj in grade_list])
+    TC = sum([ii for ii, _ in grade_list])
+    gpa = TG / TC
+    echo(1, f'{name}, Congratulations u get {TC} credits and {gpa:.3f} gpa in this university.')
+
+
+def get_grade_point(score: str):
+    score_map = {'A': 4, 'B': 3, 'C': 2, 'D': 1, 'F': 0}
+    grade_point = score_map[score[0]]
+    if len(score) == 2 and score[0] != 'F':
+        flag = 1 if score[1] == '+' else -1
+        grade_point += 0.3 * flag
+    grade_point = min(4, grade_point)
+    return grade_point
 
 
 if __name__ == '__main__':

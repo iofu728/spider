@@ -2,8 +2,9 @@
 # @Author: gunjianpan
 # @Date:   2019-02-25 21:13:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-18 00:39:14
+# @Last Modified time: 2019-09-18 01:07:36
 
+import argparse
 import time
 import random
 import os
@@ -19,9 +20,8 @@ data_path = 'brushclass/data/'
 
 """
   * brush @http
-  * www.zhihu.com/api/v4/creator/content_statistics
-  * www.jianshu.com/u/
-  * blog.csdn.net
+  * http://elective.pku.edu.cn
+  * https://portal.w.pku.edu.cn/portal2017/bizcenter/score/retrScores.do  
     .data/
     └── cookie    // elective.pku.edu.cn cookie
 """
@@ -149,5 +149,13 @@ def get_grade_point(score: str):
 if __name__ == '__main__':
     if not os.path.exists(data_path):
         os.makedirs(data_path)
-    brush = Brush()
-    brush.have_places()
+    parser = argparse.ArgumentParser(description='pku student helper')
+    parser.add_argument('--mode', type=int, default=1, metavar='mode',help='0->bruchclass,1->get_gpa')
+    parser.add_argument('--cookie', type=str, default='', metavar='cookie',help='portal cookie')
+    mode = parser.parse_args().mode
+    if mode == 0:
+        brush = Brush()
+        brush.have_places()
+    else:
+        cookie = parser.parse_args().cookie.replace('\'', '').replace('"', '')
+        get_gpa(cookie)

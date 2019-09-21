@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-17 01:13:06
+# @Last Modified time: 2019-09-22 00:35:26
 
 
 import argparse
@@ -607,7 +607,7 @@ class GetFreeProxy:
         proxies_len = len(self.waitjudge)
         self.thread_judge()
         canuse_len = len(self.canuse_proxies)
-        echo('1|info', '\nTotal Proxies num: {}\nCan use num: {}\nTime spend: {:.2f}s\n'.format(proxies_len, canuse_len, end_time(version)))
+        echo('1|info', '\nTotal Proxies num: {}\nCan use num: {}\nTime spend: {}\n'.format(proxies_len, canuse_len, end_time(version)))
         with open('{}canuse_proxies.txt'.format(data_dir), 'w') as f:
             f.write('\n'.join(self.canuse_proxies))
 

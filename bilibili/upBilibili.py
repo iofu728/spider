@@ -2,20 +2,20 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-17 01:10:58
+# @Last Modified time: 2019-09-21 23:35:14
 
 
 import codecs
+import json
 import os
+import regex
 import pickle
 import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
-
 import numpy as np
-import regex
 
 sys.path.append(os.getcwd())
 from util.util import (basic_req, can_retry, echo, get_min_s, get_time_str,
@@ -187,8 +187,7 @@ class Up(BasicBilibili):
         context = '{}\n\n'.format(email_title)
         for no, av in other_result[:3]:
             data_info = history_map[av]
-            context += '{}, av{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}{}, 发布时间: {}\n'.format(self.av_id_map[av]['title'].split(
-                '|', 1)[0], av, no, data_info[1], data_info[2], data_info[3], data_info[4], data_info[7], self.get_history_rank(data_info), time_str(self.av_id_map[av]['created']))
+            context += '{}, av{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}, 累计播放: {}{}, 发布时间: {}\n'.format(self.av_id_map[av]['title'].split('|', 1)[0], av, no, data_info[1], data_info[2], data_info[3], data_info[4], data_info[7], self.av_id_map[av]['play'], self.get_history_rank(data_info), time_str(self.av_id_map[av]['created']))
         send_email(context, email_title)
         self.history_check_finish[av_id].append(round(time_gap / 10))
 
@@ -357,7 +356,7 @@ class Up(BasicBilibili):
         self.have_assign_now[day_index] = []
         url = self.RANKING_URL % (index, day_index)
         text = proxy_req(url, 3, header=self.get_api_headers(self.basic_av_id))
-        rank_str = regex.findall('window.__INITIAL_STATE__=(.*?);', text)
+        rank_str = regex.findall('window.__INITIAL_STATE__=(.*?);\(function\(\)', text)
         if not len(rank_str):
             if can_retry(url):
                 self.load_rank_index(index, day_index)
@@ -624,12 +623,11 @@ class Up(BasicBilibili):
 
     def have_bad_comment(self, req_list: list, av_id: int, pn: int, parent_rpid=None):
         ''' check comment and send warning email if error '''
-        rpid, ctime, like, _, _, uname, sex, content, sign, idx = req_list
+        rpid, ctime, like, plat, current_level, uname, sex, content, sign, idx = req_list
 
         if not len(regex.findall(self.keyword, content)):
             return True
-        rpid = '{}{}'.format(
-            rpid, '' if not parent_rpid else '-{}'.format(rpid))
+        rpid = '{}{}'.format(rpid, '' if not parent_rpid else '-{}'.format(rpid))
 
         url = self.BASIC_AV_URL % av_id
         rpid_str = '{}-{}'.format(av_id, rpid)
@@ -638,16 +636,10 @@ class Up(BasicBilibili):
         if self.email_limit < 1 or (rpid_str in self.email_send_time and self.email_send_time[rpid_str] >= self.email_limit):
             return True
 
-        email_content = '{}\nUrl: {} Page: {} #{}@{},\nUser: {},\nSex: {},\nconetnt: {},\nsign: {}\nlike: {}'.format(
-            ctime, url, pn, idx, rpid, uname, sex, content, sign, like)
-        email_subject = '({})av_id: {} || #{} Comment Warning !!!'.format(
-            ctime, av_id, rpid)
+        email_content = '{}\nUrl: {} Page: {} #{}@{},\nUser: {},\nSex: {},\nconetnt: {},\nsign: {}\nlike: {}\nplat: {}\nlevel:{}\n'.format(ctime, url, pn, idx, rpid, uname, sex, content, sign, like, plat, current_level)
+        email_subject = '({})av_id: {} || #{} Comment Warning !!!'.format(ctime, av_id, rpid)
         echo('4|warning', email_content, email_subject)
-        send_email_time = 0
-        send_email_result = False
-        while not send_email_result and send_email_time < 4:
-            send_email_result = send_email(email_content, email_subject)
-            send_email_time += 1
+        send_email(email_content, email_subject)
         if rpid_str in self.email_send_time:
             self.email_send_time[rpid_str] += 1
         else:

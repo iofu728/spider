@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-22 22:18:33
+# @Last Modified time: 2019-09-23 00:57:40
 
 import hashlib
 import json
@@ -94,8 +94,9 @@ class ActivateArticle(TBK):
     Y_URL = 'https://note.youdao.com/'
     WEB_URL = f'{Y_URL}web/'
     SYNC_URL = f'{Y_URL}yws/api/personal/sync?method=%s&keyfrom=web&cstk=%s'
-    NOTE_URL = f'{Y_URL}yws/public/note/%s?editorType=0&unloginId=%s'
+    NOTE_URL = f'{Y_URL}yws/public/note/%s?editorType=0'
     SHARE_URL = f'{Y_URL}ynoteshare1/index.html?id=%s&type=note'
+    GET_SHARE_URL = f'{Y_URL}yws/api/personal/share?method=get&shareKey=%s'
     LISTRECENT_URL = f'{Y_URL}yws/api/personal/file?method=listRecent&offset=%d&limit=30&keyfrom=web&cstk=%s'
     DECODER_TPWD_URL = 'http://www.taokouling.com/index/taobao_tkljm'
     Y_DOC_JS_URL = 'https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js'
@@ -154,8 +155,26 @@ class ActivateArticle(TBK):
         else:
             echo(1, 'Load Article List {} items.'.format(len(self.idx)))
 
+    def get_share_info(self, share_id: str):
+        changeJsonTimeout(4)
+        url = self.GET_SHARE_URL % share_id
+        headers = {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            'Host': self.Y_URL.split('/')[2],
+        }
+        req = proxy_req(url, 1, header=headers)
+        if req is None:
+            if can_retry(url):
+                return self.get_share_info(share_id)
+            else:
+                return
+        info = req['entry']
+        self.article[share_id] = (info['name'], info['id'])
+        return req
+
+
     def basic_youdao(self, idx: str, use_proxy: bool = True):
-        url = self.NOTE_URL % (idx, self.unlogin_id)
+        url = self.NOTE_URL % idx
         refer_url = self.SHARE_URL % idx
         headers = {
             'Accept': '*/*',
@@ -173,14 +192,17 @@ class ActivateArticle(TBK):
                 return '', '', ''
         return req['content'], req['tl'], req['p']
 
-    def load_article_pipeline(self):
+    def load_article_pipeline(self, mode: int = 0):
         article_exec = ThreadPoolExecutor(max_workers=5)
-        a_list = [article_exec.submit(self.load_article, ii)
+        a_list = [article_exec.submit(self.load_article, ii, mode)
                   for ii in self.idx]
         list(as_completed(a_list))
         self.load_list2db()
 
-    def load_article(self, article_id: str):
+    def load_article(self, article_id: str, mode: int = 0):
+        if mode:
+            self.get_share_info(article_id)
+            return
         article, tl, q = self.basic_youdao(article_id)
         if article_id not in self.tpwds:
             tpwds = list(set(regex.findall('\p{Sc}(\w{8,12}?)\p{Sc}', article)))
@@ -225,7 +247,7 @@ class ActivateArticle(TBK):
         exist_map = {}
         for ii, jj in enumerate(exist_list):
             t = jj[-1].strftime('%Y-%m-%d %H:%M:%S')
-            exist_map[ii[1]] = (*jj[:-1], t)
+            exist_map[jj[1]] = (*jj[:-1], t)
         self.exist_map = exist_map
         return exist_map
 

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-17 01:13:43
+# @Last Modified time: 2019-09-22 14:18:33
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals, with_statement)
@@ -275,7 +275,7 @@ def can_retry(url: str, time: int = 3) -> bool:
         return False
 
 
-def send_email(context: str, subject: str, add_rec=None) -> bool:
+def send_email(context: str, subject: str, add_rec=None, assign_rec=None) -> bool:
     ''' send email '''
 
     if not os.path.exists('{}emailSend'.format(data_dir)) or not os.path.exists('{}emailRec'.format(data_dir)):
@@ -285,6 +285,8 @@ def send_email(context: str, subject: str, add_rec=None) -> bool:
                    for ii in read_file('{}emailRec'.format(data_dir))]
     email_rec = [ii for ii, jj in origin_file if jj == '0']
     email_cc = [ii for ii, jj in origin_file if jj == '1']
+    if assign_rec is not None:
+        email_rec = assign_rec
     send_email_once(email_rec, email_cc, context, subject)
     if not add_rec is None:
         send_email_once(add_rec, [], context, subject)

@@ -1,7 +1,12 @@
-[basic]
+[TBK]
 appkey = 123
 secret = 123
 user_id = 123
 site_id = 123
 adzone_id = 123
+uland_url = http://
 
+[YNOTE]
+cookie = "123456"
+home_id = 123456
+unlogin_id = 123456

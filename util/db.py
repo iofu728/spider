@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-09 01:10:16
+# @Last Modified time: 2019-09-22 21:27:39
 
 import os
 import shutil
@@ -83,8 +83,8 @@ class Db(object):
             cursor.execute(create_table_sql)
             echo(2, 'Create Table from {} Success!!!'.format(sql_path))
             return True
-        except:
-            echo(0, 'Create Table from {} error'.format(sql_path))
+        except Exception as e:
+            echo(0, 'Create Table from {} error'.format(sql_path), e)
             return False
 
     def select_db(self, sql: str):
@@ -93,7 +93,8 @@ class Db(object):
             cursor = self.db.cursor()
             cursor.execute(sql)
             return cursor.fetchall()
-        except:
+        except Exception as e:
+            echo(0, 'execute sql {} error'.format(sql), e)
             return False
 
     def select_one(self, sql: str):
@@ -102,7 +103,8 @@ class Db(object):
             cursor = self.db.cursor()
             cursor.execute(sql)
             return cursor.fetchone()
-        except:
+        except Exception as e:
+            echo(0, 'execute sql {} error'.format(sql), e)
             return False
 
     def insert_db(self, sql: str):
@@ -112,7 +114,8 @@ class Db(object):
             cursor.execute(sql)
             self.db.commit()
             return True
-        except:
+        except Exception as e:
+            echo(0, 'execute sql {} error'.format(sql), e)
             self.db.rollback()
             return False
 
@@ -123,6 +126,7 @@ class Db(object):
             cursor.execute(sql)
             self.db.commit()
             return True
-        except:
+        except Exception as e:
+            echo(0, 'execute sql {} error'.format(sql), e)
             self.db.rollback()
             return False

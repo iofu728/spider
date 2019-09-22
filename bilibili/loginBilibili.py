@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:47:48
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-17 01:52:52
+# @Last Modified time: 2019-09-22 12:10:52
 
 import base64
 import json
@@ -42,6 +42,15 @@ class Login(BasicBilibili):
     def get_access_key(self):
         captcha, cookie = self.get_captcha()
         hash_salt, key, cookie = self.get_hash_salt(cookie)
+        if captcha is None:
+            return
+        types, cookie = self.get_type(captcha['gt'], cookie)
+        return {
+            'captcha': captcha,
+            'hash_salt': hash_salt,
+            'types': types,
+            'cookie': cookie
+        }
 
     def get_aes_key(self):
         def wl():
@@ -75,18 +84,18 @@ class Login(BasicBilibili):
             if can_retry(url):
                 return self.get_hash_salt()
             else:
-                return
+                return None, {}
         return hash_salt['hash'], hash_salt['key'], cookies
 
     def get_captcha(self, cookie: dict = {}):
         url = self.CAPTCHA_URL
         headers = self.get_login_headers(0, cookie)
         captcha, cookies = proxy_req(url, 1, header=headers, need_cookie=True)
-        if captcha is None or list(captcha.keys()) != ['data', 'code']:
+        if captcha is None or list(captcha.keys()) != ['code', 'data']:
             if can_retry(url):
                 return self.get_captcha()
             else:
-                return
+                return None, {}
         return captcha['data']['result'], cookies
 
     def get_access_key_req(self, hash_salt: str, key: str, challenge: str, validate: str, cookie: dict = {}):
@@ -113,9 +122,9 @@ class Login(BasicBilibili):
             if can_retry(self.GETTYPE_URL):
                 return self.get_type(gt, cookies)
             else:
-                return
+                return None, {}
         type_json = json.loads(req[j_begin:-1])
-        return type_json['data']
+        return type_json['data'], cookie
 
     def encode_login_info(self, hash_salt: str, key: str):
         public_key = rsa.PublicKey.load_pkcs1_openssl_pem(key.encode())
@@ -129,7 +138,7 @@ class Login(BasicBilibili):
             'Referer': self.LOGIN_URL,
         }
         if mode != 3:
-            headers['Accept'] = '*/*' if mode == 2 else 'application/json, text/plain, */*',
+            headers['Accept'] = '*/*' if mode == 2 else 'application/json, text/plain, */*'
         if mode == 1:
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
         elif mode == 2:

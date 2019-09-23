@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-23 00:57:40
+# @Last Modified time: 2019-09-24 00:54:20
 
 import hashlib
 import json
@@ -88,6 +88,12 @@ class TBK(object):
         except Exception as e:
             echo(0, favorites_id, 'favorite error', e)
 
+    def get_dg_material(self, title: str, num_iid: int):
+        req = top.api.TbkDgMaterialOptionalRequest()
+        req.adzone_id = self.adzone_id
+        req.q = title
+        req.page_size = 30
+
 
 class ActivateArticle(TBK):
     ''' activate article in youdao Cloud'''
@@ -108,6 +114,7 @@ class ActivateArticle(TBK):
     I_ARTICLE_SQL = 'INSERT INTO article_tpwd (article_id, tpwd_id, item_id, tpwd, domain, content, url, expire_at) VALUES %s;'
     R_ARTICLE_SQL = 'REPLACE INTO article_tpwd (`id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, expire_at, created_at, is_deleted) VALUES %s;'
     END_TEXT = '</text><inline-styles/><styles/></para></body></note>'
+    TPWD_REG = '\p{Sc}(\w{8,12}?)\p{Sc}'
     JSON_KEYS = ['p', 'ct', 'su', 'pr', 'au', 'pv',
                  'mt', 'sz', 'domain', 'tl', 'content']
     URL_DOMAIN = {0: 's.click.taobao.com',
@@ -132,10 +139,11 @@ class ActivateArticle(TBK):
         self.tpwd_db_map = {}
         self.tpwds = {}
         self.cookies = {}
-        self.article = {}
+        self.share2article = {}
         self.list_recent = {}
         self.empty_content = ''
         self.tpwd_exec = ThreadPoolExecutor(max_workers=50)
+        self.get_share_list()
 
     def load_process(self):
         self.load_ids()
@@ -145,7 +153,7 @@ class ActivateArticle(TBK):
 
     def load_ids(self):
         changeJsonTimeout(5)
-        req, _, _ = self.basic_youdao(self.home_id)
+        req = self.basic_youdao(self.home_id)
         if req is None:
             echo('0|error', 'Get The Home Page Info Error!!! Please retry->->->')
             return
@@ -169,9 +177,8 @@ class ActivateArticle(TBK):
             else:
                 return
         info = req['entry']
-        self.article[share_id] = (info['name'], info['id'])
+        self.share2article[share_id] = (info['name'], info['id'])
         return req
-
 
     def basic_youdao(self, idx: str, use_proxy: bool = True):
         url = self.NOTE_URL % idx
@@ -190,7 +197,7 @@ class ActivateArticle(TBK):
             else:
                 echo(1, 'retry upper time')
                 return '', '', ''
-        return req['content'], req['tl'], req['p']
+        return req['content']
 
     def load_article_pipeline(self, mode: int = 0):
         article_exec = ThreadPoolExecutor(max_workers=5)
@@ -203,9 +210,10 @@ class ActivateArticle(TBK):
         if mode:
             self.get_share_info(article_id)
             return
-        article, tl, q = self.basic_youdao(article_id)
+        article = self.basic_youdao(article_id)
         if article_id not in self.tpwds:
-            tpwds = list(set(regex.findall('\p{Sc}(\w{8,12}?)\p{Sc}', article)))
+            tpwds = list(
+                {ii: 0 for ii in regex.findall(self.TPWD_REG, article)})
             self.tpwds[article_id] = tpwds
         else:
             tpwds = self.tpwds[article_id]
@@ -213,8 +221,6 @@ class ActivateArticle(TBK):
             self.tpwd_map[article_id] = {}
         time = 0
         au_list = []
-        if len(q):
-            self.article[article_id] = (tl, q)
         while len(self.tpwd_map[article_id]) < len(tpwds) and time < 5:
             thread_list = [ii for ii in tpwds
                            if not ii in self.tpwd_map[article_id]]
@@ -231,33 +237,33 @@ class ActivateArticle(TBK):
         self.load_article2db(article_id)
 
     def load_list2db(self):
-        exist_map = self.get_exist_list()
+        share_map = self.get_share_list()
         insert_list, update_list = [], []
-        for ii, jj in self.article.items():
-            if ii in exist_map:
-                t = exist_map[ii]
+        for ii, jj in self.share2article.items():
+            if ii in share_map:
+                t = share_map[ii]
                 update_list.append((t[0], ii, jj[0], jj[1], 0, t[-1]))
             else:
                 insert_list.append((ii, jj[0], jj[1]))
         self.update_db(insert_list, 'Insert Article List', 1)
         self.update_db(update_list, 'Update Article List', 1)
 
-    def get_exist_list(self):
-        exist_list = self.Db.select_db(self.S_LIST_SQL)
-        exist_map = {}
-        for ii, jj in enumerate(exist_list):
+    def get_share_list(self):
+        share_list = self.Db.select_db(self.S_LIST_SQL)
+        share_map = {}
+        for ii, jj in enumerate(share_list):
             t = jj[-1].strftime('%Y-%m-%d %H:%M:%S')
-            exist_map[jj[1]] = (*jj[:-1], t)
-        self.exist_map = exist_map
-        return exist_map
+            share_map[jj[1]] = (*jj[:-1], t)
+        self.share2article = share_map
+        return share_map
 
     def load_article2db(self, article_id: str):
         m = self.tpwd_map[article_id]
-        exist_list = self.get_article_db(article_id)
-        for ii, jj in enumerate(exist_list):
+        share_list = self.get_article_db(article_id)
+        for ii, jj in enumerate(share_list):
             t = jj[-1].strftime('%Y-%m-%d %H:%M:%S')
-            exist_list[ii] = (*jj[:-1], t)
-        self.tpwd_db_map[article_id] = {ii[2]: ii for ii in exist_list}
+            share_list[ii] = (*jj[:-1], t)
+        self.tpwd_db_map[article_id] = {ii[2]: ii for ii in share_list}
         data = [(article_id, ii, m[jj]['item_id'], jj, m[jj]['type'], m[jj]['content'], m[jj]['url'], str(int(m[jj]['validDate'])))
                 for ii, jj in enumerate(self.tpwds[article_id]) if jj in m and 'item_id' in m[jj] and m[jj]['type'] != 15]
         data_map = {ii[1]: ii for ii in data}
@@ -294,7 +300,7 @@ class ActivateArticle(TBK):
 
     def decoder_tpwd_once(self, article_id: str, tpwd: str):
         req = self.decoder_tpwd(tpwd)
-        if req is None or not 'data' in req or '!DOCTYPE html' in req:
+        if req is None or not 'data' in req or '!DOCTYPE html' in req or not len(req):
             return
         req = req['data']
         temp_map = {ii: req[ii] for ii in self.NEED_KEY}
@@ -303,6 +309,7 @@ class ActivateArticle(TBK):
         else:
             temp_map['validDate'] = time_stamp(time_format='%d天%H小时%M分%S秒',
                                                time_str=req['validDate']) - self.BASIC_STAMP + time_stamp()
+        temp_map['validDate'] = time_str(temp_map['validDate'])
         self.tpwd_map[article_id][tpwd] = temp_map
         self.decoder_tpwd_url(article_id, tpwd)
 
@@ -341,11 +348,13 @@ class ActivateArticle(TBK):
         }
         text = {'text': '￥{}￥'.format(tpwd)}
         req = proxy_req(self.DECODER_TPWD_URL, 11, data=text, header=headers)
-        if req is None or not 'data' in req or '!DOCTYPE html' in req:
+        if req is None or isinstance(req, str) or list(req.keys()) != ['code', 'msg', 'time', 'data']:
             if can_retry(tpwd):
                 return self.decoder_tpwd(tpwd)
             else:
                 return {}
+        if 'PASSWORD_NOT_EXIST' in req['data']['ret']:
+            return {}
         return req
 
     def get_s_click_url(self, s_click_url: str):
@@ -519,7 +528,7 @@ class ActivateArticle(TBK):
 
         url = self.SYNC_URL % ('download', self.cstk)
         data = {
-            'fileId': self.exist_map[article_id][-1].split('/')[-1],
+            'fileId': self.share2article[article_id][-1].split('/')[-1],
             'version': -1,
             'convert': True,
             'editorType': 1,
@@ -530,7 +539,7 @@ class ActivateArticle(TBK):
         return req
 
     def update_article(self, article_id: str, article_body: str):
-        p = self.exist_map[article_id][-1].split('/')[-1]
+        p = self.share2article[article_id][-1].split('/')[-1]
         article_info = self.list_recent[p]
         data = {
             'fileId': p,
@@ -546,6 +555,7 @@ class ActivateArticle(TBK):
             'tags': article_info['tags'],
             'cstk': self.cstk
         }
-        url = self.SYNC_URL % ('push', self.cstk) 
-        req = proxy_req(url, 11, data=data, headers=self.get_ynote_web_header())
+        url = self.SYNC_URL % ('push', self.cstk)
+        req = proxy_req(url, 11, data=data,
+                        headers=self.get_ynote_web_header())
         return req

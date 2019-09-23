@@ -7,7 +7,7 @@ CREATE TABLE if not exists `article_tpwd` (
   `domain` int(10) unsigned NOT NULL DEFAULT 0 COMMENT 'tpwd type @0->s.click, @1->item, @5->uland, @10->taoquan',
   `content` varchar(300) NOT NULL DEFAULT '_' COMMENT 'tpwd content', 
   `url` varchar(1000) NOT NULL DEFAULT '_' COMMENT 'tpwd corresponding url',
-  `expire_at` varchar(20) NOT NULL DEFAULT '0' COMMENT 'tpwd expire at',
+  `expire_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'expire time',
   `is_deleted` int(10) unsigned NOT NULL DEFAULT 0 COMMENT 'is deleted',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'create time',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'update time',

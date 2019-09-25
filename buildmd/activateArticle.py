@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-24 00:54:20
+# @Last Modified time: 2019-09-26 02:01:39
 
 import hashlib
 import json
@@ -93,6 +93,22 @@ class TBK(object):
         req.adzone_id = self.adzone_id
         req.q = title
         req.page_size = 30
+        try:
+            goods = req.getResponse()
+            goods = goods['tbk_dg_material_optional_response']['result_list']['map_data']
+            return [ii for ii in goods if ii['num_iid'] == num_iid]
+        except Exception as e:
+            echo(0, 'get dg material failed.', title, num_iid, e)
+
+    def convert2tpwd(self, url: str, title: str):
+        req = top.api.TbkTpwdCreateRequest()
+        req.url = url
+        req.text = title
+        try:
+            tpwds = req.getResponse()
+            return tpwds['tbk_tpwd_create_response']['data']['model'][1:-1]
+        except Exception as e:
+            echo(0, 'Generate tpwd failed', url, title, e)
 
 
 class ActivateArticle(TBK):
@@ -110,9 +126,9 @@ class ActivateArticle(TBK):
     S_LIST_SQL = 'SELECT `id`, article_id, title, q, created_at from article;'
     I_LIST_SQL = 'INSERT INTO article (article_id, title, q) VALUES %s;'
     R_LIST_SQL = 'REPLACE INTO article (`id`, article_id, title, q, is_deleted, created_at) VALUES %s;'
-    S_ARTICLE_SQL = 'SELECT `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, expire_at, created_at from article_tpwd WHERE `article_id` = "%s";'
-    I_ARTICLE_SQL = 'INSERT INTO article_tpwd (article_id, tpwd_id, item_id, tpwd, domain, content, url, expire_at) VALUES %s;'
-    R_ARTICLE_SQL = 'REPLACE INTO article_tpwd (`id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, expire_at, created_at, is_deleted) VALUES %s;'
+    S_ARTICLE_SQL = 'SELECT `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at from article_tpwd WHERE `article_id` = "%s";'
+    I_ARTICLE_SQL = 'INSERT INTO article_tpwd (article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at) VALUES %s;'
+    R_ARTICLE_SQL = 'REPLACE INTO article_tpwd (`id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at, is_deleted) VALUES %s;'
     END_TEXT = '</text><inline-styles/><styles/></para></body></note>'
     TPWD_REG = '\p{Sc}(\w{8,12}?)\p{Sc}'
     JSON_KEYS = ['p', 'ct', 'su', 'pr', 'au', 'pv',
@@ -121,7 +137,8 @@ class ActivateArticle(TBK):
                   1: 'item.taobao.com',
                   5: 'uland.taobao.com',
                   10: 'taoquan.taobao.com',
-                  15: 'empty'}
+                  15: 'empty',
+                  16: 'failure'}
     NEED_KEY = ['content', 'url', 'validDate']
     ONE_HOURS = 3600
     ONE_DAY = 24
@@ -140,13 +157,17 @@ class ActivateArticle(TBK):
         self.tpwds = {}
         self.cookies = {}
         self.share2article = {}
+        self.article_list = {}
         self.list_recent = {}
+        self.idx = []
         self.empty_content = ''
         self.tpwd_exec = ThreadPoolExecutor(max_workers=50)
         self.get_share_list()
 
     def load_process(self):
         self.load_ids()
+        self.load_article_list()
+        self.update_tpwd()
         self.get_m_h5_tk()
         self.get_ynote_file()
         self.get_ynote_file(1)
@@ -154,7 +175,7 @@ class ActivateArticle(TBK):
     def load_ids(self):
         changeJsonTimeout(5)
         req = self.basic_youdao(self.home_id)
-        if req is None:
+        if req == '':
             echo('0|error', 'Get The Home Page Info Error!!! Please retry->->->')
             return
         self.idx = regex.findall('id=(\w*?)<', req)
@@ -196,7 +217,7 @@ class ActivateArticle(TBK):
                 return self.basic_youdao(idx)
             else:
                 echo(1, 'retry upper time')
-                return '', '', ''
+                return ''
         return req['content']
 
     def load_article_pipeline(self, mode: int = 0):
@@ -259,12 +280,10 @@ class ActivateArticle(TBK):
 
     def load_article2db(self, article_id: str):
         m = self.tpwd_map[article_id]
-        share_list = self.get_article_db(article_id)
-        for ii, jj in enumerate(share_list):
-            t = jj[-1].strftime('%Y-%m-%d %H:%M:%S')
-            share_list[ii] = (*jj[:-1], t)
-        self.tpwd_db_map[article_id] = {ii[2]: ii for ii in share_list}
-        data = [(article_id, ii, m[jj]['item_id'], jj, m[jj]['type'], m[jj]['content'], m[jj]['url'], str(int(m[jj]['validDate'])))
+        m = {ii: jj for ii, jj in m.items() if jj['url']}
+        article_list = self.get_article_db(article_id)
+        self.tpwd_db_map[article_id] = {ii[2]: ii for ii in article_list}
+        data = [(article_id, ii, m[jj]['item_id'], jj, m[jj]['type'], m[jj]['content'], m[jj]['url'], 0, '', m[jj]['validDate'])
                 for ii, jj in enumerate(self.tpwds[article_id]) if jj in m and 'item_id' in m[jj] and m[jj]['type'] != 15]
         data_map = {ii[1]: ii for ii in data}
         update_list, insert_list = [], []
@@ -280,8 +299,50 @@ class ActivateArticle(TBK):
         self.update_db(insert_list, f'article_id {article_id} Insert')
         self.update_db(update_list, f'article_id {article_id} Update')
 
+    def update_tpwd(self):
+        update_num = 0
+        for ii, jj in self.article_list.items():
+            for kk, (num_iid, title, _, _, _) in jj.items():
+                if num_iid == '':
+                    continue
+                flag, c = self.generate_tpwd(title, int(num_iid), self.article_list[ii][kk])
+                if flag:
+                    self.article_list[ii][kk] = c
+                update_num += flag
+        echo(2, 'Update {} Tpwd Info Success!!'.format(update_num))
+
+    def generate_tpwd(self, title: str, num_iid: int, c: dict):
+        goods = self.get_dg_material(title, num_iid)
+        if goods is None or not len(goods):
+            return 0, None
+        goods = goods[0]
+        if 'coupon_share_url' in goods and len(goods['coupon_share_url']):
+            url = goods['coupon_share_url']
+        else:
+            url = goods['url']
+        url = 'https:{}'.format(url)
+        commission_rate = int(goods['commission_rate'])
+        commission_type = goods['commission_type']
+        tpwd = self.convert2tpwd(url, title)
+        if tpwd is None:
+            return 0, None
+        return 1, (*c[:-3], tpwd, commission_rate, commission_type)
+
+    def load_article_list(self):
+        for article_id in self.idx:
+            self.get_article_db(article_id)
+        item_num = sum([len(ii) for ii in self.article_list.values()])
+        echo(1, 'Load {} article list from db.'.format(item_num))
+
     def get_article_db(self, article_id: str):
-        return [ii for ii in self.Db.select_db(self.S_ARTICLE_SQL % article_id)]
+        article_list = list(self.Db.select_db(self.S_ARTICLE_SQL % article_id))
+        for ii, jj in enumerate(article_list):
+            t = jj[-1].strftime('%Y-%m-%d %H:%M:%S')
+            y = jj[-2].strftime('%Y-%m-%d %H:%M:%S')
+            article_list[ii] = (*jj[:-2], y, t)
+        self.article_list[article_id] = {
+            ii[2]: (ii[3], ii[6], ii[4], ii[8], ii[9]) for ii in article_list}
+        return article_list
 
     def update_db(self, data: list, types: str, mode: int = 0):
         if not len(data):
@@ -310,6 +371,7 @@ class ActivateArticle(TBK):
             temp_map['validDate'] = time_stamp(time_format='%d天%H小时%M分%S秒',
                                                time_str=req['validDate']) - self.BASIC_STAMP + time_stamp()
         temp_map['validDate'] = time_str(temp_map['validDate'])
+        temp_map['url'] = temp_map['url'].strip()
         self.tpwd_map[article_id][tpwd] = temp_map
         self.decoder_tpwd_url(article_id, tpwd)
 
@@ -333,7 +395,10 @@ class ActivateArticle(TBK):
         elif self.URL_DOMAIN[10] in url:
             return 10, 0
         elif self.URL_DOMAIN[1] in url:
-            return 1, self.get_item_detail(url)
+            good_id = self.get_item_detail(url)
+            if good_id != '':
+                return 1, good_id
+            return 16, 0
         elif url == '':
             return 15, 0
         echo('0|warning', 'New Domain:',
@@ -353,8 +418,6 @@ class ActivateArticle(TBK):
                 return self.decoder_tpwd(tpwd)
             else:
                 return {}
-        if 'PASSWORD_NOT_EXIST' in req['data']['ret']:
-            return {}
         return req
 
     def get_s_click_url(self, s_click_url: str):

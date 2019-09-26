@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-22 14:18:33
+# @Last Modified time: 2019-09-27 00:58:37
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals, with_statement)
@@ -341,10 +341,10 @@ def load_bigger(input_file: str):
     return pickle.loads(bytes_in)
 
 
-def time_str(time_stamp: int = -1, time_format: str = '%Y-%m-%d %H:%M:%S'):
+def time_str(time_s: int = -1, time_format: str = '%Y-%m-%d %H:%M:%S'):
     ''' time stamp -> time str '''
-    if time_stamp > 0:
-        return time.strftime(time_format, time.localtime(time_stamp))
+    if time_s > 0:
+        return time.strftime(time_format, time.localtime(time_s))
     return time.strftime(time_format, time.localtime(time_stamp()))
 
 

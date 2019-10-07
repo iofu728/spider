@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-22 14:55:21
+# @Last Modified time: 2019-10-07 23:44:35
 
 import json
 import os
@@ -32,7 +32,7 @@ class BasicBilibili(object):
     RELATION_STAT_URL = 'http://api.bilibili.com/x/relation/stat?jsonp=jsonp&callback=__jp11&vmid=%d'
     BASIC_RANKING_URL = 'https://www.bilibili.com/ranking/all/%d/'
     MEMBER_SUBMIT_URL = 'http://space.bilibili.com/ajax/member/getSubmitVideos?mid=%s&page=1&pagesize=50'
-    REPLY_V2_URL = 'http://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=2'
+    REPLY_V2_URL = 'http://api.bilibili.com/x/v2/reply?jsonp=jsonp&pn=%d&type=1&oid=%d&sort=%d'
     PLAYLIST_URL = 'https://api.bilibili.com/x/player/pagelist?aid=%d&jsonp=jsonp'
     DM_URL = 'https://api.bilibili.com/x/v1/dm/list.so?oid=%d'
     GET_KEY_URL = 'http://passport.bilibili.com/login?act=getkey&r=%f'
@@ -44,6 +44,7 @@ class BasicBilibili(object):
     GETTYPE_URL = 'https://api.geetest.com/gettype.php?gt=%s&callback=geetest_%d'
     NO_RANK_CONSTANT = 'No rank.....No Rank......No Rank.....'
     JSON_KEYS = ['code', 'message', 'ttl', 'data']
+    T_FORMAT = '%m-%d %H:%M'
 
     def __init__(self):
         super(BasicBilibili, self).__init__()

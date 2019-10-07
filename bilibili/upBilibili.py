@@ -2,20 +2,21 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-21 23:35:14
+# @Last Modified time: 2019-10-07 23:43:56
 
 
 import codecs
 import json
 import os
-import regex
 import pickle
 import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
+
 import numpy as np
+import regex
 
 sys.path.append(os.getcwd())
 from util.util import (basic_req, can_retry, echo, get_min_s, get_time_str,
@@ -187,7 +188,8 @@ class Up(BasicBilibili):
         context = '{}\n\n'.format(email_title)
         for no, av in other_result[:3]:
             data_info = history_map[av]
-            context += '{}, av{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}, 累计播放: {}{}, 发布时间: {}\n'.format(self.av_id_map[av]['title'].split('|', 1)[0], av, no, data_info[1], data_info[2], data_info[3], data_info[4], data_info[7], self.av_id_map[av]['play'], self.get_history_rank(data_info), time_str(self.av_id_map[av]['created']))
+            context += '{}, av{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}, 累计播放: {}{}, 发布时间: {}\n'.format(self.av_id_map[av]['title'].split(
+                '|', 1)[0], av, no, data_info[1], data_info[2], data_info[3], data_info[4], data_info[7], self.av_id_map[av]['play'], self.get_history_rank(data_info), time_str(self.av_id_map[av]['created']))
         send_email(context, email_title)
         self.history_check_finish[av_id].append(round(time_gap / 10))
 
@@ -356,7 +358,8 @@ class Up(BasicBilibili):
         self.have_assign_now[day_index] = []
         url = self.RANKING_URL % (index, day_index)
         text = proxy_req(url, 3, header=self.get_api_headers(self.basic_av_id))
-        rank_str = regex.findall('window.__INITIAL_STATE__=(.*?);\(function\(\)', text)
+        rank_str = regex.findall(
+            'window.__INITIAL_STATE__=(.*?);\(function\(\)', text)
         if not len(rank_str):
             if can_retry(url):
                 self.load_rank_index(index, day_index)
@@ -497,11 +500,9 @@ class Up(BasicBilibili):
 
     def get_check(self):
         ''' check comment '''
-        self.load_av_lists()
         av_id_list = [[ii['aid'], ii['comment']] for ii in self.av_id_map.values(
         ) if not regex.findall(self.ignore_list, str(ii['aid']))]
         av_map = {ii['aid']: ii for ii in self.av_id_map.values()}
-        self.comment_next = {ii: True for (ii, _) in av_id_list}
         if self.av_id_list and len(self.av_id_list) and len(self.av_id_list) != len(av_id_list):
             new_av_id = [ii for (
                 ii, _) in av_id_list if not ii in self.av_id_list and not ii in self.del_map]
@@ -513,8 +514,8 @@ class Up(BasicBilibili):
                 echo('0|error', 'Shell str:', shell_str)
                 os.system(shell_str % 1)
                 os.system(shell_str % 2)
-                email_str = '{} av:{} was releasing at {}!!! Please check the auto pipeline.'.format(
-                    av_map[ii]['title'], ii, time_str(av_map[ii]['created']))
+                email_str = '发布({}){}#{}'.format(time_str(
+                    av_map[ii]['created'], time_format=self.T_FORMAT), av_map[ii]['title'], ii)
                 email_str2 = '{} {} is release at {}.\nPlease check the online & common program.'.format(
                     av_map[ii]['title'], time_str(av_map[ii]['created']), self.BASIC_AV_URL % ii)
                 send_email(email_str2, email_str, self.special_info_email)
@@ -552,11 +553,17 @@ class Up(BasicBilibili):
     def comment_check_schedule(self, av_id: int, comment: int):
         ''' schedule comment check thread '''
 
-        for pn in range(1, (comment - 1) // 20 + 2):
-            if not self.comment_next[av_id]:
-                return
-            echo('2|debug', 'Comment check, av_id:', av_id, 'pn:', pn)
-            self.check_comment_once(av_id, pn)
+        threading_list = []
+        for pn in range(1, min((comment - 1) // 20 + 2, 3)):
+            for sort in [2, 0]:
+                work = threading.Thread(
+                    target=self.check_comment_once, args=(av_id, pn, sort,))
+                threading_list.append(work)
+        for work in threading_list:
+            work.start()
+        for work in threading_list:
+            work.join()
+
         comment = [self.comment[av_id][k]
                    for k in sorted(self.comment[av_id].keys())]
         basic = [','.join([str(jj) for jj in ii['basic']])
@@ -574,19 +581,29 @@ class Up(BasicBilibili):
             f.write('\n'.join(basic) + '\n')
             f.write('\n'.join(replies) + '\n')
 
-    def check_comment_once(self, av_id: int, pn: int):
+    def check_comment_once(self, av_id: int, pn: int, sort: int, root: int = -1, ps: int = 10):
         ''' check comment once '''
-        comment = self.get_comment_info(av_id, pn)
+        comment = self.get_comment_info(av_id, pn, sort, root, ps)
         if comment is None:
             return
+        if root != -1:
+            echo('2|debug', 'Comment check, av_id:', av_id, 'pn:',
+                 pn, 'sort:', sort, 'root:', root, 'ps:', ps)
+        else:
+            echo('2|debug', 'Comment check, av_id:',
+                 av_id, 'pn:', pn, 'sort:', sort)
         hots = comment['hots']
         replies = comment['replies']
-        if pn > 1:
+        if pn > 1 or root != -1:
             wait_check = replies
         else:
             wait_check = replies if hots is None else [*hots, *replies]
-        wait_check = [{**jj, 'idx': ii + 1}
-                      for ii, jj in enumerate(wait_check)]
+        if root == -1:
+            wait_check = [{**jj, 'idx': ii + 1}
+                          for ii, jj in enumerate(wait_check)]
+        else:
+            wait_check = [
+                {**jj, 'idx': 'reply-{}'.format(ii + 1)} for ii, jj in enumerate(wait_check)]
 
         for ii in wait_check:
             info = {'basic': self.get_comment_detail(ii, av_id, pn)}
@@ -596,21 +613,19 @@ class Up(BasicBilibili):
 
             if not crep is None:
                 info['replies'] = [self.get_comment_detail(
-                    {**ii, 'idx': idx}, av_id, pn, rpid) for ii in crep]
+                    {**kk, 'idx': '{}-{}'.format(idx, ww + 1)}, av_id, pn, rpid) for ww, kk in enumerate(crep)]
             self.comment[av_id][rpid] = info
         wait_check = [ii for ii in wait_check if not ii['rpid']
                       in self.comment[av_id]]
-        self.comment_next[av_id] = len(wait_check) >= 20
-        echo('1|debug', int(
-            self.comment_next[av_id]), 'av_id:', av_id, 'len of wait_check:', len(wait_check))
+        echo('1|debug', len(wait_check), 'av_id:', av_id)
 
     def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_rpid=None) -> List:
         ''' get comment detail '''
-        ctime = time_str(comment['ctime'])
-        wait_list = ['rpid', 'member', 'content', 'like', 'idx']
+        wait_list = ['rpid', 'member', 'content', 'like', 'idx', 'ctime']
         wait_list_mem = ['uname', 'sex', 'sign', 'level_info']
         wait_list_content = ['message', 'plat']
-        rpid, member, content, like, idx = [comment[ii] for ii in wait_list]
+        rpid, member, content, like, idx, ctime = [
+            comment[ii] for ii in wait_list]
         uname, sex, sign, level = [member[ii] for ii in wait_list_mem]
         current_level = level['current_level']
         content, plat = [content[ii] for ii in wait_list_content]
@@ -624,10 +639,13 @@ class Up(BasicBilibili):
     def have_bad_comment(self, req_list: list, av_id: int, pn: int, parent_rpid=None):
         ''' check comment and send warning email if error '''
         rpid, ctime, like, plat, current_level, uname, sex, content, sign, idx = req_list
+        ctimes = time_str(ctime, time_format=self.T_FORMAT)
+        ctime = time_str(ctime)
 
         if not len(regex.findall(self.keyword, content)):
             return True
-        rpid = '{}{}'.format(rpid, '' if not parent_rpid else '-{}'.format(rpid))
+        rpid = '{}{}'.format(
+            rpid, '' if not parent_rpid else '-{}'.format(parent_rpid))
 
         url = self.BASIC_AV_URL % av_id
         rpid_str = '{}-{}'.format(av_id, rpid)
@@ -635,15 +653,18 @@ class Up(BasicBilibili):
             return True
         if self.email_limit < 1 or (rpid_str in self.email_send_time and self.email_send_time[rpid_str] >= self.email_limit):
             return True
-
-        email_content = '{}\nUrl: {} Page: {} #{}@{},\nUser: {},\nSex: {},\nconetnt: {},\nsign: {}\nlike: {}\nplat: {}\nlevel:{}\n'.format(ctime, url, pn, idx, rpid, uname, sex, content, sign, like, plat, current_level)
-        email_subject = '({})av_id: {} || #{} Comment Warning !!!'.format(ctime, av_id, rpid)
-        echo('4|warning', email_content, email_subject)
-        send_email(email_content, email_subject)
         if rpid_str in self.email_send_time:
             self.email_send_time[rpid_str] += 1
         else:
             self.email_send_time[rpid_str] = 1
+        title = self.av_id_map[av_id]['title'].split(
+            '|', 1)[0] if av_id in self.av_id_map else ''
+
+        email_content = 'Date: {}\nUrl: {}\nTitle: {},\nPage: {} #{}@{},\nUser: {},\nSex: {},\nsign: {}\nlike: {}\nplat: {}\nlevel:{}\nconetnt: {},\n'.format(
+            ctime, title, url, pn, idx, rpid, uname, sex, sign, like, plat, current_level, content)
+        email_subject = '评论({}){}{}#{}'.format(ctimes, title, pn, idx)
+        echo('4|warning', email_content, email_subject)
+        send_email(email_content, email_subject, assign_rec=self.assign_rec)
 
     def get_cid(self, av_id: int):
         playlist_url = self.PLAYLIST_URL % av_id
@@ -672,8 +693,10 @@ class Up(BasicBilibili):
         stat_url = self.ARCHIVE_STAT_URL % av_id
         return self.get_api_req(stat_url, av_id)
 
-    def get_comment_info(self, av_id: int, pn: int):
-        comment_url = self.REPLY_V2_URL % (pn, av_id)
+    def get_comment_info(self, av_id: int, pn: int, sort: int, root: int = -1, ps: int = 10):
+        comment_url = self.REPLY_V2_URL % (pn, av_id, sort)
+        if root != -1:
+            comment_url += '&&ps={}&&root={}'.format(ps, root)
         return self.get_api_req(comment_url, av_id)
 
     def get_danmaku(self, av_id: int):

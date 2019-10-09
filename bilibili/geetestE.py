@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-15 19:25:31
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-15 23:18:38
+# @Last Modified time: 2019-10-09 23:23:44
 
 import os
 import sys
@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 sys.path.append(os.getcwd())
-from util.util import echo
+from util.util import echo, time_stamp
 
 g = '0123456789abcdefghijklmnopqrstuvwxyz'
 FV = 4503599627370496
@@ -445,8 +445,10 @@ class E(object):
         return i if o else '0'
 
 
-class BrowserStyle(object):
+class O(object):
     def __init__(self):
+        self.T = {}
+
         self.n = {
             'A': 48,
             'BUTTON': 1,
@@ -502,7 +504,7 @@ class BrowserStyle(object):
             'sessionStorageEnabled': 1,
             'systemLanguage': None,
             'textLength': 93737,
-            'timestamp': int(time.time()),
+            'timestamp': int(time_stamp()),
             'timezone': -8,
             'touchEvent': False,
             'userAgent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3818.0 Safari/537.36",
@@ -560,4 +562,39 @@ class BrowserStyle(object):
     def __call__(self):
         self.get_performanceTiming()
         self.r = [self.n[ii] if ii in self.n else -1 for ii in self.t]
-        return '!!'.join([str(ii) for ii in self.r]).replace('False', 'false').replace('True', 'true')
+        self.i = '!!'.join([str(ii) for ii in self.r]).replace(
+            'False', 'false').replace('True', 'true')
+
+
+class T(object):
+    ''' AES '''
+    def gjson_stringify(self, o: dict):
+        o_str = str(o).replace("'", '"').replace(
+            'True', 'true').replace('False', 'false')
+        return o_str
+
+    def parse(self, aes_key: str):
+        n = {}
+        for r, p in enumerate(aes_key):
+            if r >> 2 in n:
+                n[r >> 2] = (n[r >> 2]) | ((255 & ord(p)) << 24 - r % 4 * 8)
+            else:
+                n[r >> 2] = ((255 & ord(p)) << 24 - r % 4 * 8)
+        return {
+            'sigBytes': len(aes_key),
+            'words': list(n.values()),
+        }
+
+    def encrypt(self, e: str, t: str):
+        t = self.parse(t)
+        n = {}
+        n['iv'] = self.parse('0000000000000000')
+
+    def E_encrypt(self, u: dict, e: str, t: dict, n: dict):
+        self.createEncryptor(t, n)
+
+    def createEncryptor(self, e: dict, r: dict):
+        pass
+
+    def create(self):
+        e = 1

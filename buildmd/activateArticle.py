@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-27 02:19:07
+# @Last Modified time: 2019-10-11 02:03:40
 
 import hashlib
 import json
@@ -25,7 +25,7 @@ from util.util import (basic_req, begin_time, can_retry, changeHeaders,
                        changeJsonTimeout, decoder_cookie, decoder_url, echo,
                        encoder_cookie, encoder_url, end_time, headers,
                        json_str, mkdir, read_file, send_email, time_stamp,
-                       time_str)
+                       time_str, get_accept, get_content_type)
 
 
 proxy_req = GetFreeProxy().proxy_req
@@ -449,7 +449,7 @@ class ActivateArticle(TBK):
 
     def get_s_click_tu(self, s_click_url: str):
         headers = {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            'Accept': get_accept('html'),
             'Host': 's.click.taobao.com'
         }
         req = proxy_req(s_click_url, 2, header=headers)
@@ -462,7 +462,7 @@ class ActivateArticle(TBK):
 
     def get_s_click_detail(self, redirect_url: str, tu_url: str):
         headers = {
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            'accept': get_accept('html'),
             'referer': tu_url
         }
         req = proxy_req(redirect_url, 2, header=headers)
@@ -559,16 +559,16 @@ class ActivateArticle(TBK):
 
     def get_ynote_web_header(self, mode: int = 0):
         headers = {
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'Content-Type': get_content_type(),
             'Cookie': self.cookie,
             'Host': self.Y_URL.split('/')[2],
             'Origin': self.Y_URL,
             'Referer': self.WEB_URL
         }
         if mode:
-            headers['Accept'] = 'application/json, text/plain, */*'
+            headers['Accept'] = get_accept('xhr')
         else:
-            headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3'
+            headers['Accept'] = get_accept('html')
         return headers
 
     def get_empty_content(self):

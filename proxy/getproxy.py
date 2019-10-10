@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-22 00:35:26
+# @Last Modified time: 2019-10-11 02:04:39
 
 
 import argparse
@@ -24,7 +24,7 @@ from bs4 import BeautifulSoup
 sys.path.append(os.getcwd())
 from util.db import Db
 from util.util import (basic_req, begin_time, can_retry, changeHtmlTimeout,
-                       changeJsonTimeout, echo, end_time, read_file, time_str)
+                       changeJsonTimeout, echo, end_time, read_file, time_str, get_accept, get_content_type)
 
 
 """
@@ -477,8 +477,8 @@ class GetFreeProxy:
             'Origin': 'http://www.gatherproxy.com',
             'Referer': 'http://www.gatherproxy.com/proxylist/anonymity/?t=Transparent',
             'Cookie': '_lang=en-US; _ga=GA1.2.1084455496.1548351129; _gid=GA1.2.1515017701.1552361687; ASP.NET_SessionId=ckin3pzyqyoyt3zg54zrtrct; _gat=1; arp_scroll_position=57',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            'Content-Type': get_content_type(),
+            'Accept': get_accept('html'),
         }
         login_url = 'http://www.gatherproxy.com/subscribe/login'
 
@@ -531,8 +531,8 @@ class GetFreeProxy:
             'Origin': 'http://www.gatherproxy.com',
             'Referer': 'http://www.gatherproxy.com/proxylist/anonymity/?t=Transparent',
             'Cookie': '_lang=en-US; _ga=GA1.2.1084455496.1548351129; _gid=GA1.2.1515017701.1552361687; ASP.NET_SessionId=ckin3pzyqyoyt3zg54zrtrct; _gat=1; arp_scroll_position=57',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            'Content-Type': get_content_type(),
+            'Accept': get_accept('html'),
         }
         url = 'http://www.gatherproxy.com/subscribe/infos'
         try:

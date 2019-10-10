@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-02-25 21:13:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-18 01:07:36
+# @Last Modified time: 2019-10-11 02:03:24
 
 import argparse
 import time
@@ -13,7 +13,7 @@ import sys
 sys.path.append(os.getcwd())
 from collections import Counter
 from proxy.getproxy import GetFreeProxy
-from util.util import begin_time, end_time, send_email, can_retry, echo, basic_req
+from util.util import begin_time, end_time, send_email, can_retry, echo, basic_req, get_accept, get_content_type
 
 proxy_req = GetFreeProxy().proxy_req
 data_path = 'brushclass/data/'
@@ -63,15 +63,10 @@ class Brush(object):
         with open('%scookie' % data_path, 'r') as f:
             cookie = f.readlines()
         headers = {
-            'pragma': 'no-cache',
             'X-Requested-With': 'XMLHttpRequest',
-            'cache-control': 'no-cache',
             'Cookie': '',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            "Accept-Encoding": "",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
+            'Content-Type': get_content_type(),
+            'Accept': get_accept('xhr'),
             "Origin": "http://elective.pku.edu.cn",
             "Referer": "http://elective.pku.edu.cn/elective2008/edu/pku/stu/elective/controller/supplement/SupplyCancel.do",
         }
@@ -96,7 +91,7 @@ class Brush(object):
 def get_score(cookie: str):
     SCORE_URL = 'https://portal.w.pku.edu.cn/portal2017/bizcenter/score/retrScores.do'
     headers = {
-        'Accept': 'application/json, text/plain, */*',
+        'Accept': get_accept('xhr'),
         'Host': 'portal.w.pku.edu.cn',
         'Origin': 'https://portal.w.pku.edu.cn',
         'Referer': 'https://portal.w.pku.edu.cn/portal2017/',

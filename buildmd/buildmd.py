@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-01-31 17:08:32
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-27 23:47:55
+# @Last Modified time: 2019-10-11 02:04:06
 
 import codecs
 import threading
@@ -13,7 +13,7 @@ import random
 
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
-from util.util import begin_time, end_time, changeCookie, changeHtmlTimeout, basic_req, can_retry
+from util.util import begin_time, end_time, changeCookie, changeHtmlTimeout, basic_req, can_retry, get_accept, get_content_type
 from urllib.request import urlopen
 
 """
@@ -417,14 +417,9 @@ class Buildmd(object):
         """
         url = 'https://note.youdao.com/yws/api/personal/sync?method=push&keyfrom=web&cstk=E3CF_lx8'
         headers = {
-            'pragma': 'no-cache',
-            'cache-control': 'no-cache',
             'Cookie': '',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'Accept': 'application/json, text/plain, */*',
-            "Accept-Encoding": "",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
+            'Content-Type': get_content_type(),
+            'Accept': get_accept('xhr'),
             'Origin': 'https://note.youdao.com',
             'Referer': 'https://note.youdao.com/web'
         }
@@ -482,15 +477,10 @@ class Buildmd(object):
         goods_len = len(self.goods_candidate)
 
         self.headers = {
-            'pragma': 'no-cache',
             'X-Requested-With': 'XMLHttpRequest',
-            'cache-control': 'no-cache',
             'Cookie': '',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            "Accept-Encoding": "",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
+            'Content-Type': get_content_type(),
+            'Accept': get_accept('xhr'),
             'Origin': 'http://pub.alimama.com',
             'Referer': 'http://pub.alimama.com/promo/search/index.htm?q=%E7%AC%AC%E5%9B%9B%E5%8D%81%E4%B9%9D%E5%A4%A9%2019%E6%98%A5%E5%AD%A3&_t=1550891362391'
         }
@@ -566,15 +556,10 @@ class Buildmd(object):
     def match_goods(self):
 
         self.headers = {
-            'pragma': 'no-cache',
             'X-Requested-With': 'XMLHttpRequest',
-            'cache-control': 'no-cache',
             'Cookie': '',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            "Accept-Encoding": "",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
+            'Content-Type': get_content_type(),
+            'Accept': get_accept('xhr')
         }
 
         version = begin_time()
@@ -706,15 +691,10 @@ class Buildmd(object):
             goods_name
         ]
         headers = {
-            'pragma': 'no-cache',
             'X-Requested-With': 'XMLHttpRequest',
-            'cache-control': 'no-cache',
             'Cookie': '',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            "Accept-Encoding": "",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36",
+            'Content-Type': get_content_type(),
+            'Accept': get_accept('xhr'),
         }
         headers['Cookie'] = cookie[0][:-1]
         ca = basic_req(''.join(url_list), 2, header=headers)

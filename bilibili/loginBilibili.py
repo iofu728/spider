@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:47:48
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-22 12:10:52
+# @Last Modified time: 2019-10-11 02:03:06
 
 import base64
 import json
@@ -16,7 +16,7 @@ import regex
 import rsa
 
 sys.path.append(os.getcwd())
-from util.util import can_retry, echo, encoder_cookie, send_email, time_stamp
+from util.util import can_retry, echo, encoder_cookie, send_email, time_stamp, get_accept, get_content_type
 
 from .basicBilibili import BasicBilibili
 from .geetestE import E, O, S
@@ -138,9 +138,9 @@ class Login(BasicBilibili):
             'Referer': self.LOGIN_URL,
         }
         if mode != 3:
-            headers['Accept'] = '*/*' if mode == 2 else 'application/json, text/plain, */*'
+            headers['Accept'] = get_accept('*') if mode == 2 else get_accept('xhr')
         if mode == 1:
-            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            headers['Content-Type'] = get_content_type('')
         elif mode == 2:
             headers['X-Requested-With'] = 'XMLHttpRequest'
         if len(cookie):

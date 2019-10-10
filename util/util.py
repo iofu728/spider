@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-27 00:58:37
+# @Last Modified time: 2019-10-11 02:07:01
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals, with_statement)
@@ -30,24 +30,17 @@ from bs4 import BeautifulSoup
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 headers = {
-    'pragma': 'no-cache',
-    'cache-control': 'no-cache',
     'Cookie': '',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
-    "Accept-Encoding": "",
-    "Accept-Language": "zh-CN,zh;q=0.9",
-    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"}
+    'Accept': get_accept('html'),
+    'Content-Type': get_content_type(),
+    "User-Agent": get_use_agent()}
 data_dir = 'util/data/'
 log_path = 'service.log'
-if not os.path.exists(data_dir):
-    os.makedirs(data_dir)
-try:
-    with codecs.open('%sagent' % data_dir, 'r', encoding='utf-8') as f:
-        file = f.readlines()
-    agent_lists = [" ".join(index.split()[1:])[1:-1] for index in file]
-except:
+mkdir(data_dir)
+agent_lists = [" ".join(index.split()[1:])[1:-1] for index in read_file('{}agent'.format(data_dir))]
+if not len(agent_lists):
     agent_lists = [headers['User-Agent']]
+
 agent_len = len(agent_lists) - 1
 html_timeout = 5
 json_timeout = 4
@@ -521,3 +514,23 @@ def decoder_fuzz(reg: str, file_path: str, replace_func=replace_params):
                                                                 origin_str.count('\n')))
     with open(output_path, 'w') as f:
         f.write(origin_str)
+
+def get_accept(types: str) -> str:
+    ''' @param: types => html, json, xhr '''
+    if types == 'html':
+        return 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3'
+    elif types == 'json':
+        return 'application/json, text/javascript, */*; q=0.01'
+    elif types == 'xhr':
+        return 'application/json, text/plain, */*'
+    return '*/*'
+
+
+def get_use_agent(types: str = 'pc') -> str:
+    ''' @param: types => pc, mobile'''
+    if types == 'pc':
+        return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"
+    return 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1'
+
+def get_content_type(types: str = 'utf8') -> str:
+    return 'application/x-www-form-urlencoded{}'.format(';charset=UTF-8' if types == 'utf8' else '')

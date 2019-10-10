@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-07 23:43:56
+# @Last Modified time: 2019-10-11 01:57:42
 
 
 import codecs
@@ -20,7 +20,7 @@ import regex
 
 sys.path.append(os.getcwd())
 from util.util import (basic_req, can_retry, echo, get_min_s, get_time_str,
-                       mkdir, read_file, send_email, time_stamp, time_str)
+                       mkdir, read_file, send_email, time_stamp, time_str, get_accept, get_use_agent)
 
 from .analysis import clean_csv
 from .basicBilibili import BasicBilibili
@@ -748,6 +748,25 @@ class Up(BasicBilibili):
             echo(1, print_str, 'success')
         else:
             echo(0, print_str, 'error')
+
+    def get_m_html(self, av_id: int) -> str:
+        url = self.M_BILIBILI_URL % av_id
+        headers = {
+            'Accept': get_accept('html'),
+            'Host': url.split('/')[2],
+            'User-Agent': get_use_agent('mobile')
+        }
+        m_html = proxy_req(url, 3, header=headers)
+        if len(m_html) < 1000:
+            if can_retry(url):
+                return self.get_m_html(av_id)
+            else:
+                return ''
+        return m_html
+    
+    def is_hot(self, av_id: int) -> bool:
+        m_html = self.get_m_html(av_id)
+        return '热门' in m_html
 
 
 if __name__ == '__main__':

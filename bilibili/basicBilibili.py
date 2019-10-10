@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-08 23:52:23
+# @Last Modified time: 2019-10-11 01:28:20
 
 import json
 import os
@@ -46,6 +46,7 @@ class BasicBilibili(object):
     CAPTCHA_URL = "https://passport.bilibili.com/web/captcha/combine?plat=11"
     GET_KEY_URL = "https://passport.bilibili.com/api/oauth2/getKey"
     GETTYPE_URL = "https://api.geetest.com/gettype.php?gt=%s&callback=geetest_%d"
+    M_BILIBILI_URL = "https://m.bilibili.com/video/av%s.html"
     NO_RANK_CONSTANT = "No rank.....No Rank......No Rank....."
     JSON_KEYS = ["code", "message", "ttl", "data"]
     T_FORMAT = "%m-%d %H:%M"

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-08 16:19:39
+# @Last Modified time: 2019-10-11 01:58:12
 
 import argparse
 import codecs
@@ -14,7 +14,7 @@ import threading
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
-from util.util import begin_time, end_time, changeCookie, basic_req, can_retry, changeHtmlTimeout, echo, mkdir, read_file, echo
+from util.util import begin_time, end_time, changeCookie, basic_req, can_retry, changeHtmlTimeout, echo, mkdir, read_file, echo, get_accept
 
 """
   * blog @http
@@ -154,16 +154,7 @@ class TitleViews(object):
 
     def getJianshuViews(self):
         ''' get jianshu views '''
-        header = {
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
-            'accept-encoding': 'gzip, deflate, br',
-            'accept-language': 'zh-CN,zh;q=0.9',
-            'cache-control': 'no-cache',
-            'pragma': 'no-cache',
-            'sec-ch-ua': 'Google Chrome 75',
-            'upgrade-insecure-requests': '1',
-            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3736.0 Safari/537.36'
-        }
+        header = {'accept': get_accept('html')}
 
         for rounds in range(1, 4):
             url = self.JIANSHU_URL

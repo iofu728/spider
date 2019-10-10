@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-20 10:57:55
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-13 17:59:26
+# @Last Modified time: 2019-10-11 02:04:24
 
 import codecs
 import datetime
@@ -24,7 +24,7 @@ import js2py
 
 sys.path.append(os.getcwd())
 from util.util import (basic_req, begin_time, changeHeaders, decoder_fuzz,
-                       echo, end_time, time_str)
+                       echo, end_time, time_str, get_accept, get_content_type)
 
 
 data_dir = 'ctrip/data/'
@@ -164,14 +164,9 @@ class HotelDetail:
     def __init__(self):
         self.default_hotel_id = 4889292
         self.header = {
-            'pragma': 'no-cache',
-            'cache-control': 'no-cache',
             'Cookie': '',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
-            "Accept-Encoding": "",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"
+            'Accept': get_accept('html'),
+            'Content-Type': get_content_type(),
         }
 
     def generate_callback(self, e):
@@ -490,8 +485,7 @@ class HotelDetail:
         cookie = {'uid': 'Yn17vOkRm2gW+jCNwT8jPg=='}
         header = {
             'Referer': 'https://hotels.ctrip.com/hotel/4889292.html',
-            'Cookie': self.encoder_cookie(cookie),
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3777.0 Safari/537.36',
+            'Cookie': self.encoder_cookie(cookie)
         }
         url = 'https://s.c-ctrip.com/bf.gif?ac=a&d={}&jv=1.0.0'.format(eeee)
         req = basic_req(url, 2, header=header)

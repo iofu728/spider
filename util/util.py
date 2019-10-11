@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-11 02:07:01
+# @Last Modified time: 2019-10-11 23:04:54
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals, with_statement)
@@ -28,28 +28,6 @@ import urllib3
 from bs4 import BeautifulSoup
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-headers = {
-    'Cookie': '',
-    'Accept': get_accept('html'),
-    'Content-Type': get_content_type(),
-    "User-Agent": get_use_agent()}
-data_dir = 'util/data/'
-log_path = 'service.log'
-mkdir(data_dir)
-agent_lists = [" ".join(index.split()[1:])[1:-1] for index in read_file('{}agent'.format(data_dir))]
-if not len(agent_lists):
-    agent_lists = [headers['User-Agent']]
-
-agent_len = len(agent_lists) - 1
-html_timeout = 5
-json_timeout = 4
-start = []
-spend_list = []
-failure_map = {}
-is_service = False
-LOG_DIR = 'log/'
-EMAIL_SIGN = '\n\n\nBest wish!!\n%s\n\n————————————————————\n• Send from script designed by gunjianpan.'
 
 
 def basic_req(url: str, types: int, proxies=None, data=None, header=None, need_cookie: bool = False):
@@ -515,6 +493,7 @@ def decoder_fuzz(reg: str, file_path: str, replace_func=replace_params):
     with open(output_path, 'w') as f:
         f.write(origin_str)
 
+
 def get_accept(types: str) -> str:
     ''' @param: types => html, json, xhr '''
     if types == 'html':
@@ -532,5 +511,30 @@ def get_use_agent(types: str = 'pc') -> str:
         return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"
     return 'Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1'
 
+
 def get_content_type(types: str = 'utf8') -> str:
     return 'application/x-www-form-urlencoded{}'.format(';charset=UTF-8' if types == 'utf8' else '')
+
+
+headers = {
+    'Cookie': '',
+    'Accept': get_accept('html'),
+    'Content-Type': get_content_type(),
+    "User-Agent": get_use_agent()}
+data_dir = 'util/data/'
+log_path = 'service.log'
+mkdir(data_dir)
+agent_lists = [" ".join(index.split()[1:])[1:-1] for index in read_file('{}agent'.format(data_dir))]
+if not len(agent_lists):
+    agent_lists = [headers['User-Agent']]
+
+agent_len = len(agent_lists) - 1
+html_timeout = 5
+json_timeout = 4
+start = []
+spend_list = []
+failure_map = {}
+is_service = False
+LOG_DIR = 'log/'
+EMAIL_SIGN = '\n\n\nBest wish!!\n%s\n\n————————————————————\n• Send from script designed by gunjianpan.'
+

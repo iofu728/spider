@@ -181,16 +181,16 @@ class Up(BasicBilibili):
             ov_sort_idx) if ii == other_views_len][0] + 1
         other_result = [(jj + 1, av_ids[ii])
                         for jj, ii in enumerate(ov_sort_idx[:4]) if ii != other_views_len]
-        time_tt = get_time_str(time_gap * 60)
-        email_title = 'av{}发布{}, 本年度排名No.{}/{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}'.format(
-            av_id, time_tt, now_sorted, len(other_views), now_info[1], now_info[2], now_info[3], now_info[4], now_info[7])
+        time_tt = self.get_time_str(time_gap)
+        title = self.av_id_map[av_id]['title'].split('|', 1)[0] if av_id in self.av_id_map else ''
+        title_email = '排名(发布{}){}本年度排名No.{}/{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}'.format(time_tt, title, now_sorted, len(other_views), now_info[1], now_info[2], now_info[3], now_info[4], now_info[7])
+        email_title = 'av{}发布{}, 本年度排名No.{}/{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}'.format(av_id, time_tt, now_sorted, len(other_views), now_info[1], now_info[2], now_info[3], now_info[4], now_info[7])
         email_title += self.get_history_rank(now_info)
         context = '{}\n\n'.format(email_title)
         for no, av in other_result[:3]:
             data_info = history_map[av]
-            context += '{}, av{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}, 累计播放: {}{}, 发布时间: {}\n'.format(self.av_id_map[av]['title'].split(
-                '|', 1)[0], av, no, data_info[1], data_info[2], data_info[3], data_info[4], data_info[7], self.av_id_map[av]['play'], self.get_history_rank(data_info), time_str(self.av_id_map[av]['created']))
-        send_email(context, email_title)
+            context += '{}, av{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}, 累计播放: {}{}, 发布时间: {}\n'.format(self.av_id_map[av]['title'].split('|', 1)[0], av, no, data_info[1], data_info[2], data_info[3], data_info[4], data_info[7], self.av_id_map[av]['play'], self.get_history_rank(data_info), time_str(self.av_id_map[av]['created']))
+        send_email(context, title_email)
         self.history_check_finish[av_id].append(round(time_gap / 10))
 
     def get_history_rank(self, data_info: list) -> str:
@@ -331,15 +331,18 @@ class Up(BasicBilibili):
         else:
             self.rank[av_id_id].append(rank_list[0] // 10)
         self.last_rank[av_id_id] = rank_list[0]
-        rank_str = 'Av: {} {} day List || Rank: {} Score: {}'.format(
-            av_id, rank_list[-1], rank, score)
+        is_hot = self.is_hot(av_id)
+        is_hot = '[热门]' if is_hot else ''
+        title = self.av_id_map[av_id]['title'].split('|', 1)[0] if av_id in self.av_id_map else ''
+        rank_str = '热榜{}(%s){}|{}Day List, Rank: {}, Score: {}'.format(is_hot, title, rank_list[-1], rank, score)
         if av_id in self.public:
-            time_gap = (time_stamp() - self.public[av_id][0])
-            rank_str += ', Public: {}'.format(get_time_str(time_gap))
-            rank_context = '{}, Public Time: {}'.format(
-                rank_str, time_str(self.public[av_id][0]))
+            time_gap = (time.time() - self.public[av_id][0]) / 60
+            ts = self.get_time_str(time_gap)
+            ts_str = time_str(self.public[av_id][0])
         else:
-            rank_context = rank_str
+            ts, ts_str = '', ''
+        rank_str = rank_str % ts
+        rank_context = rank_str % ts_str
         send_email(rank_context, rank_str)
 
     def check_star(self, mid: int, star: int) -> bool:
@@ -443,13 +446,11 @@ class Up(BasicBilibili):
 
         if len(not_rank_list):
             for not_rank_av_id in not_rank_list:
-                no_rank_warning = 'Time: {}, Av: {}, {}'.format(
-                    time_str(), not_rank_av_id, self.NO_RANK_CONSTANT)
-                send_email(no_rank_warning, no_rank_warning,
-                           self.special_info_email)
+                title = self.av_id_map[not_rank_av_id]['title'].split('|', 1)[0] if not_rank_av_id in self.av_id_map else ''
+                no_rank_warning = '下榜({}){},{}'.format(time_str(time_format=self.T_FORMAT), title, self.NO_RANK_CONSTANT)
+                send_email(no_rank_warning, no_rank_warning, self.special_info_email)
                 time.sleep(pow(np.pi, 2))
-                send_email(no_rank_warning, no_rank_warning,
-                           self.special_info_email)
+                send_email(no_rank_warning, no_rank_warning, self.special_info_email)
                 echo('4|error', no_rank_warning)
         self.have_assign = have_assign
 
@@ -469,9 +470,6 @@ class Up(BasicBilibili):
             if not index % 5:
                 threading_list.append(threading.Thread(
                     target=self.load_rank, args=()))
-            if index % 7 == 3:
-                threading_list.append(threading.Thread(
-                    target=self.delay_load_history_data, args=()))
             if index % 15 == 2:
                 threading_list.append(threading.Thread(
                     target=self.get_star_num, args=(self.assign_up_mid, True)))
@@ -500,6 +498,7 @@ class Up(BasicBilibili):
 
     def get_check(self):
         ''' check comment '''
+        self.delay_load_history_data()
         av_id_list = [[ii['aid'], ii['comment']] for ii in self.av_id_map.values(
         ) if not regex.findall(self.ignore_list, str(ii['aid']))]
         av_map = {ii['aid']: ii for ii in self.av_id_map.values()}
@@ -529,16 +528,11 @@ class Up(BasicBilibili):
         now_time = now_hour + now_min / 60
         if now_time > self.ignore_start and now_time < self.ignore_end:
             return
-        if os.path.exists('{}comment.pkl'.format(comment_dir)):
-            with codecs.open('{}comment.pkl'.format(comment_dir), 'rb') as f:
-                self.comment = pickle.load(f)
         if self.assign_up_mid == -1:
             return
 
         threading_list = []
         for (ii, jj) in av_id_list:
-            if ii not in self.comment:
-                self.comment[ii] = {}
             work = threading.Thread(
                 target=self.comment_check_schedule, args=(ii, jj,))
             threading_list.append(work)
@@ -546,8 +540,6 @@ class Up(BasicBilibili):
             work.start()
         for work in threading_list:
             work.join()
-        with codecs.open('{}comment.pkl'.format(comment_dir), 'wb') as f:
-            pickle.dump(self.comment, f)
         return av_id_list
 
     def comment_check_schedule(self, av_id: int, comment: int):
@@ -563,23 +555,6 @@ class Up(BasicBilibili):
             work.start()
         for work in threading_list:
             work.join()
-
-        comment = [self.comment[av_id][k]
-                   for k in sorted(self.comment[av_id].keys())]
-        basic = [','.join([str(jj) for jj in ii['basic']])
-                 for ii in comment if 'basic' in ii]
-        replies = []
-        for ii in comment:
-            if not 'replies' in ii:
-                continue
-            parent_rpid = ii['basic'][0]
-            replies_t = ii['replies']
-            for jj in replies_t:
-                jj[0] = '%s-%s' % (str(parent_rpid), str(jj[0]))
-                replies.append(','.join([str(kk) for kk in jj]))
-        with codecs.open('%s%d_comment.csv' % (comment_dir, av_id), 'w', encoding='utf-8') as f:
-            f.write('\n'.join(basic) + '\n')
-            f.write('\n'.join(replies) + '\n')
 
     def check_comment_once(self, av_id: int, pn: int, sort: int, root: int = -1, ps: int = 10):
         ''' check comment once '''
@@ -614,10 +589,6 @@ class Up(BasicBilibili):
             if not crep is None:
                 info['replies'] = [self.get_comment_detail(
                     {**kk, 'idx': '{}-{}'.format(idx, ww + 1)}, av_id, pn, rpid) for ww, kk in enumerate(crep)]
-            self.comment[av_id][rpid] = info
-        wait_check = [ii for ii in wait_check if not ii['rpid']
-                      in self.comment[av_id]]
-        echo('1|debug', len(wait_check), 'av_id:', av_id)
 
     def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_rpid=None) -> List:
         ''' get comment detail '''
@@ -657,12 +628,11 @@ class Up(BasicBilibili):
             self.email_send_time[rpid_str] += 1
         else:
             self.email_send_time[rpid_str] = 1
-        title = self.av_id_map[av_id]['title'].split(
-            '|', 1)[0] if av_id in self.av_id_map else ''
+        title = self.av_id_map[av_id]['title'].split('|', 1)[0] if av_id in self.av_id_map else ''
+        sort = '热门' if sort else '时间'
 
-        email_content = 'Date: {}\nUrl: {}\nTitle: {},\nPage: {} #{}@{},\nUser: {},\nSex: {},\nsign: {}\nlike: {}\nplat: {}\nlevel:{}\nconetnt: {},\n'.format(
-            ctime, title, url, pn, idx, rpid, uname, sex, sign, like, plat, current_level, content)
-        email_subject = '评论({}){}{}#{}'.format(ctimes, title, pn, idx)
+        email_content = 'Date: {}\nUrl: {}\nTitle: {},\nPage: {} #{}@{},\nUser: {},\nSex: {},\nsign: {}\nlike: {}\nplat: {}\nlevel:{}\nconetnt: {},\n'.format(ctime, title, url, pn, idx, rpid, uname, sex, sign, like, plat, current_level, content)
+        email_subject = '评论({}){}{}{}#{}'.format(ctimes, title, sort, pn, idx)
         echo('4|warning', email_content, email_subject)
         send_email(email_content, email_subject, assign_rec=self.assign_rec)
 

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-11 01:57:42
+# @Last Modified time: 2019-10-14 23:29:59
 
 
 import codecs
@@ -341,8 +341,8 @@ class Up(BasicBilibili):
             ts_str = time_str(self.public[av_id][0])
         else:
             ts, ts_str = '', ''
-        rank_str = rank_str % ts
         rank_context = rank_str % ts_str
+        rank_str = rank_str % ts
         send_email(rank_context, rank_str)
 
     def check_star(self, mid: int, star: int) -> bool:

@@ -63,7 +63,7 @@ class GetFreeProxy:
         self.canuse_proxies = []
         self.init_proxy()
 
-    def proxy_req(self, url: str, types: int, data=None, header=None, test_func=None, need_cookie: bool = False):
+    def proxy_req(self, url: str, types: int, data=None, header=None, test_func=None, need_cookie: bool = False, config: dict = {}):
         """
         use proxy to send requests, and record the proxy cann't use
         @types S0XY: X=0.->get;   =1.->post;
@@ -91,11 +91,11 @@ class GetFreeProxy:
             proxies = {type_map[httptype]: proxies_url}
 
         try:
-            result = basic_req(url, types=types, proxies=proxies, data=data, header=header, need_cookie=need_cookie)
+            result = basic_req(url, types=types, proxies=proxies, data=data, header=header, need_cookie=need_cookie, config=config)
             if test_func is not None:
                 if not test_func(result):
                     if self.check_retry(url):
-                        return self.proxy_req(url, types=types + 1000 * ss_type, data=data, header=header, test_func=test_func, need_cookie=need_cookie)
+                        return self.proxy_req(url, types=types + 1000 * ss_type, data=data, header=header, test_func=test_func, need_cookie=need_cookie, config=config)
                     else:
                         self.failured_time[url] = 0
                         return
@@ -113,7 +113,7 @@ class GetFreeProxy:
                 self.clean_cannot_use()
 
             if self.check_retry(url):
-                self.proxy_req(url, types=types + 1000 * ss_type, data=data, test_func=test_func, header=header, need_cookie=need_cookie)
+                self.proxy_req(url, types=types + 1000 * ss_type, data=data, test_func=test_func, header=header, need_cookie=need_cookie, config=config)
 
     def check_retry(self, url: str) -> bool:
         ''' check try time '''

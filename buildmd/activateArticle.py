@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-11 02:03:40
+# @Last Modified time: 2019-10-24 00:56:42
 
 import hashlib
 import json
@@ -116,11 +116,13 @@ class ActivateArticle(TBK):
     ''' activate article in youdao Cloud'''
     Y_URL = 'https://note.youdao.com/'
     WEB_URL = f'{Y_URL}web/'
-    SYNC_URL = f'{Y_URL}yws/api/personal/sync?method=%s&keyfrom=web&cstk=%s'
+    API_P_URL = f'{Y_URL}yws/api/personal/'
+    SYNC_URL = f'{API_P_URL}sync?method=%s&keyfrom=web&cstk=%s'
     NOTE_URL = f'{Y_URL}yws/public/note/%s?editorType=0'
     SHARE_URL = f'{Y_URL}ynoteshare1/index.html?id=%s&type=note'
-    GET_SHARE_URL = f'{Y_URL}yws/api/personal/share?method=get&shareKey=%s'
-    LISTRECENT_URL = f'{Y_URL}yws/api/personal/file?method=listRecent&offset=%d&limit=30&keyfrom=web&cstk=%s'
+    GET_SHARE_URL = f'{API_P_URL}share?method=get&shareKey=%s'
+    LISTRECENT_URL = f'{API_P_URL}file?method=listRecent&offset=%d&limit=30&keyfrom=web&cstk=%s'
+    MYSHARE_URL = f'{API_P_URL}myshare?method=get&checkBan=true&entryId=%s&keyfrom=web&cstk=%s'
     DECODER_TPWD_URL = 'http://www.taokouling.com/index/taobao_tkljm'
     Y_DOC_JS_URL = 'https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js'
     MTOP_URL = 'https://h5api.m.taobao.com/h5/mtop.alimama.union.xt.en.api.entry/1.0/'
@@ -146,6 +148,7 @@ class ActivateArticle(TBK):
     ONE_DAY = 24
     M = '_m_h5_tk'
     ZERO_STAMP = '0天0小时0分0秒'
+    T_FORMAT = "%m-%d %H:%M"
     BASIC_STAMP = time_stamp(time_format='%d天%H小时%M分%S秒',
                              time_str='1天0小时0分0秒') - ONE_DAY * ONE_HOURS
 
@@ -244,7 +247,8 @@ class ActivateArticle(TBK):
             self.tpwd_map[article_id] = {}
         time = 0
         au_list = []
-        while len(self.tpwd_map[article_id]) < len(tpwds) and time < 5:
+        no_type = [ii for ii, jj in self.tpwd_map[article_id].items() if 'type' not in jj or jj['item_id'] is None]
+        while (len(self.tpwd_map[article_id]) < len(tpwds) or (len(no_type) and not time)) and time < 5:
             thread_list = [ii for ii in tpwds
                            if not ii in self.tpwd_map[article_id]]
             echo(1, article_id, 'tpwds len:', len(tpwds),
@@ -252,9 +256,8 @@ class ActivateArticle(TBK):
             thread_list = [self.tpwd_exec.submit(self.decoder_tpwd_once,
                                                  article_id, ii) for ii in thread_list]
             list(as_completed(thread_list))
-            au_list.extend([self.tpwd_exec.submit(self.decoder_tpwd_url,
-                                                  article_id, ii) for ii, jj in self.tpwd_map[article_id].items()
-                            if not 'type' in jj or jj['item_id'] is None])
+            no_type = [ii for ii, jj in self.tpwd_map[article_id].items() if 'type' not in jj or jj['item_id'] is None]
+            au_list.extend([self.tpwd_exec.submit(self.decoder_tpwd_url, article_id, ii) for ii in no_type])
             time += 1
         list(as_completed(au_list))
         self.load_article2db(article_id)
@@ -428,6 +431,14 @@ class ActivateArticle(TBK):
         return req
 
     def get_s_click_url(self, s_click_url: str):
+        ''' decoder s.click real jump url @validation time: 2019.10.23'''
+        item_url = self.get_s_click_location(s_click_url)
+        if item_url is None:
+            echo(3, 's_click_url location Error..')
+            return
+        return self.get_item_detail(item_url)
+
+    def get_s_click_url_v1(self, s_click_url: str):
         ''' decoder s.click real jump url @validation time: 2019.08.31'''
         if 'tu=' not in s_click_url:
             tu_url = self.get_s_click_tu(s_click_url)
@@ -446,19 +457,43 @@ class ActivateArticle(TBK):
             return
         redirect_url = urllib.parse.unquote(qso['tu'])
         return self.get_s_click_detail(redirect_url, tu_url)
-
-    def get_s_click_tu(self, s_click_url: str):
+    
+    def get_s_click_basic(self, s_click_url: str, retry_func = (lambda x: False), referer: str = '', allow_redirects: bool = True):
         headers = {
             'Accept': get_accept('html'),
             'Host': 's.click.taobao.com'
         }
-        req = proxy_req(s_click_url, 2, header=headers)
-        if req is None or 'tu=' not in req.url:
+        if referer != '':
+            headers['Referer'] = referer
+        req = proxy_req(s_click_url, 2, header=headers, config={'allow_redirects':allow_redirects})
+        if req is None or retry_func(req):
             if can_retry(s_click_url):
-                return self.get_s_click_tu(s_click_url)
+                return self.get_s_click_basic(s_click_url)
             else:
                 return
+        return req 
+
+    def get_s_click_tu(self, s_click_url: str):
+        req = self.get_s_click_basic(s_click_url, lambda i: 'tu=' not in i.url)
+        if req is None:
+            return 
         return req.url
+    
+    def get_s_click_location(self, s_click_url: str):
+        req = self.get_s_click_basic(s_click_url, lambda i: 'real_jump_address' not in i.text)
+        if req is None:
+            echo("0|warning", 's_click_url first click error.')
+            return 
+        rj = regex.findall('real_jump_address = \'(.*?)\'', req.text)
+        if not len(rj):
+            echo("0|warning", 'real_jump_address get error.')
+            return
+        rj = rj[0].replace('&amp;', '&')
+        req_rj = self.get_s_click_basic(rj, lambda i: 'Location' not in i.headers, referer=s_click_url, allow_redirects=False)
+        if req_rj is None:
+            return 
+        return req_rj.headers['Location']
+        
 
     def get_s_click_detail(self, redirect_url: str, tu_url: str):
         headers = {
@@ -608,15 +643,17 @@ class ActivateArticle(TBK):
             self.email_update_result(article_id, r_log, r_num)
             self.update_valid(article_id)
             self.update_article2db(article_id)
+            self.share_article(article_id)
 
     def email_update_result(self, article_id: str, r_log: list, r_num: int):
         p = self.share2article[article_id][-2].split('/')[-1]
         article_info = self.list_recent[p]
-        subject = '({})更新{}/{}条tpwd, {}'.format(
-            time_str(), r_num, len(r_log), article_info['name'])
+        name = article_info['name'].replace('.note', '')
+        subject = '更新({}){}/{}条[{}]'.format(
+            time_str(time_format=self.T_FORMAT), r_num, len(r_log), article_info['name'])
         content = '\n'.join(['Title: {}'.format(article_info['name']),
                              'Time: {}'.format(time_str()),
-                             'Update Num: {}/{}条'.format(r_num, len(r_log)), *r_log])
+                             'Update Num: {}/{}条'.format(r_num, len(r_log)), '', *r_log])
         send_email(content, subject, assign_rec=self.assign_rec)
 
     def update_valid(self, article_id: str):
@@ -722,3 +759,15 @@ class ActivateArticle(TBK):
             return False
         echo('1|warning', 'Update atricle_id {} Success!!!'.format(article_id))
         return True
+
+    def share_article(self, article_id: str):
+        p = self.share2article[article_id][-2].split('/')[-1]
+        url = self.MYSHARE_URL % (p, self.cstk)
+        req = proxy_req(url, 1, header=self.get_ynote_web_header(1))
+        if req is None or list(req.keys()) != ['entry', 'meta']:
+            if can_retry(url):
+                return self.share_article(article_id)
+            return False
+        echo('2', 'Share article {} Success!!!'.format(article_id))
+        return True
+

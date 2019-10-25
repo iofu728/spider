@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-23 23:28:31
+# @Last Modified time: 2019-10-25 22:50:32
 
 from __future__ import (
     absolute_import,
@@ -93,12 +93,14 @@ def get_basic(
     need_cookie: bool,
     config: dict,
     mode: int = 0,
-    timeout: int = 5,
+    timeouts: int = 5,
 ):
     """ basic get requests"""
     if header is None:
         header = headers
     allow_redirects = config.get("allow_redirects", True)
+    timeout = config.get("timeout", timeouts)
+    return_proxy = config.get("return_proxy", False)
     try:
         req = req_func(
             url,
@@ -110,6 +112,8 @@ def get_basic(
             allow_redirects=allow_redirects,
         )
         if mode == 2:
+            if return_proxy:
+                return req, proxies
             return req
         elif mode == 0:
             if req.apparent_encoding == "utf-8" or "gbk" in req.apparent_encoding:
@@ -121,6 +125,8 @@ def get_basic(
             result = req.text
         if need_cookie:
             return result, req.cookies.get_dict()
+        if return_proxy:
+            return result, proxies
         return result
     except:
         if mode == 3:

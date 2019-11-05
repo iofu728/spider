@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-27 02:49:26
+# @Last Modified time: 2019-11-06 00:56:33
 
 import hashlib
 import json
@@ -71,7 +71,7 @@ class TBK(object):
         self.site_id = cfg.getint("TBK", "site_id")
         self.adzone_id = cfg.getint("TBK", "adzone_id")
         self.home_id = cfg.get("YNOTE", "home_id")
-        self.uland_url = cfg.get("TBK", "uland_url")
+        self.test_item_id = cfg.getint("TBK", "test_item_id")
         self.unlogin_id = cfg.get("YNOTE", "unlogin_id")
         self.cookie = cfg.get("YNOTE", "cookie")[1:-1]
         self.assign_rec = cfg.get("YNOTE", "assign_email").split(",")
@@ -155,7 +155,7 @@ class ActivateArticle(TBK):
     )
     DECODER_TPWD_URL = "http://www.taokouling.com/index/taobao_tkljm"
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
-    MTOP_URL = "https://h5api.m.taobao.com/h5/mtop.alimama.union.xt.en.api.entry/1.0/"
+    MTOP_URL = "https://h5api.m.taobao.com/h5/%s/1.0/"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
     S_LIST_SQL = "SELECT `id`, article_id, title, q, created_at from article;"
     I_LIST_SQL = "INSERT INTO article (article_id, title, q) VALUES %s;"
@@ -180,7 +180,7 @@ class ActivateArticle(TBK):
         15: "empty",
         16: "failure",
     }
-    NEED_KEY = ["content", "url", "validDate"]
+    NEED_KEY = ["content", "url", "validDate", "picUrl"]
     ONE_HOURS = 3600
     ONE_DAY = 24
     M = "_m_h5_tk"
@@ -413,7 +413,7 @@ class ActivateArticle(TBK):
         self.update_db(insert_list, f"article_id {article_id} Insert")
         self.update_db(update_list, f"article_id {article_id} Update")
 
-    def update_tpwd(self):
+    def update_tpwd(self, mode: int = 0):
         update_num = 0
         for ii, jj in self.article_list.items():
             for kk, (num_iid, title, domain, tpwd, _, _, url) in jj.items():
@@ -438,17 +438,18 @@ class ActivateArticle(TBK):
                     )
                 else:
                     c = self.generate_tpwd(
-                        title, int(num_iid), origin_tpwd, renew_type, c
+                        title, int(num_iid), origin_tpwd, renew_type, c, mode
                     )
                 self.article_list[ii][kk] = c
                 update_num += int(c[2] < 15 or (renew_type))
         echo(2, "Update {} Tpwd Info Success!!".format(update_num))
 
     def generate_tpwd(
-        self, title: str, num_iid: int, renew_tpwd: str, renew_type: int, c: dict
+        self, title: str, num_iid: int, renew_tpwd: str, renew_type: int, c: dict, mode: int
     ):
         goods = self.get_dg_material(title, num_iid)
         if goods is None or not len(goods):
+            echo(0, "goods get error:", title, num_iid)
             return (*c[:2], 17, renew_tpwd, 1 if renew_type == 0 else 2, *c[-2:])
         goods = goods[0]
         if "coupon_share_url" in goods and len(goods["coupon_share_url"]):
@@ -462,6 +463,8 @@ class ActivateArticle(TBK):
         if tpwd is None:
             echo(0, "tpwd error:", tpwd)
             return (*c[:2], 18, renew_tpwd, 1 if renew_type == 0 else 2 * c[-2:])
+        if mode:
+           return (*c[:3], tpwd, commission_rate, commission_type, c[-1]) 
         if renew_type == 1:
             return (*c[:3], tpwd, 2, commission_type, c[-1])
         return (*c[:3], tpwd, commission_rate, commission_type, c[-1])
@@ -739,17 +742,49 @@ class ActivateArticle(TBK):
 
     def get_m_h5_tk(self):
         self.m_time = time_stamp()
-        req = self.get_uland_url_once(self.uland_url)
+        req = self.get_finger(self.test_item_id)
         self.cookies = req.cookies.get_dict()
         echo(1, "get m h5 tk cookie:", self.cookies)
+
+    def get_tb_h5_api(self, api: str, jsv: str, refer_url: str, data: dict, cookies: dict = {}):
+        """ tb h5 api @2019.11.6 ✔️Tested"""
+        step = self.M in cookies
+        data = json_str(data)
+        
+        headers = {"referer": refer_url}
+        if step:
+            headers["Cookie"] = encoder_cookie(cookies)
+        appkey = "12574478"
+
+        token = cookies[self.M].split("_")[0] if step else ""
+        t = int(time_stamp() * 1000)
+        j_data = {
+            "jsv": jsv,
+            "appKey": appkey,
+            "t": t,
+            "sign": self.get_tb_h5_token(token, appkey, data, t),
+            "api": api,
+            "v": 1.0,
+            "timeout": 20000,
+            "AntiCreep": True,
+            "AntiFlood": True,
+            "type": "originaljson",
+            "dataType": "jsonp",
+            "data": data,
+        }
+        mtop_url = encoder_url(j_data, self.MTOP_URL % api)
+        req = proxy_req(mtop_url, 2, header=headers)
+        if req is None:
+            if can_retry(mtop_url):
+                return self.get_tb_h5_api(api, jsv, refer_url, data, cookies)
+            else:
+                return
+        return req
 
     def get_uland_url_once(self, uland_url: str, cookies: dict = {}):
         """ tb h5 api @2019.9.7 ✔️Tested"""
         step = self.M in cookies
         uland_params = decoder_url(uland_url)
-        headers = {"referer": uland_url}
-        if step:
-            headers["Cookie"] = encoder_cookie(cookies)
         tt = json_str(
             {
                 "floorId": "13193" if step else "13052",
@@ -762,33 +797,15 @@ class ActivateArticle(TBK):
                 ),
             }
         )
-        appkey = "12574478"
+        api = "mtop.alimama.union.xt.en.api.entry"
+        jsv = '2.4.0'
+        return self.get_tb_h5_api(api, jsv, uland_url, tt)
 
-        token = cookies[self.M].split("_")[0] if step else ""
-        t = int(time_stamp() * 1000)
-        data = {
-            "jsv": "2.4.0",
-            "appKey": appkey,
-            "t": t,
-            "sign": self.get_tb_h5_token(token, appkey, tt, t),
-            "api": "mtop.alimama.union.xt.en.api.entry",
-            "v": 1.0,
-            "timeout": 20000,
-            "AntiCreep": True,
-            "AntiFlood": True,
-            "type": "jsonp",
-            "dataType": "jsonp",
-            "callback": "mtopjsonp{}".format(int(step) + 1),
-            "data": tt,
-        }
-        mtop_url = encoder_url(data, self.MTOP_URL)
-        req = proxy_req(mtop_url, 2, header=headers)
-        if req is None:
-            if can_retry(mtop_url):
-                return self.get_uland_url_once(uland_url, cookies)
-            else:
-                return
-        return req
+    def get_finger(self, item_id: int, cookies: dict = {}):
+        api = 'mtop.taobao.hacker.finger.create'
+        refer_url = self.ITEM_URL % item_id
+        jsv = '2.4.11'
+        return self.get_tb_h5_api(api, jsv, refer_url, {}, cookies)
 
     def get_tb_h5_token(self, token: str, appkey: str, data: str, t: int):
         md5 = hashlib.md5()
@@ -1058,4 +1075,36 @@ class ActivateArticle(TBK):
             return False
         echo("2", "Share article {} Success!!!".format(article_id))
         return True
+
+    def load_article_local(self, file_path: str):
+        if file_path not in self.tpwds:
+            tt = '||||'.join(read_file(file_path))
+            tpwds = regex.findall(self.TPWD_REG, tt)
+            self.tpwds[file_path] = tpwds
+        else:
+            tpwds = self.tpwds[file_path]
+        if file_path not in self.tpwd_map:
+            self.tpwd_map[file_path] = {}
+        time = 0
+        while (len(self.tpwd_map[file_path]) < len(tpwds)) and time < 5:
+            thread_list = [ii for ii in tpwds if not ii in self.tpwd_map[file_path]]
+            echo(1, file_path, "tpwds len:", len(tpwds), "need load", len(thread_list))
+            thread_list = [
+                self.tpwd_exec.submit(self.decoder_tpwd_once, file_path, ii, 1)
+                for ii in thread_list
+            ]
+            list(as_completed(thread_list))
+
+    def load_picture(self, url: str, idx: int):
+        td = basic_req(url, 2)
+        with open('picture/{}.jpg'.format(idx), 'wb') as f:
+            f.write(td.content)
+
+    def load_picture_pipeline(self, file_path: str):
+        mkdir('picture')
+        picture_url = [(ii['picUrl'], idx) for idx, ii in enumerate(list(self.tpwd_map[file_path].values()))]
+        picture_url = [(ii, idx) for ii, idx in picture_url if not os.path.exists('picture/{}.jpg'.format(idx))]
+        echo(1, 'Load {} picture Begin'.format(len(picture_url)))
+        pp = [self.tpwd_exec.submit(self.load_picture, ii, jj) for ii, jj in picture_url]
+        return pp
 

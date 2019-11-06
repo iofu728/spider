@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-11-06 00:56:33
+# @Last Modified time: 2019-11-06 23:33:01
 
 import hashlib
 import json
@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import urllib
+import cv2
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from configparser import ConfigParser
 
@@ -72,6 +73,7 @@ class TBK(object):
         self.adzone_id = cfg.getint("TBK", "adzone_id")
         self.home_id = cfg.get("YNOTE", "home_id")
         self.test_item_id = cfg.getint("TBK", "test_item_id")
+        self.uland_url = cfg.get("TBK", "uland_url")
         self.unlogin_id = cfg.get("YNOTE", "unlogin_id")
         self.cookie = cfg.get("YNOTE", "cookie")[1:-1]
         self.assign_rec = cfg.get("YNOTE", "assign_email").split(",")
@@ -742,11 +744,13 @@ class ActivateArticle(TBK):
 
     def get_m_h5_tk(self):
         self.m_time = time_stamp()
-        req = self.get_finger(self.test_item_id)
+        req = self.get_uland_url_once(self.uland_url)
+        if req is None:
+            return
         self.cookies = req.cookies.get_dict()
         echo(1, "get m h5 tk cookie:", self.cookies)
 
-    def get_tb_h5_api(self, api: str, jsv: str, refer_url: str, data: dict, cookies: dict = {}):
+    def get_tb_h5_api(self, api: str, jsv: str, refer_url: str, data: dict, j_data_t: dict = {}, cookies: dict = {}):
         """ tb h5 api @2019.11.6 ✔️Tested"""
         step = self.M in cookies
         data = json_str(data)
@@ -771,11 +775,13 @@ class ActivateArticle(TBK):
             "type": "originaljson",
             "dataType": "jsonp",
             "data": data,
+            **j_data_t
         }
         mtop_url = encoder_url(j_data, self.MTOP_URL % api)
         req = proxy_req(mtop_url, 2, header=headers)
+        echo(4, 'request once.')
         if req is None:
-            if can_retry(mtop_url):
+            if can_retry(self.MTOP_URL % api):
                 return self.get_tb_h5_api(api, jsv, refer_url, data, cookies)
             else:
                 return
@@ -785,8 +791,7 @@ class ActivateArticle(TBK):
         """ tb h5 api @2019.9.7 ✔️Tested"""
         step = self.M in cookies
         uland_params = decoder_url(uland_url)
-        tt = json_str(
-            {
+        tt = {
                 "floorId": "13193" if step else "13052",
                 "variableMap": json_str(
                     {
@@ -795,11 +800,11 @@ class ActivateArticle(TBK):
                         "scm": uland_params["scm"],
                     }
                 ),
-            }
-        )
+                }
         api = "mtop.alimama.union.xt.en.api.entry"
         jsv = '2.4.0'
-        return self.get_tb_h5_api(api, jsv, uland_url, tt)
+        j_data = {'type': 'jsonp', "callback": "mtopjsonp{}".format(int(step) + 1),}
+        return self.get_tb_h5_api(api, jsv, uland_url, tt, j_data, cookies)
 
     def get_finger(self, item_id: int, cookies: dict = {}):
         api = 'mtop.taobao.hacker.finger.create'
@@ -1097,8 +1102,12 @@ class ActivateArticle(TBK):
 
     def load_picture(self, url: str, idx: int):
         td = basic_req(url, 2)
-        with open('picture/{}.jpg'.format(idx), 'wb') as f:
+        picture_path = 'picture/{}.jpg'.format(idx)
+        with open(picture_path, 'wb') as f:
             f.write(td.content)
+        pic = cv2.imread(picture_path)
+        pic.resize(pic, (600, 600), interpolation=cv2.INTER_CUBIC)
+        cv2.imwrite(picture_path, pic)
 
     def load_picture_pipeline(self, file_path: str):
         mkdir('picture')

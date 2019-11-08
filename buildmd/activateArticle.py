@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-11-06 23:33:01
+# @Last Modified time: 2019-11-09 01:43:48
 
 import hashlib
 import json
@@ -73,6 +73,7 @@ class TBK(object):
         self.adzone_id = cfg.getint("TBK", "adzone_id")
         self.home_id = cfg.get("YNOTE", "home_id")
         self.test_item_id = cfg.getint("TBK", "test_item_id")
+        self.test_finger_id = cfg.getint("TBK", "test_finger_id")
         self.uland_url = cfg.get("TBK", "uland_url")
         self.unlogin_id = cfg.get("YNOTE", "unlogin_id")
         self.cookie = cfg.get("YNOTE", "cookie")[1:-1]
@@ -157,8 +158,9 @@ class ActivateArticle(TBK):
     )
     DECODER_TPWD_URL = "http://www.taokouling.com/index/taobao_tkljm"
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
-    MTOP_URL = "https://h5api.m.taobao.com/h5/%s/1.0/"
+    MTOP_URL = "https://h5api.m.taobao.com/h5/%s/%d.0/"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
+    DETAIL_URL = 'https://detail.m.tmall.com/item.htm?id=%d'
     S_LIST_SQL = "SELECT `id`, article_id, title, q, created_at from article;"
     I_LIST_SQL = "INSERT INTO article (article_id, title, q) VALUES %s;"
     R_LIST_SQL = "REPLACE INTO article (`id`, article_id, title, q, is_deleted, created_at) VALUES %s;"
@@ -415,13 +417,14 @@ class ActivateArticle(TBK):
         self.update_db(insert_list, f"article_id {article_id} Insert")
         self.update_db(update_list, f"article_id {article_id} Update")
 
-    def update_tpwd(self, mode: int = 0):
+    def update_tpwd(self, mode: int = 0, is_renew: bool = True):
         update_num = 0
         for ii, jj in self.article_list.items():
             for kk, (num_iid, title, domain, tpwd, _, _, url) in jj.items():
                 c = self.article_list[ii][kk]
                 if (
-                    self.URL_DOMAIN[1] not in url
+                    is_renew
+                    and self.URL_DOMAIN[1] not in url
                     and self.URL_DOMAIN[2] not in url
                     and self.URL_DOMAIN[10] not in url
                 ):
@@ -443,7 +446,7 @@ class ActivateArticle(TBK):
                         title, int(num_iid), origin_tpwd, renew_type, c, mode
                     )
                 self.article_list[ii][kk] = c
-                update_num += int(c[2] < 15 or (renew_type))
+                update_num += int(c[2] < 15 or (renew_type and not mode))
         echo(2, "Update {} Tpwd Info Success!!".format(update_num))
 
     def generate_tpwd(
@@ -677,6 +680,13 @@ class ActivateArticle(TBK):
             return ""
         return item["id"]
 
+    def get_item_title_once(self, item_id: int) -> str:
+        item = self.get_tb_getdetail(item_id)
+        if item is None:
+            return ''
+        return item['title']
+        
+
     def get_item_title(self, article_id: str, tpwd: str):
         temp_map = self.tpwd_map[article_id][tpwd]
         if (
@@ -690,7 +700,7 @@ class ActivateArticle(TBK):
         if title != "":
             self.tpwd_map[article_id][tpwd]["title"] = title
 
-    def get_item_title_once(self, item_id: int) -> str:
+    def get_item_title_once_v1(self, item_id: int) -> str:
         req = self.get_item_basic(item_id)
         if req is None:
             return ""
@@ -717,11 +727,12 @@ class ActivateArticle(TBK):
 
     def get_uland_url(self, uland_url: str):
         if (
-            not self.M in self.cookies
+            not 'uland' in self.cookies
+            # or not self.M in self.cookies['uland']
             or time_stamp() - self.m_time > self.ONE_HOURS / 2
         ):
             self.get_m_h5_tk()
-        s_req = self.get_uland_url_once(uland_url, self.cookies)
+        s_req = self.get_uland_url_once(uland_url, self.cookies['uland'])
         req_text = s_req.text
         re_json = json.loads(req_text[req_text.find("{") : -1])
         return re_json["data"]["resultList"][0]["itemId"]
@@ -744,29 +755,101 @@ class ActivateArticle(TBK):
 
     def get_m_h5_tk(self):
         self.m_time = time_stamp()
-        req = self.get_uland_url_once(self.uland_url)
-        if req is None:
-            return
-        self.cookies = req.cookies.get_dict()
-        echo(1, "get m h5 tk cookie:", self.cookies)
+        def get_cookie_once(key, func, *param):
+            req = func(*param)
+            if req is not None: 
+                self.cookies[key] = req.cookies.get_dict()
+                echo(1, "get {} cookie:".format(key), self.cookies[key])
 
-    def get_tb_h5_api(self, api: str, jsv: str, refer_url: str, data: dict, j_data_t: dict = {}, cookies: dict = {}):
+        get_cookie_once('uland', self.get_uland_url_once, self.uland_url)
+        if False:
+            get_cookie_once('finger', self.get_finger_once, self.test_item_id)
+            get_cookie_once('baichuan', self.get_baichuan_once, self.test_item_id, self.test_finger_id) 
+
+
+    def get_baichuan(self, item_id: int):
+        if (
+            not 'baichuan' in self.cookies
+            or not self.M in self.cookies['baichuan']
+            or time_stamp() - self.m_time > self.ONE_HOURS / 2
+        ):
+            self.get_m_h5_tk()
+        finger_id = self.get_finger(item_id)
+        if finger_id is None:
+            return
+        echo(4, 'finger id:', finger_id) 
+        req = self.get_baichuan_once(item_id, finger_id, self.cookies['baichuan'])
+        if req is not None:
+            return req.json()['data']
+
+    def get_tb_getdetail(self, item_id: int):
+        if (
+            not 'uland' in self.cookies
+            or time_stamp() - self.m_time > self.ONE_HOURS / 2
+        ):
+            self.get_m_h5_tk()
+        req = self.get_tb_getdetail_once(item_id, self.cookies['uland'])
+        if req is not None:
+            req_text = req.text
+            re_json = json.loads(req_text[req_text.find("{") : -1])
+            return re_json["data"]["item"]
+
+
+    def get_tb_getdetail_once(self, item_id: int, cookies: dict = {}):
+        refer_url = self.DETAIL_URL % item_id
+        data = {"itemNumId": str(item_id)}
+        jsv = '2.4.8'
+        api = 'mtop.taobao.detail.getdetail'
+        j_data_t = {'v': 6.0,
+        'ttid': '2017@taobao_h5_6.6.0',
+        'AntiCreep': True,
+        'callback': 'mtopjsonp1'
+        }
+        return self.get_tb_h5_api(api, jsv, refer_url, data, j_data_t, cookies)
+
+
+    def get_baichuan_once(self, item_id: int, finger_id: str, cookies: dict = {}):
+        refer_url = self.DETAIL_URL % item_id
+        data = {
+            'pageCode': 'mallDetail',
+            'ua': get_use_agent('mobile'),
+            'params': json_str({
+                "url": refer_url,
+                "referrer": "",
+                "oneId": None, "isTBInstalled": "null", "fid": finger_id
+                })
+            }
+        data_str = r'{"pageCode":"mallDetail","ua":"%s","params":"{\"url\":\"%s\",\"referrer\":\"\",\"oneId\":null,\"isTBInstalled\":\"null\",\"fid\":\"%s\"}"}' % (get_use_agent('mobile'), refer_url, finger_id)
+        print(data)
+        api = 'mtop.taobao.baichuan.smb.get'
+        jsv = '2.4.8'
+        
+        return self.get_tb_h5_api(api, jsv, refer_url, data, cookies=cookies, mode=1, data_str=data_str)
+        
+
+    def get_tb_h5_api(self, api: str, jsv: str, refer_url: str, data: dict, j_data_t: dict = {}, cookies: dict = {}, mode: int = 0, data_str: str = None):
         """ tb h5 api @2019.11.6 ✔️Tested"""
         step = self.M in cookies
-        data = json_str(data)
+        if data_str is None:
+            data_str = json_str(data)
         
-        headers = {"referer": refer_url}
+        headers = {
+            "Accept": 'application/json',
+            "referer": refer_url,
+            "Agent": get_use_agent('mobile')
+        }
         if step:
             headers["Cookie"] = encoder_cookie(cookies)
         appkey = "12574478"
 
         token = cookies[self.M].split("_")[0] if step else ""
         t = int(time_stamp() * 1000)
+        
         j_data = {
             "jsv": jsv,
             "appKey": appkey,
             "t": t,
-            "sign": self.get_tb_h5_token(token, appkey, data, t),
+            "sign": self.get_tb_h5_token(token, t, appkey, data_str),
             "api": api,
             "v": 1.0,
             "timeout": 20000,
@@ -774,21 +857,25 @@ class ActivateArticle(TBK):
             "AntiFlood": True,
             "type": "originaljson",
             "dataType": "jsonp",
-            "data": data,
             **j_data_t
         }
-        mtop_url = encoder_url(j_data, self.MTOP_URL % api)
-        req = proxy_req(mtop_url, 2, header=headers)
+        if mode == 0:
+            j_data['data'] = data_str
+        mtop_url = encoder_url(j_data, self.MTOP_URL % (api, int(j_data['v'])))
+        if mode == 0:
+            req = proxy_req(mtop_url, 2, header=headers)
+        else:
+            req = proxy_req(mtop_url, 12, data=data, header=headers)
         echo(4, 'request once.')
         if req is None:
-            if can_retry(self.MTOP_URL % api):
-                return self.get_tb_h5_api(api, jsv, refer_url, data, cookies)
+            if can_retry(self.MTOP_URL % (api, int(j_data['v']))):
+                return self.get_tb_h5_api(api, jsv, refer_url, data, j_data_t, cookies, mode)
             else:
                 return
         return req
 
     def get_uland_url_once(self, uland_url: str, cookies: dict = {}):
-        """ tb h5 api @2019.9.7 ✔️Tested"""
+        """ tb h5 api @2019.11.9 ✔️Tested"""
         step = self.M in cookies
         uland_params = decoder_url(uland_url)
         tt = {
@@ -803,18 +890,35 @@ class ActivateArticle(TBK):
                 }
         api = "mtop.alimama.union.xt.en.api.entry"
         jsv = '2.4.0'
-        j_data = {'type': 'jsonp', "callback": "mtopjsonp{}".format(int(step) + 1),}
+        j_data = {'type': 'jsonp', "callback": "mtopjsonp{}".format(int(step) + 1)}
         return self.get_tb_h5_api(api, jsv, uland_url, tt, j_data, cookies)
+    
+    def get_finger(self, item_id: int):
+        if (
+            not 'finger' in self.cookies
+            or not self.M in self.cookies['finger']
+            or time_stamp() - self.m_time > self.ONE_HOURS / 2
+        ):
+            self.get_m_h5_tk()
+        s_req = self.get_finger_once(item_id, self.cookies['finger'])
+        if s_req is None:
+            return
+        try:
+            return s_req.json()['data']['fingerId']
+        except Exception as e:
+            return
 
-    def get_finger(self, item_id: int, cookies: dict = {}):
+    def get_finger_once(self, item_id: int, cookies: dict = {}):
+        step = self.M in cookies
         api = 'mtop.taobao.hacker.finger.create'
         refer_url = self.ITEM_URL % item_id
         jsv = '2.4.11'
-        return self.get_tb_h5_api(api, jsv, refer_url, {}, cookies)
+        j_data = {'type': 'jsonp', "callback": "mtopjsonp{}".format(int(step) + 1),}
+        return self.get_tb_h5_api(api, jsv, refer_url, {}, cookies=cookies)
 
-    def get_tb_h5_token(self, token: str, appkey: str, data: str, t: int):
+    def get_tb_h5_token(self, *data: list):
         md5 = hashlib.md5()
-        wait_enc = "&".join([token, str(t), appkey, data])
+        wait_enc = "&".join([str(ii) for ii in data])
         md5.update(wait_enc.encode())
         return md5.hexdigest()
 

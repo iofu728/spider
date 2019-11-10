@@ -2,15 +2,10 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-25 22:50:32
+# @Last Modified time: 2019-11-09 21:39:51
 
-from __future__ import (
-    absolute_import,
-    division,
-    print_function,
-    unicode_literals,
-    with_statement,
-)
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals, with_statement)
 
 import codecs
 import datetime
@@ -27,6 +22,7 @@ import time
 import urllib
 from email.mime.text import MIMEText
 
+import cv2
 import numpy as np
 import requests
 import urllib3
@@ -516,6 +512,17 @@ def get_content_type(types: str = "utf8") -> str:
     )
 
 
+def change_pic_size(picture_path: str, resize: tuple = (600, 600)):
+    if not os.path.exists(picture_path):
+        echo(0, 'picture not found in', picture_path)
+        return
+    pic = cv2.imread(picture_path)
+    pic = cv2.resize(pic, resize)
+    split_text = os.path.splitext(picture_path)
+    output_path = "{}_resize{}".format(*split_text)
+    cv2.imwrite(output_path, pic)
+
+
 headers = {
     "Cookie": "",
     "Accept": get_accept("html"),
@@ -540,4 +547,3 @@ failure_map = {}
 is_service = False
 LOG_DIR = "log/"
 EMAIL_SIGN = "\n\n\nBest wish!!\n%s\n\n————————————————————\n• Send from script designed by gunjianpan."
-

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-11-09 01:43:48
+# @Last Modified time: 2019-11-10 01:35:33
 
 import hashlib
 import json
@@ -11,7 +11,6 @@ import sys
 import threading
 import time
 import urllib
-import cv2
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from configparser import ConfigParser
 
@@ -22,29 +21,13 @@ sys.path.append(os.getcwd())
 import top
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
-from util.util import (
-    basic_req,
-    begin_time,
-    can_retry,
-    changeHeaders,
-    changeJsonTimeout,
-    decoder_cookie,
-    decoder_url,
-    echo,
-    encoder_cookie,
-    encoder_url,
-    end_time,
-    headers,
-    json_str,
-    mkdir,
-    read_file,
-    send_email,
-    time_stamp,
-    time_str,
-    get_accept,
-    get_content_type,
-    get_use_agent,
-)
+from util.util import (basic_req, begin_time, can_retry, changeHeaders,
+                       changeJsonTimeout, decoder_cookie, decoder_url, echo,
+                       encoder_cookie, encoder_url, end_time, get_accept,
+                       get_content_type, get_use_agent, headers, json_str,
+                       mkdir, read_file, send_email, time_stamp, time_str)
+
+
 
 
 proxy_req = GetFreeProxy().proxy_req
@@ -274,6 +257,7 @@ class ActivateArticle(TBK):
     def load_article(self, article_id: str, mode: int = 0, is_load2db: bool = True):
         if mode:
             self.get_share_info(article_id)
+            self.load_list2db()
             return
         if article_id not in self.tpwds:
             article = self.basic_youdao(article_id)
@@ -362,9 +346,10 @@ class ActivateArticle(TBK):
         self.update_article2db(article_id)
 
     def load_list2db(self):
+        t_share_map = self.share2article.copy()
         share_map = self.get_share_list()
         insert_list, update_list = [], []
-        for ii, jj in self.share2article.items():
+        for ii, jj in t_share_map.items():
             if ii in share_map:
                 t = share_map[ii]
                 update_list.append((t[0], ii, jj[0], jj[1], 0, t[-1]))
@@ -457,7 +442,9 @@ class ActivateArticle(TBK):
             echo(0, "goods get error:", title, num_iid)
             return (*c[:2], 17, renew_tpwd, 1 if renew_type == 0 else 2, *c[-2:])
         goods = goods[0]
-        if "coupon_share_url" in goods and len(goods["coupon_share_url"]):
+        if "ysyl_click_url" in goods and len(goods["ysyl_click_url"]):
+            url = goods["ysyl_click_url"]
+        elif "coupon_share_url" in goods and len(goods["coupon_share_url"]):
             url = goods["coupon_share_url"]
         else:
             url = goods["url"]
@@ -1203,15 +1190,13 @@ class ActivateArticle(TBK):
                 for ii in thread_list
             ]
             list(as_completed(thread_list))
+            time += 1
 
     def load_picture(self, url: str, idx: int):
         td = basic_req(url, 2)
         picture_path = 'picture/{}.jpg'.format(idx)
         with open(picture_path, 'wb') as f:
             f.write(td.content)
-        pic = cv2.imread(picture_path)
-        pic.resize(pic, (600, 600), interpolation=cv2.INTER_CUBIC)
-        cv2.imwrite(picture_path, pic)
 
     def load_picture_pipeline(self, file_path: str):
         mkdir('picture')
@@ -1220,4 +1205,3 @@ class ActivateArticle(TBK):
         echo(1, 'Load {} picture Begin'.format(len(picture_url)))
         pp = [self.tpwd_exec.submit(self.load_picture, ii, jj) for ii, jj in picture_url]
         return pp
-

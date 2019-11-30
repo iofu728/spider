@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-11-10 01:35:33
+# @Last Modified time: 2019-11-30 21:44:27
 
 import hashlib
 import json
@@ -1200,7 +1200,8 @@ class ActivateArticle(TBK):
 
     def load_picture_pipeline(self, file_path: str):
         mkdir('picture')
-        picture_url = [(ii['picUrl'], idx) for idx, ii in enumerate(list(self.tpwd_map[file_path].values()))]
+        tpk_list = self.tpwds[file_path]
+        picture_url = [(self.tpwd_map[file_path][tpk]['picUrl'], idx) for idx, tpk in enumerate(tpk_list) if tpk in self.tpwd_map[file_path]]
         picture_url = [(ii, idx) for ii, idx in picture_url if not os.path.exists('picture/{}.jpg'.format(idx))]
         echo(1, 'Load {} picture Begin'.format(len(picture_url)))
         pp = [self.tpwd_exec.submit(self.load_picture, ii, jj) for ii, jj in picture_url]

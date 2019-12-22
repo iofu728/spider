@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-11-30 21:44:27
+# @Last Modified time: 2019-12-22 21:47:11
 
 import hashlib
 import json
@@ -198,7 +198,7 @@ class ActivateArticle(TBK):
     def load_process(self):
         self.load_ids()
         self.load_article_list()
-        self.update_tpwd()
+        # self.update_tpwd()
         self.get_m_h5_tk()
         self.get_ynote_file()
         self.get_ynote_file(1)
@@ -219,14 +219,11 @@ class ActivateArticle(TBK):
         changeJsonTimeout(4)
         url = self.GET_SHARE_URL % share_id
         headers = self.get_tb_headers(self.Y_URL)
-        req = proxy_req(url, 1, header=headers)
+        req = basic_req(url, 1, header=headers)
         if req is None:
-            if can_retry(url):
-                return self.get_share_info(share_id)
-            else:
-                return
+            return
         info = req["entry"]
-        self.share2article[share_id] = (info["name"], info["id"])
+        self.share2article[share_id] = (info["name"].replace('.note', ''), info["id"], info["lastUpdateTime"])
         return req
 
     def basic_youdao(self, idx: str, use_proxy: bool = True):
@@ -370,8 +367,6 @@ class ActivateArticle(TBK):
     def load_article2db(self, article_id: str):
         m = self.tpwd_map[article_id]
         m = {ii: jj for ii, jj in m.items() if jj["url"]}
-        article_list = self.get_article_db(article_id)
-        self.tpwd_db_map[article_id] = {ii[2]: ii for ii in article_list}
         data = [
             (
                 article_id,
@@ -391,8 +386,8 @@ class ActivateArticle(TBK):
         data_map = {ii[1]: ii for ii in data}
         update_list, insert_list = [], []
         for ii in data:
-            if ii[1] in self.tpwd_db_map[article_id]:
-                t = self.tpwd_db_map[article_id][ii[1]]
+            if ii[3] in self.tpwd_db_map[article_id]:
+                t = self.tpwd_db_map[article_id][ii[3]]
                 update_list.append((t[0], *ii, t[-1], 0))
             else:
                 insert_list.append(ii)
@@ -402,11 +397,13 @@ class ActivateArticle(TBK):
         self.update_db(insert_list, f"article_id {article_id} Insert")
         self.update_db(update_list, f"article_id {article_id} Update")
 
-    def update_tpwd(self, mode: int = 0, is_renew: bool = True):
+    def update_tpwd(self, mode: int = 0, is_renew: bool = True, a_id: str = None):
         update_num = 0
-        for ii, jj in self.article_list.items():
-            for kk, (num_iid, title, domain, tpwd, _, _, url) in jj.items():
-                c = self.article_list[ii][kk]
+        for article_id, jj in self.article_list.items():
+            if a_id is not None and article_id != a_id:
+                continue
+            for o_tpwd, (num_iid, title, domain, tpwd, _, _, url) in jj.items():
+                c = jj[o_tpwd]
                 if (
                     is_renew
                     and self.URL_DOMAIN[1] not in url
@@ -415,6 +412,8 @@ class ActivateArticle(TBK):
                 ):
                     renew_type = 2 if url in self.URL_DOMAIN[5] else 1
                     origin_tpwd = self.convert2tpwd(url, title)
+                    if origin_tpwd is None:
+                        origin_tpwd = tpwd
                 else:
                     renew_type = 0
                     origin_tpwd = tpwd
@@ -430,7 +429,7 @@ class ActivateArticle(TBK):
                     c = self.generate_tpwd(
                         title, int(num_iid), origin_tpwd, renew_type, c, mode
                     )
-                self.article_list[ii][kk] = c
+                self.article_list[article_id][o_tpwd] = c
                 update_num += int(c[2] < 15 or (renew_type and not mode))
         echo(2, "Update {} Tpwd Info Success!!".format(update_num))
 
@@ -439,7 +438,7 @@ class ActivateArticle(TBK):
     ):
         goods = self.get_dg_material(title, num_iid)
         if goods is None or not len(goods):
-            echo(0, "goods get error:", title, num_iid)
+            echo(0, "goods get", 'error' if goods is None else 'empty', ':', title, num_iid)
             return (*c[:2], 17, renew_tpwd, 1 if renew_type == 0 else 2, *c[-2:])
         goods = goods[0]
         if "ysyl_click_url" in goods and len(goods["ysyl_click_url"]):
@@ -462,21 +461,26 @@ class ActivateArticle(TBK):
         return (*c[:3], tpwd, commission_rate, commission_type, c[-1])
 
     def load_article_list(self):
+        """
+        tpwd: [goods_id, goods_name, domain, tpwd, commission_rate, commission_type, url]
+        """
         for article_id in self.idx:
             article_list = self.get_article_db(article_id)
             self.article_list[article_id] = {
-                ii[2]: (ii[3], ii[6], ii[5], ii[4], ii[8], ii[9], ii[7])
+                ii[4]: [ii[3], ii[6], ii[5], ii[4], ii[8], ii[9], ii[7]]
                 for ii in article_list
             }
+            self.tpwd_db_map[article_id] = {ii[4]: ii for ii in article_list}
+            
         item_num = sum([len(ii) for ii in self.article_list.values()])
         echo(1, "Load {} article list from db.".format(item_num))
 
     def get_article_db(self, article_id: str):
-        article_list = list(self.Db.select_db(self.S_ARTICLE_SQL % article_id))
+        article_list = list(self.Db.select_db(self.S_ARTICLE_SQL % article_id)) 
         for ii, jj in enumerate(article_list):
             t = jj[-1].strftime("%Y-%m-%d %H:%M:%S")
             y = jj[-2].strftime("%Y-%m-%d %H:%M:%S")
-            article_list[ii] = (*jj[:-2], y, t)
+            article_list[ii] = [*jj[:-2], y, t]
         return article_list
 
     def update_db(self, data: list, types: str, mode: int = 0):
@@ -973,7 +977,7 @@ class ActivateArticle(TBK):
         if flag:
             self.email_update_result(article_id, r_log, r_num)
             self.update_valid(article_id)
-            self.update_article2db(article_id)
+            self.update_article2db(article_id, True)
             self.share_article(article_id)
 
     def email_update_result(self, article_id: str, r_log: list, r_num: int):
@@ -998,9 +1002,9 @@ class ActivateArticle(TBK):
         if article_id not in self.tpwd_map:
             self.tpwd_map[article_id] = {}
         wait_list = [
-            ii[-4]
-            for ii in self.article_list[article_id].values()
-            if ii[-4] not in self.tpwd_map[article_id]
+            ii
+            for ii in self.article_list[article_id].keys()
+            if ii not in self.tpwd_map[article_id]
         ]
         update_time = 0
         while len(wait_list) and update_time < 5:
@@ -1011,27 +1015,27 @@ class ActivateArticle(TBK):
             ]
             list(as_completed(update_v))
             wait_list = [
-                ii[-4]
-                for ii in self.article_list[article_id].values()
-                if ii[-4] not in self.tpwd_map[article_id]
+                ii
+                for ii in self.article_list[article_id].keys()
+                if ii not in self.tpwd_map[article_id]
             ]
             update_time += 1
 
-    def update_article2db(self, article_id: str):
+    def update_article2db(self, article_id: str, is_tpwd_update: bool = False):
         def valid_t(types: str, maps: dict):
             return types in maps and maps[types] != ''
-        m = {ii[2]: ii for ii in self.get_article_db(article_id)}
+        m = {ii[4]: ii for ii in self.get_article_db(article_id)}
         data = []
         for (
-            ii,
+            o_tpwd,
             (num_iid, title, domain, tpwd, commission_rate, commission_type, ur),
         ) in self.article_list[article_id].items():
             """
             `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at, is_deleted
             """
-            n = m[ii]
-            if tpwd in self.tpwd_map[article_id]:
-                t = self.tpwd_map[article_id][tpwd]
+            n = m[o_tpwd]
+            if o_tpwd in self.tpwd_map[article_id]:
+                t = self.tpwd_map[article_id][o_tpwd]
                 content = (
                     t["title"]
                     if valid_t('title', t)
@@ -1040,9 +1044,9 @@ class ActivateArticle(TBK):
                 url = t["url"] if valid_t('url', t) else n[7]
                 validDate = t["validDate"] if valid_t('validDate', t) else n[-2]
                 data.append(
-                    (
+                    [
                         *n[:4],
-                        tpwd,
+                        tpwd if is_tpwd_update else o_tpwd,
                         domain,
                         content,
                         url,
@@ -1051,13 +1055,13 @@ class ActivateArticle(TBK):
                         validDate,
                         n[-1],
                         0,
-                    )
+                    ]
                 )
             else:
                 data.append(
-                    (
+                    [
                         *n[:4],
-                        tpwd,
+                        tpwd if is_tpwd_update else o_tpwd,
                         domain,
                         n[6],
                         n[7],
@@ -1066,7 +1070,7 @@ class ActivateArticle(TBK):
                         n[-2],
                         n[-1],
                         0,
-                    )
+                    ]
                 )
         self.update_db(data, "Update Article {} TPWD".format(article_id))
 
@@ -1079,12 +1083,13 @@ class ActivateArticle(TBK):
         NO_GOODS = "GOODS_NOT_FOUND::未参加淘客"
         TPWD_ERROR = "TPWD_ERROR::淘口令生成异常"
         for ii, jj in enumerate(tpwds):
+            pure_jj = jj[1:-1]
             no_t = "No.{} tpwd: {}, ".format(ii + 1, jj)
-            if ii not in m:
+            if pure_jj not in m:
                 r_log.append("{}{}".format(no_t, EXIST))
                 continue
                 # tpwd = 'NOTNOTEXIST'
-            num_iid, title, domain, tpwd, commission_rate, commission_type, ur = m[ii]
+            num_iid, title, domain, tpwd, commission_rate, commission_type, ur = m[pure_jj]
             if domain >= 15:
                 if domain == 15:
                     applied = "{},{}".format(EXIST, title)
@@ -1206,3 +1211,51 @@ class ActivateArticle(TBK):
         echo(1, 'Load {} picture Begin'.format(len(picture_url)))
         pp = [self.tpwd_exec.submit(self.load_picture, ii, jj) for ii, jj in picture_url]
         return pp
+    
+    def check_overdue(self):
+        def check_overdue_once(data: list) -> bool:
+            dif_time = time_stamp(data[-2]) - time_stamp() 
+            return dif_time > 0 and dif_time <= self.ONE_HOURS * self.ONE_DAY
+        overdue_article = [(article_id, article_list[4]) for article_id, ii in self.tpwd_db_map.items() for article_list in ii.values() if check_overdue_once(article_list)]
+        overdue_id = set([article_id for article_id, _ in overdue_article])
+        overdue_list = [(article_id, len([1 for a_id, tpwd in overdue_article if article_id == a_id])) for article_id in overdue_id]
+        if not len(overdue_list):
+            return
+        title = '链接需要更新#{}#篇'.format(len(overdue_list))
+        content = title + '\n \n'
+        for article_id, num in overdue_list:
+            content += '{}, 需要更新{}个链接，{}\n'.format(self.share2article[article_id][2], num, self.NOTE_URL % article_id)
+        content += '\n\nPlease update within 6 hours, Thx!'
+        echo('2|debug', title, content)
+        send_email(content, title)        
+
+    def load_share_total(self):
+        self.check_overdue()
+        for article_id in self.idx:
+            self.get_share_info(article_id)
+        self.load_list2db()
+        self.__init__()
+        self.load_process()
+    
+    def load_article_new(self):
+        time.sleep(3 * 60)
+        for article_id in self.idx:
+            self.load_article(article_id)
+
+    def load_click(self, num=1000000):
+        ''' schedule click '''
+
+        for index in range(num):
+            threading_list = []
+            threading_list.append(threading.Thread(
+                target=self.load_article_new, args=()))
+            if index % 12 == 1:
+                threading_list.append(threading.Thread(target=self.load_share_total, args=()))
+            for work in threading_list:
+                work.start()
+            time.sleep(self.ONE_HOURS / 2)
+
+if __name__ == '__main__':
+    ba = ActivateArticle()
+    ba.load_process()
+    ba.load_click()

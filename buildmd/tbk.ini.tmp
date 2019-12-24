@@ -7,6 +7,7 @@ adzone_id = 123
 uland_url = http://
 test_item_id = 123
 test_finger_id = 111
+apikey = 111
 
 [YNOTE]
 cookie = "123456"

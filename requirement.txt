@@ -12,3 +12,4 @@ PyExecJS
 fonttools
 regex
 rsa
+opencv-python

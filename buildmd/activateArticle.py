@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-12-22 21:47:11
+# @Last Modified time: 2019-12-24 21:39:46
 
 import hashlib
 import json
@@ -60,6 +60,7 @@ class TBK(object):
         self.uland_url = cfg.get("TBK", "uland_url")
         self.unlogin_id = cfg.get("YNOTE", "unlogin_id")
         self.cookie = cfg.get("YNOTE", "cookie")[1:-1]
+        self.api_key = cfg.get("TBK", "apikey")
         self.assign_rec = cfg.get("YNOTE", "assign_email").split(",")
         cookie_de = decoder_cookie(self.cookie)
         self.cstk = cookie_de[self.CSTK_KEY] if self.CSTK_KEY in cookie_de else ""
@@ -139,7 +140,7 @@ class ActivateArticle(TBK):
     MYSHARE_URL = (
         f"{API_P_URL}myshare?method=get&checkBan=true&entryId=%s&keyfrom=web&cstk=%s"
     )
-    DECODER_TPWD_URL = "http://www.taokouling.com/index/taobao_tkljm"
+    DECODER_TPWD_URL = "https://api.taokouling.com/tkl/tkljm?apikey=%s&tkl=￥%s￥"
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
     MTOP_URL = "https://h5api.m.taobao.com/h5/%s/%d.0/"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
@@ -197,6 +198,8 @@ class ActivateArticle(TBK):
 
     def load_process(self):
         self.load_ids()
+        if len(self.idx) < 30:
+            self.load_ids()
         self.load_article_list()
         # self.update_tpwd()
         self.get_m_h5_tk()
@@ -367,6 +370,7 @@ class ActivateArticle(TBK):
     def load_article2db(self, article_id: str):
         m = self.tpwd_map[article_id]
         m = {ii: jj for ii, jj in m.items() if jj["url"]}
+        tpwds = list(set(self.tpwds[article_id]))
         data = [
             (
                 article_id,
@@ -380,7 +384,7 @@ class ActivateArticle(TBK):
                 "",
                 m[jj]["validDate"],
             )
-            for ii, jj in enumerate(self.tpwds[article_id])
+            for ii, jj in enumerate(tpwds)
             if jj in m and "item_id" in m[jj] and m[jj]["type"] != 15
         ]
         data_map = {ii[1]: ii for ii in data}
@@ -500,9 +504,8 @@ class ActivateArticle(TBK):
 
     def decoder_tpwd_once(self, article_id: str, tpwd: str, mode: int = 0):
         req = self.decoder_tpwd(tpwd)
-        if req is None or not "data" in req or "!DOCTYPE html" in req or not len(req):
+        if req is None or not len(req):
             return
-        req = req["data"]
         temp_map = {ii: req[ii] for ii in self.NEED_KEY}
         if temp_map["validDate"] == self.ZERO_STAMP or "-" in temp_map["validDate"]:
             temp_map["validDate"] = time_stamp()
@@ -552,21 +555,14 @@ class ActivateArticle(TBK):
 
     def decoder_tpwd(self, tpwd: str):
         """ decoder the tpwd from taokouling """
-        headers = {
-            "Referer": self.DECODER_TPWD_URL,
-            "X-Requested-With": "XMLHttpRequest",
-        }
-        text = {"text": "￥{}￥".format(tpwd)}
-        req = proxy_req(self.DECODER_TPWD_URL, 11, data=text, header=headers)
+        url = self.DECODER_TPWD_URL % (self.api_key, tpwd)
+        req = basic_req(url, 1)
         if (
             req is None
             or isinstance(req, str)
-            or list(req.keys()) != ["code", "msg", "time", "data"]
+            or list(req.keys()) != ['ret', 'url', 'content', 'picUrl', 'taopwdOwnerId', 'validDate', 'pj', 'code', 'msg']
         ):
-            if can_retry(tpwd):
-                return self.decoder_tpwd(tpwd)
-            else:
-                return {}
+            return {}
         return req
 
     def get_s_click_url(self, s_click_url: str):
@@ -916,12 +912,9 @@ class ActivateArticle(TBK):
     def get_ynote_file(self, offset: int = 0):
         url = self.LISTRECENT_URL % (offset, self.cstk)
         data = {"cstk": self.cstk}
-        req = proxy_req(url, 11, data=data, header=self.get_ynote_web_header(1))
+        req = basic_req(url, 11, data=data, header=self.get_ynote_web_header(1))
         if req is None or type(req) != list:
-            if can_retry(url):
-                return self.get_ynote_file(offset)
-            else:
-                return None
+            return None
         list_recent = {ii["fileEntry"]["id"]: ii["fileEntry"] for ii in req}
         self.list_recent = {**self.list_recent, **list_recent}
         echo(1, "Load ynote file {} items.".format(len(self.list_recent)))
@@ -1044,7 +1037,7 @@ class ActivateArticle(TBK):
                 url = t["url"] if valid_t('url', t) else n[7]
                 validDate = t["validDate"] if valid_t('validDate', t) else n[-2]
                 data.append(
-                    [
+                    (
                         *n[:4],
                         tpwd if is_tpwd_update else o_tpwd,
                         domain,
@@ -1055,11 +1048,11 @@ class ActivateArticle(TBK):
                         validDate,
                         n[-1],
                         0,
-                    ]
+                    )
                 )
             else:
                 data.append(
-                    [
+                    (
                         *n[:4],
                         tpwd if is_tpwd_update else o_tpwd,
                         domain,
@@ -1070,7 +1063,7 @@ class ActivateArticle(TBK):
                         n[-2],
                         n[-1],
                         0,
-                    ]
+                    )
                 )
         self.update_db(data, "Update Article {} TPWD".format(article_id))
 

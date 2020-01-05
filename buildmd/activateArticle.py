@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-12-24 21:39:46
+# @Last Modified time: 2020-01-04 14:44:38
 
 import hashlib
 import json
@@ -194,11 +194,13 @@ class ActivateArticle(TBK):
         self.idx = []
         self.empty_content = ""
         self.tpwd_exec = ThreadPoolExecutor(max_workers=20)
+        self.need_del = {}
         self.get_share_list()
 
     def load_process(self):
         self.load_ids()
         if len(self.idx) < 30:
+            time.sleep(np.random.rand() * 30 + 6)
             self.load_ids()
         self.load_article_list()
         # self.update_tpwd()
@@ -238,7 +240,7 @@ class ActivateArticle(TBK):
             "X-Requested-With": "XMLHttpRequest",
         }
         req_req = proxy_req if use_proxy else basic_req
-        req = req_req(url, 1, header=headers)
+        req = req_req(url, 1, header=headers, config={'timeout': 8})
         if req is None or list(req.keys()) != self.JSON_KEYS:
             if can_retry(url):
                 echo(2, "retry")
@@ -387,7 +389,7 @@ class ActivateArticle(TBK):
             for ii, jj in enumerate(tpwds)
             if jj in m and "item_id" in m[jj] and m[jj]["type"] != 15
         ]
-        data_map = {ii[1]: ii for ii in data}
+        data_map = {ii[3]: ii for ii in data}
         update_list, insert_list = [], []
         for ii in data:
             if ii[3] in self.tpwd_db_map[article_id]:
@@ -475,7 +477,9 @@ class ActivateArticle(TBK):
                 for ii in article_list
             }
             self.tpwd_db_map[article_id] = {ii[4]: ii for ii in article_list}
-            
+            have_id = [ii[0] for ii in self.tpwd_db_map[article_id].values()]
+            need_del_id = [ii[0] for ii in article_list if ii[0] not in have_id]
+            self.need_del[article_id] = need_del_id
         item_num = sum([len(ii) for ii in self.article_list.values()])
         echo(1, "Load {} article list from db.".format(item_num))
 
@@ -508,7 +512,7 @@ class ActivateArticle(TBK):
             return
         temp_map = {ii: req[ii] for ii in self.NEED_KEY}
         if temp_map["validDate"] == self.ZERO_STAMP or "-" in temp_map["validDate"]:
-            temp_map["validDate"] = time_stamp()
+            temp_map["validDate"] = 1500000000
         else:
             temp_map["validDate"] = (
                 time_stamp(time_format="%d天%H小时%M分%S秒", time_str=req["validDate"])
@@ -560,7 +564,7 @@ class ActivateArticle(TBK):
         if (
             req is None
             or isinstance(req, str)
-            or list(req.keys()) != ['ret', 'url', 'content', 'picUrl', 'taopwdOwnerId', 'validDate', 'pj', 'code', 'msg']
+            or 'ret' not in list(req.keys())
         ):
             return {}
         return req
@@ -853,7 +857,7 @@ class ActivateArticle(TBK):
             req = proxy_req(mtop_url, 2, header=headers)
         else:
             req = proxy_req(mtop_url, 12, data=data, header=headers)
-        echo(4, 'request once.')
+        # echo(4, 'request once.')
         if req is None:
             if can_retry(self.MTOP_URL % (api, int(j_data['v']))):
                 return self.get_tb_h5_api(api, jsv, refer_url, data, j_data_t, cookies, mode)
@@ -1231,7 +1235,6 @@ class ActivateArticle(TBK):
         self.load_process()
     
     def load_article_new(self):
-        time.sleep(3 * 60)
         for article_id in self.idx:
             self.load_article(article_id)
 
@@ -1240,8 +1243,8 @@ class ActivateArticle(TBK):
 
         for index in range(num):
             threading_list = []
-            threading_list.append(threading.Thread(
-                target=self.load_article_new, args=()))
+            if index % 12 != 1:
+                threading_list.append(threading.Thread(target=self.load_article_new, args=()))
             if index % 12 == 1:
                 threading_list.append(threading.Thread(target=self.load_share_total, args=()))
             for work in threading_list:

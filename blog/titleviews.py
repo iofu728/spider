@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-11 01:58:12
+# @Last Modified time: 2020-01-04 14:41:30
 
 import argparse
 import codecs
@@ -96,13 +96,14 @@ class TitleViews(object):
         ]
         url = ''.join(url_basic)
 
-        json = self.get_request('{}{}'.format(url, 0), 1, lambda i: not i)
+        json = self.get_request('{}{}'.format(url, 1), 1, lambda i: not i)
         if not json:
             return
         if not 'data' in json:
             if 'code' in json:
                 echo('0|warning', json)
             return
+        echo(3, 'zhihu', json)
         for index in json['data']:
             zhihu_title = index['title']
             zhihu_id = int(index['url_token'])
@@ -121,7 +122,8 @@ class TitleViews(object):
 
         for index in range(1, json['count'] // 10):
             echo(1, 'zhihu', index)
-            json = self.get_request(url + str(index + 1), 1)
+            json = self.get_request('{}{}'.format(url, 1 + index), 1, lambda i: not i)
+            echo(2, 'zhihu', json)
             if not json:
                 continue
             for index in json['data']:
@@ -191,6 +193,7 @@ class TitleViews(object):
             url = self.CSDN_URL
             if index > 1:
                 url += '/article/list/{}?'.format(index)
+            echo(1, 'csdn url', url)
 
             html = self.get_request(url, 0, lambda i: i is None or not i or not len(
                 i.find_all('p', class_='content')))

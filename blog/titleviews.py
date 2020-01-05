@@ -2,18 +2,19 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-03-28 21:09:01
+# @Last Modified time: 2020-01-04 14:41:30
 
 import argparse
 import codecs
 import datetime
 import re
 import os
+import threading
 
 from bs4 import BeautifulSoup
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
-from util.util import begin_time, end_time, changeCookie, basic_req, can_retry, changeHtmlTimeout
+from util.util import begin_time, end_time, changeCookie, basic_req, can_retry, changeHtmlTimeout, echo, mkdir, read_file, echo, get_accept
 
 """
   * blog @http
@@ -31,16 +32,16 @@ data_dir = 'blog/data/'
 
 
 class TitleViews(object):
-    """
-    update title views
-    """
+    ''' script of load my blog data -> analysis '''
+    CSDN_URL = 'https://blog.csdn.net/iofu728'
+    JIANSHU_URL = 'https://www.jianshu.com/u/2e0f69e4a4f0'
+    ZHIHU_URL = 'https://www.zhihu.com/api/v4/creator/content_statistics/'
 
     def __init__(self):
         self.Db = Db("blog")
         self.local_views = {}
         self.title_map = {}
         self.title2slug = {}
-        self.failured_map = {}
         self.zhihu_views = {}
         self.zhihu_id = {}
         self.jianshu_views = {}
@@ -54,14 +55,8 @@ class TitleViews(object):
         self.new_day_sql = '''INSERT INTO page_views(`date`, `existed_views`, `existed_spider`) VALUES %s'''
 
     def loadLocalView(self):
-        """
-        load local view
-        """
-        if not os.path.exists("%sgoogle" % data_dir):
-            return
-        with codecs.open("%sgoogle" % data_dir, 'r', encoding='utf-8') as f:
-            test = f.readlines()
-        test = test[7:]
+        '''  load local view '''
+        test = read_file('{}google'.format(data_dir))[7:]
         for index in test:
             arr = index.split(',')
             slug = self.matchSlug(arr[0])
@@ -74,19 +69,9 @@ class TitleViews(object):
                 self.local_views[slug] = int(arr[1])
 
     def getTitleMap(self):
-        """
-        get title map
-        """
-        if os.path.exists('%sslug' % data_dir):
-            with codecs.open('%sslug' % data_dir, 'r', encoding='utf-8') as f:
-                slug = f.readlines()
-        else:
-            slug = []
-        if os.path.exists('%stitle' % data_dir):
-            with codecs.open('%stitle' % data_dir, 'r', encoding='utf-8') as f:
-                title = f.readlines()
-        else:
-            title = []
+        ''' get title map '''
+        slug = read_file('{}slug'.format(data_dir))
+        title = read_file('{}title'.format(data_dir))
         self.title_map = {tempslug.split(
             '"')[1]: title[num].split('"')[1] for num, tempslug in enumerate(slug)}
         title2slug = {
@@ -95,34 +80,30 @@ class TitleViews(object):
             self.title_map[index]).replace('\u200d', ''): index for index in self.title_map.keys()}
         self.title2slug = {**noemoji_title, **title2slug}
 
-    def matchSlug(self, pattern):
-        """
-        match slug
-        """
+    def matchSlug(self, pattern: str):
+        ''' match slug '''
         arr = re.search(r'\/([^\/]+).html', pattern)
         return None if arr is None else arr.group(1)
 
     def getZhihuView(self):
-        if os.path.exists('%scookie' % data_dir):
-            with codecs.open('%scookie' % data_dir, 'r', encoding='utf-8') as f:
-                cookie = f.readline()
-        else:
-            cookie = ' '
-        changeCookie(cookie[:-1])
+        cookie = ''.join(read_file('{}cookie'.format(data_dir)))
+        changeCookie(cookie)
         url_basic = [
-            'https://www.zhihu.com/api/v4/creator/content_statistics/',
+            self.ZHIHU_URL,
             'articles?order_field=object_created&order_sort=descend&begin_date=2018-09-01&end_date=',
             datetime.datetime.now().strftime("%Y-%m-%d"),
             '&page_no='
         ]
-        url = "".join(url_basic)
-        json = self.get_request(url + '1', 1)
+        url = ''.join(url_basic)
+
+        json = self.get_request('{}{}'.format(url, 1), 1, lambda i: not i)
         if not json:
             return
         if not 'data' in json:
             if 'code' in json:
-                print(json)
+                echo('0|warning', json)
             return
+        echo(3, 'zhihu', json)
         for index in json['data']:
             zhihu_title = index['title']
             zhihu_id = int(index['url_token'])
@@ -137,11 +118,12 @@ class TitleViews(object):
                 self.zhihu_id[temp_slug] = zhihu_id
                 self.zhihu_views[temp_slug] = zhihu_count
             else:
-                print(index['title'])
+                echo('0|debug', index['title'])
 
-        for index in range(json['count'] // 10):
-            print('zhihu', index)
-            json = self.get_request(url + str(index + 2), 1)
+        for index in range(1, json['count'] // 10):
+            echo(1, 'zhihu', index)
+            json = self.get_request('{}{}'.format(url, 1 + index), 1, lambda i: not i)
+            echo(2, 'zhihu', json)
             if not json:
                 continue
             for index in json['data']:
@@ -158,67 +140,33 @@ class TitleViews(object):
                     self.zhihu_id[temp_slug] = zhihu_id
                     self.zhihu_views[temp_slug] = zhihu_count
                 else:
-                    print(index['title'])
+                    echo('0|debug', index['title'])
 
-    def get_request(self, url, types):
+    def get_request(self, url: str, types: int, functs, header: dict = {}):
+        if len(header):
+            req = basic_req(url, types, header=header)
+        else:
+            req = basic_req(url, types)
 
-        result = basic_req(url, 1)
-
-        if not result:
+        if functs(req):
             if can_retry(url):
-                self.get_request(url, types)
+                self.get_request(url, types, functs, header)
             return
-        return result
-
-    def get_request_v2(self, url, types, header):
-
-        result = proxy_req(url, 0, header=header)
-
-        if not result or not len(result.find_all('div', class_='content')):
-            if can_retry(url):
-                self.get_request_v2(url, types, header)
-            return
-        return result
-
-    def get_request_v3(self, url, types):
-
-        result = basic_req(url, 0)
-
-        if result is None or not result or not len(result.find_all('p', class_='content')):
-            if can_retry(url):
-                self.get_request_v3(url, types)
-            return
-        return result
+        return req
 
     def getJianshuViews(self):
-        """
-        get jianshu views
-        """
-        header = {
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
-            'accept-encoding': 'gzip, deflate, br',
-            'accept-language': 'zh-CN,zh;q=0.9',
-            'cache-control': 'no-cache',
-            'pragma': 'no-cache',
-            'sec-ch-ua': 'Google Chrome 75',
-            'sec-fetch-dest': 'document',
-            'sec-fetch-mode': 'navigate',
-            'sec-fetch-site': 'cross-site',
-            'sec-fetch-user': '?F',
-            'sec-origin-policy': '0',
-            'upgrade-insecure-requests': '1',
-            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3736.0 Safari/537.36'
-        }
-
-        basic_url = 'https://www.jianshu.com/u/2e0f69e4a4f0'
+        ''' get jianshu views '''
+        header = {'accept': get_accept('html')}
 
         for rounds in range(1, 4):
-            url = basic_url if rounds == 1 else basic_url + \
-                '?order_by=shared_at&page=' + str(rounds)
-            print(url)
-            html = self.get_request_v2(url, 0, header)
+            url = self.JIANSHU_URL
+            if rounds > 1:
+                url += '?order_by=shared_at&page={}'.format(rounds)
+            echo('1|debug', 'jianshu req url:', url)
+            html = self.get_request(url, 0, lambda i: not i or not len(
+                i.find_all('div', class_='content')), header)
             if html is None:
-                print('None')
+                echo(0, 'None')
                 return
             for index in html.find_all('li', class_=["", 'have-img']):
                 if len(index.find_all('i')) < 3:
@@ -236,22 +184,21 @@ class TitleViews(object):
                     self.jianshu_id[temp_slug] = jianshu_id
                     self.jianshu_views[temp_slug] = jianshu_count
                 else:
-                    print(title)
+                    echo(1, title)
 
     def getCsdnViews(self):
-        """
-        get csdn views
-        """
-
-        basic_url = "https://blog.csdn.net/iofu728"
+        ''' get csdn views '''
 
         for index in range(1, 3):
-            url = basic_url if index == 1 else basic_url + \
-                '/article/list/' + str(index) + '?'
+            url = self.CSDN_URL
+            if index > 1:
+                url += '/article/list/{}?'.format(index)
+            echo(1, 'csdn url', url)
 
-            html = self.get_request_v3(url, 0)
+            html = self.get_request(url, 0, lambda i: i is None or not i or not len(
+                i.find_all('p', class_='content')))
             if html is None:
-                print('None')
+                echo(0, 'None')
                 return
             for div_lists in html.find_all('div', class_='article-item-box csdn-tracking-statistics'):
                 if 'style' in div_lists.attrs:
@@ -270,12 +217,10 @@ class TitleViews(object):
                     self.csdn_id[temp_slug] = csdn_id
                     self.csdn_views[temp_slug] = csdn_count
                 else:
-                    print(title)
+                    echo(1, title)
 
     def filter_emoji(self, desstr, restr=''):
-        '''
-        filter emoji
-        '''
+        ''' filter emoji '''
         desstr = str(desstr)
         try:
             co = re.compile(u'[\U00010000-\U0010ffff]')
@@ -371,6 +316,52 @@ class TitleViews(object):
                 print('New day update' + str(len(new_day_list)) + ' Success!')
         else:
             pass
+
+    def load_csdn_img(self):
+        ''' load csdn img '''
+        mkdir(data_dir)
+        urls = ['/article/list/2?', '']
+        article_ids = []
+        for url in urls:
+            req = basic_req('{}{}'.format(self.CSDN_URL, url), 3)
+            article_ids.extend(re.findall('data-articleid="(\w*?)"', req))
+        echo(0, article_ids)
+        article_thread = [threading.Thread(
+            target=self.load_csdn_img_batch, args=(ii,)) for ii in article_ids]
+        for work in article_thread:
+            work.start()
+        for work in article_thread:
+            work.join()
+
+    def load_csdn_img_batch(self, article_id: int):
+        url = '{}/article/details/{}'.format(self.CSDN_URL, article_id)
+        req = proxy_req(url, 3)
+        if not 'iofu728' in req:
+            if can_retry(url):
+                self.load_csdn_img_batch(article_id)
+            return
+        img_lists = re.findall('"(https://cdn.nlark.com.*)" alt', req)
+        img_thread = [threading.Thread(target=self.load_csdn_img_load, args=(
+            jj, article_id, ii))for ii, jj in enumerate(img_lists)]
+        echo(1, 'Article Need Load {} Img...'.format(len(img_lists)))
+        for work in img_thread:
+            work.start()
+        for work in img_thread:
+            work.join()
+
+    def load_csdn_img_load(self, img_url: str, article_id: int, idx: int):
+        img_dir = '{}{}/'.format(data_dir, article_id)
+        img_path = '{}{}.png'.format(img_dir, idx)
+        if os.path.exists(img_path):
+            return
+        req = proxy_req(img_url, 2)
+        if type(req) == bool or req is None:
+            if can_retry(img_url):
+                self.load_csdn_img_load(img_url, article_id, idx)
+            return
+        mkdir(img_dir)
+        with open(img_path, 'wb') as f:
+            f.write(req.content)
 
 
 if __name__ == '__main__':

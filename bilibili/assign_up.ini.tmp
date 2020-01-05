@@ -8,6 +8,8 @@ tid = 126
 view_abnormal = 1000
 history_check_list = 1,3,6
 ;split by ','
+special_info_email = 123456@163.com
+assign_email = 123456@163.com
 
 [assign]
 av_ids = 21061574,11624347
@@ -21,3 +23,7 @@ ignore_rpid = {"21061574":["242-2"],"21062574":["1242"],"21061577":["1284"]}
 ignore_start = 0.5
 ignore_end = 8.5
 email_limit = 5
+
+[login]
+username = 123
+password = 123

@@ -2,15 +2,14 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-08-10 16:56:44
+# @Last Modified time: 2019-09-17 01:14:28
 
-import aiohttp
+
 import asyncio
 import codecs
 import json
 import logging
 import os
-import re
 import shutil
 import struct
 import sys
@@ -20,9 +19,12 @@ from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
 
+import aiohttp
+import regex
+
 sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
-from util.util import basic_req, can_retry, echo, mkdir, time_str
+from util.util import basic_req, can_retry, echo, mkdir, time_stamp, time_str
 
 logger = logging.getLogger(__name__)
 proxy_req = GetFreeProxy().proxy_req
@@ -52,7 +54,9 @@ class BWebsocketClient:
     ''' bilibili websocket client '''
     ROOM_INIT_URL = 'https://www.bilibili.com/video/av%d'
     WEBSOCKET_URL = 'wss://broadcast.chat.bilibili.com:7823/sub'
+    PLAYLIST_URL = 'https://api.bilibili.com/x/player/pagelist?aid=%d&jsonp=jsonp'
     HEARTBEAT_BODY = '[object Object]'
+    JSON_KEYS = ['code', 'message', 'ttl', 'data']
 
     HEADER_STRUCT = struct.Struct('>I2H2IH')
     HeaderTuple = namedtuple(
@@ -67,7 +71,7 @@ class BWebsocketClient:
         self._room_id = None
         self._count = 1
         self._types = types
-        self._begin_time = int(time.time())
+        self._begin_time = int(time_stamp())
         self._loop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
         self._is_running = False
@@ -85,16 +89,24 @@ class BWebsocketClient:
         self._is_running = True
         return asyncio.ensure_future(self._message_loop(), loop=self._loop)
 
+    def get_cid(self, av_id: int):
+        playlist_url = self.PLAYLIST_URL % av_id
+        headers = {
+            'Accept': '*/*',
+            'Referer': self.ROOM_INIT_URL % av_id
+        }
+        req = proxy_req(playlist_url, 1, header=headers)
+        if req is None or list(req.keys()) != self.JSON_KEYS:
+            if can_retry(playlist_url):
+                return self.get_cid(av_id)
+            else:
+                return
+        cid = [ii['cid'] for ii in req['data']]
+        return cid
+
     def _getroom_id(self, proxy: bool = True):
         ''' get av room id '''
-        url = self.ROOM_INIT_URL % self._av_id
-        text = proxy_req(url, 3) if proxy else basic_req(url, 3)
-        pages = re.findall('"pages":\[(.*?)\],', text)
-
-        if not len(pages):
-            if can_retry(url, 5):
-                self._getroom_id(proxy=proxy)
-        cid = re.findall('"cid":(.*?),', pages[0])
+        cid = self.get_cid(self._av_id)
         assert len(cid) >= self._p, 'Actual Page len: {} <=> Need Pages Num: {}'.format(
             len(cid), self._p)
         self._room_id = int(cid[self._p - 1])
@@ -102,7 +114,7 @@ class BWebsocketClient:
 
     def parse_struct(self, data: dict, operation: int):
         ''' parse struct '''
-        assert int(time.time()) < self._begin_time + \
+        assert int(time_stamp()) < self._begin_time + \
             7 * one_day, 'Excess Max RunTime!!!'
 
         if operation == 7:
@@ -172,7 +184,7 @@ class BWebsocketClient:
 
     async def _heartbeat_loop(self):
         ''' heart beat every 30s '''
-        if self._types and int(time.time()) > self._begin_time + one_day:
+        if self._types and int(time_stamp()) > self._begin_time + one_day:
             self.close()
         for _ in range(int(one_day * 7 / 30)):
             try:

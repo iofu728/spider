@@ -10,3 +10,6 @@ aiohttp
 apscheduler
 PyExecJS
 fonttools
+regex
+rsa
+opencv-python

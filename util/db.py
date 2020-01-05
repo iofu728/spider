@@ -1,16 +1,17 @@
-'''
-@Author: gunjianpan
-@Date:   2018-10-24 13:32:39
-@Last Modified by:   gunjianpan
-@Last Modified time: 2019-04-24 01:13:29
-'''
+# -*- coding: utf-8 -*-
+# @Author: gunjianpan
+# @Date:   2018-10-24 13:32:39
+# @Last Modified by:   gunjianpan
+# @Last Modified time: 2019-09-22 21:27:39
 
 import os
-import pymysql
 import shutil
-
+import sys
 from configparser import ConfigParser
-from util.util import echo
+
+import pymysql
+sys.path.append(os.getcwd())
+from util.util import echo, read_file
 
 configure_path = 'util/db.ini'
 
@@ -35,7 +36,6 @@ class Db(object):
 
     def connect_db(self, database: str, return_type: str):
         ''' connect database '''
-
         cursorclass = pymysql.cursors.DictCursor if return_type == 'dict' else pymysql.cursors.Cursor
         try:
             self.db = pymysql.connect(host=self.mysql_host,
@@ -67,29 +67,44 @@ class Db(object):
         try:
             cursor = db.cursor()
             cursor.execute(database_sql)
+            echo(2, 'Create Database {} Success!!!'.format(database))
             return True
         except:
             echo(0, 'Create Database {} error'.format(database))
             return False
 
+    def create_table(self, sql_path: str):
+        if not os.path.exists(sql_path):
+            echo(0, 'Create Table {} error, file not found'.format(sql_path))
+            return False
+        create_table_sql = '\n'.join(read_file(sql_path))
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(create_table_sql)
+            echo(2, 'Create Table from {} Success!!!'.format(sql_path))
+            return True
+        except Exception as e:
+            echo(0, 'Create Table from {} error'.format(sql_path), e)
+            return False
+
     def select_db(self, sql: str):
         '''  select sql @return False: Expection; list: Success '''
-
         try:
             cursor = self.db.cursor()
             cursor.execute(sql)
             return cursor.fetchall()
-        except:
+        except Exception as e:
+            echo(0, 'execute sql {} error'.format(sql), e)
             return False
 
     def select_one(self, sql: str):
         ''' select one @return False: Expection; list: Success '''
-
         try:
             cursor = self.db.cursor()
             cursor.execute(sql)
             return cursor.fetchone()
-        except:
+        except Exception as e:
+            echo(0, 'execute sql {} error'.format(sql), e)
             return False
 
     def insert_db(self, sql: str):
@@ -99,18 +114,19 @@ class Db(object):
             cursor.execute(sql)
             self.db.commit()
             return True
-        except:
+        except Exception as e:
+            echo(0, 'execute sql {} error'.format(sql), e)
             self.db.rollback()
             return False
 
     def update_db(self, sql: str):
         '''  update sql @return False: Expection; True: Success '''
-
         try:
             cursor = self.db.cursor()
             cursor.execute(sql)
             self.db.commit()
             return True
-        except:
+        except Exception as e:
+            echo(0, 'execute sql {} error'.format(sql), e)
             self.db.rollback()
             return False

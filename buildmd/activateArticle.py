@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-01-04 14:44:38
+# @Last Modified time: 2020-01-18 23:16:37
 
 import hashlib
 import json
@@ -231,7 +231,7 @@ class ActivateArticle(TBK):
         self.share2article[share_id] = (info["name"].replace('.note', ''), info["id"], info["lastUpdateTime"])
         return req
 
-    def basic_youdao(self, idx: str, use_proxy: bool = True):
+    def basic_youdao(self, idx: str, use_proxy: bool = False):
         url = self.NOTE_URL % idx
         refer_url = self.SHARE_URL % idx
         headers = {
@@ -242,13 +242,13 @@ class ActivateArticle(TBK):
         req_req = proxy_req if use_proxy else basic_req
         req = req_req(url, 1, header=headers, config={'timeout': 8})
         if req is None or list(req.keys()) != self.JSON_KEYS:
-            if can_retry(url):
+            if can_retry(url) and use_proxy:
                 echo(2, "retry")
                 return self.basic_youdao(idx)
             else:
                 echo(1, "retry upper time")
                 return ""
-        return req["content"]
+        return req["content"].replace('font-size:12px;', '').replace('color:#494949;', '').replace('background-color:#ffffff;', '').replace('<span style="">', '').replace('</span>', '')
 
     def load_article_pipeline(self, mode: int = 0):
         article_exec = ThreadPoolExecutor(max_workers=5)
@@ -264,7 +264,8 @@ class ActivateArticle(TBK):
         if article_id not in self.tpwds:
             article = self.basic_youdao(article_id)
             tpwds = list({ii: 0 for ii in regex.findall(self.TPWD_REG, article)})
-            self.tpwds[article_id] = tpwds
+            if len(tpwds):
+                self.tpwds[article_id] = tpwds
         else:
             tpwds = self.tpwds[article_id]
         if article_id not in self.tpwd_map:
@@ -402,6 +403,9 @@ class ActivateArticle(TBK):
                 update_list.append((*jj, 1))
         self.update_db(insert_list, f"article_id {article_id} Insert")
         self.update_db(update_list, f"article_id {article_id} Update")
+        if len(insert_list):
+            self.load_ids()
+            self.load_article_list()
 
     def update_tpwd(self, mode: int = 0, is_renew: bool = True, a_id: str = None):
         update_num = 0
@@ -724,6 +728,8 @@ class ActivateArticle(TBK):
         ):
             self.get_m_h5_tk()
         s_req = self.get_uland_url_once(uland_url, self.cookies['uland'])
+        if s_req is None:
+            return
         req_text = s_req.text
         re_json = json.loads(req_text[req_text.find("{") : -1])
         return re_json["data"]["resultList"][0]["itemId"]
@@ -866,24 +872,52 @@ class ActivateArticle(TBK):
         return req
 
     def get_uland_url_once(self, uland_url: str, cookies: dict = {}):
-        """ tb h5 api @2019.11.9 ✔️Tested"""
+        """ tb h5 api @2020.01.18 ✔️Tested"""
+        def get_v1_tt(a: dict):
+            """mtop.alimama.union.xt.en.api.entry @2019.11.09"""
+            variableMap = json_str(
+                {
+                    "taoAppEnv": "0",
+                    "e": uland_params["e"],
+                    "scm": uland_params["scm"],
+                }
+            )
+            api = "mtop.alimama.union.xt.en.api.entry"
+            return variableMap, api
+
+        def get_v2_tt(a: dict):
+            """mtop.alimama.union.xt.biz.quan.api.entry @2020.01.18"""
+            variableMap = json_str(
+                {
+                    "e": a["e"],
+                    "ptl": a["ptl"],
+                    "type": "nBuy",
+                    "buyMoreSwitch": "0",
+                    "union_lens": a["union_lens"],
+                    "recoveryId": "201_11.168.242.104_{}".format(time_stamp() * 1000)
+                }
+            )
+            api = "mtop.alimama.union.xt.biz.quan.api.entry"
+            return variableMap, api
+
         step = self.M in cookies
         uland_params = decoder_url(uland_url)
+        if 'scm' in uland_params:
+            variableMap, api = get_v1_tt(uland_params)
+        elif 'spm' in uland_params:
+            variableMap, api = get_v2_tt(uland_params)
+        else:
+            echo(0, "UnKnowned ULAND mode,", uland_url)
+            return
+
         tt = {
-                "floorId": "13193" if step else "13052",
-                "variableMap": json_str(
-                    {
-                        "taoAppEnv": "0",
-                        "e": uland_params["e"],
-                        "scm": uland_params["scm"],
-                    }
-                ),
-                }
-        api = "mtop.alimama.union.xt.en.api.entry"
+            "floorId": "13193" if step else "13052",
+            "variableMap": variableMap
+        }
         jsv = '2.4.0'
         j_data = {'type': 'jsonp', "callback": "mtopjsonp{}".format(int(step) + 1)}
         return self.get_tb_h5_api(api, jsv, uland_url, tt, j_data, cookies)
-    
+
     def get_finger(self, item_id: int):
         if (
             not 'finger' in self.cookies

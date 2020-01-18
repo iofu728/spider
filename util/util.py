@@ -2,10 +2,15 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-11-09 21:39:51
+# @Last Modified time: 2020-01-18 22:02:26
 
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals, with_statement)
+from __future__ import (
+    absolute_import,
+    division,
+    print_function,
+    unicode_literals,
+    with_statement,
+)
 
 import codecs
 import datetime
@@ -399,14 +404,17 @@ def log(types: str, *log_args: list):
         logging.info("{} {}".format(types, log_str))
 
 
-def decoder_url(url: str) -> dict:
+def decoder_url(url: str, do_decoder: bool = False) -> dict:
     if "?" not in url:
         return {}
-    return {
+    decoder_dict = {
         ii.split("=", 1)[0]: ii.split("=", 1)[1]
         for ii in url.split("?", 1)[1].split("&")
         if ii != ""
     }
+    if do_decoder:
+        decoder_dict = {key: urllib.parse.unquote(value) for key, value in decoder_dict.items()}
+    return decoder_dict
 
 
 def encoder_url(url_dict: {}, origin_url: str) -> str:
@@ -514,7 +522,7 @@ def get_content_type(types: str = "utf8") -> str:
 
 def change_pic_size(picture_path: str, resize: tuple = (600, 600)):
     if not os.path.exists(picture_path):
-        echo(0, 'picture not found in', picture_path)
+        echo(0, "picture not found in", picture_path)
         return
     pic = cv2.imread(picture_path)
     pic = cv2.resize(pic, resize)

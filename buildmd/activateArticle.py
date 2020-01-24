@@ -1136,6 +1136,7 @@ class ActivateArticle(TBK):
             if commission_rate == 2:
                 COMMISSION = "->￥{}￥ SUCCESS, 保持原链接, {}".format(tpwd, applied)
             elif commission_rate == 1:
+                xml = xml.replace("￥{}￥".format(tpwd), "￥{}￥(已失效)".format(tpwd))
                 COMMISSION = "未能更新淘口令, {}".format(applied)
             else:
                 COMMISSION = "->￥{}￥ SUCCESS, 佣金: {}, 类型: {}, {}".format(

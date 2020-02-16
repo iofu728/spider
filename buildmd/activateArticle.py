@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-01-28 21:09:05
+# @Last Modified time: 2020-02-16 16:04:50
 
 import hashlib
 import json
@@ -216,10 +216,10 @@ class ActivateArticle(TBK):
         self.share2article = {}
         self.article_list = {}
         self.list_recent = {}
+        self.need_del = {}
         self.idx = []
         self.empty_content = ""
         self.tpwd_exec = ThreadPoolExecutor(max_workers=20)
-        self.need_del = {}
         self.get_share_list()
 
     def load_process(self):
@@ -269,7 +269,7 @@ class ActivateArticle(TBK):
             "X-Requested-With": "XMLHttpRequest",
         }
         req_req = proxy_req if use_proxy else basic_req
-        req = req_req(url, 1, header=headers, config={"timeout": 8})
+        req = req_req(url, 1, header=headers, config={"timeout": 10})
         if req is None or list(req.keys()) != self.JSON_KEYS:
             if can_retry(url) and use_proxy:
                 echo(2, "retry")
@@ -417,7 +417,7 @@ class ActivateArticle(TBK):
                 m[jj]["item_id"],
                 jj,
                 m[jj]["type"],
-                m[jj]["content"],
+                m[jj]["title"] if "title" in m[jj] else m[jj]["content"],
                 m[jj]["url"],
                 0,
                 "",
@@ -456,7 +456,7 @@ class ActivateArticle(TBK):
                     and self.URL_DOMAIN[2] not in url
                     and self.URL_DOMAIN[10] not in url
                 ):
-                    renew_type = 2 if url in self.URL_DOMAIN[5] else 1
+                    renew_type = 2 if self.URL_DOMAIN[5] in url else 1
                     origin_tpwd = self.convert2tpwd(url, title)
                     if origin_tpwd is None:
                         origin_tpwd = tpwd
@@ -506,7 +506,7 @@ class ActivateArticle(TBK):
         tpwd = self.convert2tpwd(url, title)
         if tpwd is None:
             echo(0, "tpwd error:", tpwd)
-            return (*c[:2], 18, renew_tpwd, 1 if renew_type == 0 else 2 * c[-2:])
+            return (*c[:2], 18, renew_tpwd, 1 if renew_type == 0 else 2, *c[-2:])
         if mode:
             return (*c[:3], tpwd, commission_rate, commission_type, c[-1])
         if renew_type == 1:
@@ -608,6 +608,7 @@ class ActivateArticle(TBK):
         """ decoder the tpwd from taokouling """
         url = self.DECODER_TPWD_URL % (self.api_key, tpwd)
         req = basic_req(url, 1)
+        # print(req.keys())
         if req is None or isinstance(req, str) or "ret" not in list(req.keys()):
             return {}
         return req
@@ -767,7 +768,7 @@ class ActivateArticle(TBK):
             self.get_m_h5_tk()
         s_req = self.get_uland_url_once(uland_url, self.cookies["uland"])
         if s_req is None:
-            return
+            return ""
         req_text = s_req.text
         re_json = json.loads(req_text[req_text.find("{") : -1])
         return re_json["data"]["resultList"][0]["itemId"]
@@ -960,7 +961,7 @@ class ActivateArticle(TBK):
             return variableMap, api
 
         step = self.M in cookies
-        uland_params = decoder_url(uland_url)
+        uland_params = decoder_url(uland_url, True)
         if "scm" in uland_params:
             variableMap, api = get_v1_tt(uland_params)
         elif "spm" in uland_params:
@@ -1062,25 +1063,30 @@ class ActivateArticle(TBK):
             return
         flag = self.update_article(article_id, xml)
         if flag:
-            self.email_update_result(article_id, r_log, r_num)
+            need_num = len(regex.findall("已失效", xml))
+            self.email_update_result(article_id, r_log, r_num, need_num)
             self.update_valid(article_id)
             self.update_article2db(article_id, True)
             self.share_article(article_id)
 
-    def email_update_result(self, article_id: str, r_log: list, r_num: int):
+    def email_update_result(
+        self, article_id: str, r_log: list, r_num: int, need_num: int
+    ):
         p = self.share2article[article_id][-2].split("/")[-1]
         article_info = self.list_recent[p]
         name = article_info["name"].replace(".note", "")
-        subject = "更新({}){}/{}条[{}]".format(
-            time_str(time_format=self.T_FORMAT), r_num, len(r_log), article_info["name"]
+        subject = "更新({}){}/{}剩{}条[{}]".format(
+            time_str(time_format=self.T_FORMAT),
+            r_num,
+            len(r_log),
+            need_num,
+            article_info["name"].replace(".note", ""),
         )
         content = "\n".join(
             [
                 "Title: {}".format(article_info["name"]),
                 "Time: {}".format(time_str()),
-                "Update Num: {}/{}条, 还有{}条需要手动更新".format(
-                    r_num, len(r_log), len(r_log) - r_num
-                ),
+                "Update Num: {}/{}条, 还有{}条需要手动更新".format(r_num, len(r_log), need_num),
                 "",
                 *r_log,
             ]
@@ -1195,7 +1201,7 @@ class ActivateArticle(TBK):
                 applied = title
             xml = xml.replace(jj, "￥{}￥".format(tpwd))
             if tpwd == pure_jj:
-                commission_rate == 1
+                commission_rate = 1
             if commission_rate == 2:
                 COMMISSION = "->￥{}￥ SUCCESS, 保持原链接, {}".format(tpwd, applied)
             elif commission_rate == 1:
@@ -1218,7 +1224,7 @@ class ActivateArticle(TBK):
             "editorType": 1,
             "cstk": self.cstk,
         }
-        req = basic(url, 12, data=data, header=self.get_ynote_web_header(1))
+        req = basic_req(url, 12, data=data, header=self.get_ynote_web_header(1))
         if req is None or len(req.text) < 100:
             return
         return req.text
@@ -1356,6 +1362,7 @@ class ActivateArticle(TBK):
     def load_article_new(self):
         for article_id in self.idx:
             self.load_article(article_id)
+            time.sleep(30)
 
     def load_click(self, num=1000000):
         """ schedule click """

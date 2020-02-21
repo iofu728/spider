@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-02-16 16:04:50
+# @Last Modified time: 2020-02-21 23:29:49
 
 import hashlib
 import json
@@ -1063,7 +1063,7 @@ class ActivateArticle(TBK):
             return
         flag = self.update_article(article_id, xml)
         if flag:
-            need_num = len(regex.findall("已失效", xml))
+            need_num = len(regex.findall("\(已失效\)", xml))
             self.email_update_result(article_id, r_log, r_num, need_num)
             self.update_valid(article_id)
             self.update_article2db(article_id, True)
@@ -1199,6 +1199,8 @@ class ActivateArticle(TBK):
                     applied = "{},{}".format(TPWD_ERROR, title)
             else:
                 applied = title
+            if "{}(已失效)".format(jj) in xml:
+                jj = "{}(已失效)".format(jj)
             xml = xml.replace(jj, "￥{}￥".format(tpwd))
             if tpwd == pure_jj:
                 commission_rate = 1

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-02-21 23:29:49
+# @Last Modified time: 2020-03-12 21:01:12
 
 import hashlib
 import json
@@ -13,6 +13,7 @@ import time
 import urllib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from configparser import ConfigParser
+from collections import Counter
 
 import numpy as np
 import regex
@@ -43,12 +44,17 @@ from util.util import (
     send_email,
     time_stamp,
     time_str,
+    load_bigger,
+    dump_bigger,
 )
 
 
 proxy_req = GetFreeProxy().proxy_req
 root_dir = os.path.abspath("buildmd")
 assign_path = os.path.join(root_dir, "tbk.ini")
+DATA_DIR = os.path.join(root_dir, "data")
+TPWDLIST_PATH = os.path.join(root_dir, "tpwdlist.pkl")
+mkdir(DATA_DIR)
 
 
 class TBK(object):
@@ -212,6 +218,7 @@ class ActivateArticle(TBK):
         self.tpwd_map = {}
         self.tpwd_db_map = {}
         self.tpwds = {}
+        self.tpwd_list = {}
         self.cookies = {}
         self.share2article = {}
         self.article_list = {}
@@ -299,7 +306,8 @@ class ActivateArticle(TBK):
             return
         if article_id not in self.tpwds:
             article = self.basic_youdao(article_id)
-            tpwds = list({ii: 0 for ii in regex.findall(self.TPWD_REG, article)})
+            self.tpwd_list[article_id] = regex.findall(self.TPWD_REG, article)
+            tpwds = list({ii: 0 for ii in self.tpwd_list[article_id]})
             if len(tpwds):
                 self.tpwds[article_id] = tpwds
         else:
@@ -1379,9 +1387,66 @@ class ActivateArticle(TBK):
                 threading_list.append(
                     threading.Thread(target=self.load_share_total, args=())
                 )
+            threading_list.append(
+                threading.Thread(target=self.send_repeat_email, args=())
+            )
             for work in threading_list:
                 work.start()
             time.sleep(self.ONE_HOURS / 2)
+
+    def does_update(self, do_it: bool) -> bool:
+        if do_it:
+            return True
+        if not os.path.exists(TPWDLIST_PATH):
+            return True
+        old = load_bigger(TPWDLIST_PATH)
+        return old == self.tpwd_list
+
+    def send_repeat_email(self, do_it: bool = False):
+        def get_repeat(items: list):
+            repeat_time = {k: v for k, v in Counter(items).items() if v >= 2}
+            repeat_order = sorted(repeat_time.items(), key=lambda i: -i[1])
+            return ",".join(["￥{}￥出现{}次".format(k, v) for k, v in repeat_order])
+
+        if not self.does_update(do_it):
+            return
+        repeats = []
+        for article_id, tpwd in self.tpwd_list.items():
+            repeat = get_repeat(tpwd)
+            if repeat == "":
+                continue
+            p = self.share2article[article_id][-2].split("/")[-1]
+            article_info = self.list_recent[p]
+            repeats.append(
+                "{}({})共{}条: {}".format(
+                    article_info["name"].replace(".note", ""),
+                    article_id,
+                    repeat.count(",") + 1,
+                    repeat,
+                )
+            )
+        name = article_info["name"].replace(".note", "")
+        subject = "重复({}){}/{}共{}条".format(
+            time_str(time_format=self.T_FORMAT),
+            len(repeats),
+            len(self.tpwd_list),
+            "".join(repeats).count(",") + len(repeats),
+        )
+        content = "\n".join(
+            [
+                "重复情况",
+                "Time: {}".format(time_str()),
+                "Repeat Num: {}/{}篇, 共{}条.".format(
+                    len(repeats),
+                    len(self.tpwd_list),
+                    "".join(repeats).count(",") + len(repeats),
+                ),
+                "--------------------------------" "",
+                *repeats,
+            ]
+        )
+        dump_bigger(self.tpwd_list, TPWDLIST_PATH)
+        send_email(content, subject)
 
 
 if __name__ == "__main__":

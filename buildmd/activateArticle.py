@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-12 21:01:12
+# @Last Modified time: 2020-03-18 23:38:29
 
 import hashlib
 import json
@@ -53,7 +53,7 @@ proxy_req = GetFreeProxy().proxy_req
 root_dir = os.path.abspath("buildmd")
 assign_path = os.path.join(root_dir, "tbk.ini")
 DATA_DIR = os.path.join(root_dir, "data")
-TPWDLIST_PATH = os.path.join(root_dir, "tpwdlist.pkl")
+TPWDLIST_PATH = os.path.join(DATA_DIR, "tpwdlist.pkl")
 mkdir(DATA_DIR)
 
 
@@ -536,7 +536,7 @@ class ActivateArticle(TBK):
             need_del_id = [ii[0] for ii in article_list if ii[0] not in have_id]
             self.need_del[article_id] = need_del_id
         item_num = sum([len(ii) for ii in self.article_list.values()])
-        echo(1, "Load {} article list from db.".format(item_num))
+        echo(1, "Load {} TPWD from db.".format(item_num))
 
     def get_article_db(self, article_id: str):
         article_list = list(self.Db.select_db(self.S_ARTICLE_SQL % article_id))
@@ -1370,9 +1370,10 @@ class ActivateArticle(TBK):
         self.load_process()
 
     def load_article_new(self):
-        for article_id in self.idx:
-            self.load_article(article_id)
-            time.sleep(30)
+        article_exec = ThreadPoolExecutor(max_workers=3)
+        a_list = [article_exec.submit(self.load_article, ii) for ii in self.idx]
+        list(as_completed(a_list))
+        self.send_repeat_email()
 
     def load_click(self, num=1000000):
         """ schedule click """
@@ -1387,20 +1388,19 @@ class ActivateArticle(TBK):
                 threading_list.append(
                     threading.Thread(target=self.load_share_total, args=())
                 )
-            threading_list.append(
-                threading.Thread(target=self.send_repeat_email, args=())
-            )
             for work in threading_list:
                 work.start()
             time.sleep(self.ONE_HOURS / 2)
 
-    def does_update(self, do_it: bool) -> bool:
+    def does_update(self, do_it: bool) -> int:
         if do_it:
-            return True
+            return 2
         if not os.path.exists(TPWDLIST_PATH):
-            return True
-        old = load_bigger(TPWDLIST_PATH)
-        return old == self.tpwd_list
+            return 3
+        if len(self.tpwd_list) <= 20:
+            return 4
+        old, _, _ = load_bigger(TPWDLIST_PATH)
+        return int(old != self.tpwd_list)
 
     def send_repeat_email(self, do_it: bool = False):
         def get_repeat(items: list):
@@ -1408,24 +1408,35 @@ class ActivateArticle(TBK):
             repeat_order = sorted(repeat_time.items(), key=lambda i: -i[1])
             return ",".join(["￥{}￥出现{}次".format(k, v) for k, v in repeat_order])
 
-        if not self.does_update(do_it):
+        do_update = self.does_update(do_it)
+        echo(1, "Do_update:", do_update)
+        if not do_update:
             return
         repeats = []
         for article_id, tpwd in self.tpwd_list.items():
             repeat = get_repeat(tpwd)
             if repeat == "":
                 continue
-            p = self.share2article[article_id][-2].split("/")[-1]
-            article_info = self.list_recent[p]
+            if article_id in self.share2article:
+                p = self.share2article[article_id][-2].split("/")[-1]
+                if p in self.list_recent:
+                    article_info = self.list_recent[p]
+                else:
+                    echo(0, "P error.", p, article_id)
+                    article_info = {"name": ""}
+            else:
+                article_info = {"name": ""}
             repeats.append(
                 "{}({})共{}条: {}".format(
-                    article_info["name"].replace(".note", ""),
+                    article_info["name"]
+                    .replace(".note", "")
+                    .split("/")[0]
+                    .split(" ")[0],
                     article_id,
                     repeat.count(",") + 1,
                     repeat,
                 )
             )
-        name = article_info["name"].replace(".note", "")
         subject = "重复({}){}/{}共{}条".format(
             time_str(time_format=self.T_FORMAT),
             len(repeats),
@@ -1445,7 +1456,7 @@ class ActivateArticle(TBK):
                 *repeats,
             ]
         )
-        dump_bigger(self.tpwd_list, TPWDLIST_PATH)
+        dump_bigger([self.tpwd_list, content, subject], TPWDLIST_PATH)
         send_email(content, subject)
 
 
@@ -1453,3 +1464,4 @@ if __name__ == "__main__":
     ba = ActivateArticle()
     ba.load_process()
     ba.load_click()
+

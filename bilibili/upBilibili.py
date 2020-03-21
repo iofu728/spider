@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-14 23:29:59
+# @Last Modified time: 2020-03-21 21:14:56
 
 
 import codecs
@@ -22,8 +22,8 @@ sys.path.append(os.getcwd())
 from util.util import (basic_req, can_retry, echo, get_min_s, get_time_str,
                        mkdir, read_file, send_email, time_stamp, time_str, get_accept, get_use_agent)
 
-from .analysis import clean_csv
-from .basicBilibili import BasicBilibili
+from bilibili.analysis import clean_csv
+from bilibili.basicBilibili import BasicBilibili
 
 
 proxy_req = 0
@@ -581,16 +581,16 @@ class Up(BasicBilibili):
                 {**jj, 'idx': 'reply-{}'.format(ii + 1)} for ii, jj in enumerate(wait_check)]
 
         for ii in wait_check:
-            info = {'basic': self.get_comment_detail(ii, av_id, pn)}
+            info = {'basic': self.get_comment_detail(ii, av_id, pn, sort)}
             rpid = info['basic'][0]
             crep = ii['replies']
             idx = ii['idx']
 
             if not crep is None:
                 info['replies'] = [self.get_comment_detail(
-                    {**kk, 'idx': '{}-{}'.format(idx, ww + 1)}, av_id, pn, rpid) for ww, kk in enumerate(crep)]
+                    {**kk, 'idx': '{}-{}'.format(idx, ww + 1)}, av_id, pn, sort, rpid) for ww, kk in enumerate(crep)]
 
-    def get_comment_detail(self, comment: dict, av_id: int, pn: int, parent_rpid=None) -> List:
+    def get_comment_detail(self, comment: dict, av_id: int, pn: int, sort: int, parent_rpid=None) -> List:
         ''' get comment detail '''
         wait_list = ['rpid', 'member', 'content', 'like', 'idx', 'ctime']
         wait_list_mem = ['uname', 'sex', 'sign', 'level_info']
@@ -601,15 +601,15 @@ class Up(BasicBilibili):
         current_level = level['current_level']
         content, plat = [content[ii] for ii in wait_list_content]
         req_list = [rpid, ctime, like, plat,
-                    current_level, uname, sex, content, sign, idx]
+                    current_level, uname, sex, content, sign, idx, sort]
         self.have_bad_comment(req_list, av_id, pn, parent_rpid)
-        req_list[-2] = req_list[-2].replace(',', ' ').replace('\n', ' ')
         req_list[-3] = req_list[-3].replace(',', ' ').replace('\n', ' ')
+        req_list[-4] = req_list[-4].replace(',', ' ').replace('\n', ' ')
         return req_list
 
     def have_bad_comment(self, req_list: list, av_id: int, pn: int, parent_rpid=None):
         ''' check comment and send warning email if error '''
-        rpid, ctime, like, plat, current_level, uname, sex, content, sign, idx = req_list
+        rpid, ctime, like, plat, current_level, uname, sex, content, sign, idx, sort = req_list
         ctimes = time_str(ctime, time_format=self.T_FORMAT)
         ctime = time_str(ctime)
 

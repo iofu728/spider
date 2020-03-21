@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:47:48
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-11 02:03:06
+# @Last Modified time: 2020-03-21 20:56:38
 
 import base64
 import json
@@ -18,8 +18,8 @@ import rsa
 sys.path.append(os.getcwd())
 from util.util import can_retry, echo, encoder_cookie, send_email, time_stamp, get_accept, get_content_type
 
-from .basicBilibili import BasicBilibili
-from .geetestE import E, O, S
+from bilibili.basicBilibili import BasicBilibili
+from bilibili.geetestE import E, O, S
 
 
 proxy_req = 0

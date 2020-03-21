@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-18 23:38:29
+# @Last Modified time: 2020-03-19 11:12:30
 
 import hashlib
 import json
@@ -1398,7 +1398,7 @@ class ActivateArticle(TBK):
         if not os.path.exists(TPWDLIST_PATH):
             return 3
         if len(self.tpwd_list) <= 20:
-            return 4
+            return 0
         old, _, _ = load_bigger(TPWDLIST_PATH)
         return int(old != self.tpwd_list)
 

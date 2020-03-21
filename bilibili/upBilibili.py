@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-21 21:14:56
+# @Last Modified time: 2020-03-22 00:04:00
 
 
 import codecs
@@ -224,7 +224,7 @@ class Up(BasicBilibili):
 
     def check_rank_v2(self, av_id: int):
         rank_list = self.rank_map[av_id] if av_id in self.rank_map else []
-        stat = self.get_star_info(av_id)
+        stat = self.get_stat_info(av_id)
         if stat is None:
             return
         need = ['view', 'like', 'coin', 'favorite',
@@ -477,8 +477,8 @@ class Up(BasicBilibili):
                     target=self.update_proxy, args=()))
             threading_list.append(threading.Thread(
                 target=self.load_configure, args=()))
-            threading_list.append(threading.Thread(
-                target=self.get_check, args=()))
+            # threading_list.append(threading.Thread(
+            #     target=self.get_check, args=()))
             for av_id in self.rank_map:
                 if av_id in self.av_id_list or av_id in self.assign_ids:
                     threading_list.append(threading.Thread(

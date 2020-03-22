@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-01-18 22:02:26
+# @Last Modified time: 2020-03-23 02:19:56
 
 from __future__ import (
     absolute_import,
@@ -442,8 +442,9 @@ def encoder_cookie(cookie_dict: {}) -> str:
     return "; ".join(["{}={}".format(ii, jj) for ii, jj in cookie_dict.items()])
 
 
-def get_time_str(time_gap: int) -> str:
-    time_gap = int(time_gap // 60)
+def get_time_str(time_gap: int, is_gap: bool=True) -> str:
+    if not is_gap:
+        time_gap = int(time_gap // 60)
     day = int(time_gap // 1440)
     hour = int(time_gap / 60) % 24
     minute = int(time_gap % 60)

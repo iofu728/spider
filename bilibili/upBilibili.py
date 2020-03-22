@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-22 00:04:00
+# @Last Modified time: 2020-03-23 01:50:44
 
 
 import codecs
@@ -181,7 +181,7 @@ class Up(BasicBilibili):
             ov_sort_idx) if ii == other_views_len][0] + 1
         other_result = [(jj + 1, av_ids[ii])
                         for jj, ii in enumerate(ov_sort_idx[:4]) if ii != other_views_len]
-        time_tt = self.get_time_str(time_gap)
+        time_tt = get_time_str(time_gap)
         title = self.av_id_map[av_id]['title'].split('|', 1)[0] if av_id in self.av_id_map else ''
         title_email = '排名(发布{}){}本年度排名No.{}/{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}'.format(time_tt, title, now_sorted, len(other_views), now_info[1], now_info[2], now_info[3], now_info[4], now_info[7])
         email_title = 'av{}发布{}, 本年度排名No.{}/{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}'.format(av_id, time_tt, now_sorted, len(other_views), now_info[1], now_info[2], now_info[3], now_info[4], now_info[7])
@@ -337,7 +337,7 @@ class Up(BasicBilibili):
         rank_str = '热榜{}(%s){}|{}Day List, Rank: {}, Score: {}'.format(is_hot, title, rank_list[-1], rank, score)
         if av_id in self.public:
             time_gap = (time.time() - self.public[av_id][0]) / 60
-            ts = self.get_time_str(time_gap)
+            ts = get_time_str(time_gap)
             ts_str = time_str(self.public[av_id][0])
         else:
             ts, ts_str = '', ''
@@ -477,13 +477,13 @@ class Up(BasicBilibili):
                     target=self.update_proxy, args=()))
             threading_list.append(threading.Thread(
                 target=self.load_configure, args=()))
-            # threading_list.append(threading.Thread(
-            #     target=self.get_check, args=()))
+            if index % 5 == 4:
+                threading_list.append(threading.Thread(target=self.get_check, args=()))
             for av_id in self.rank_map:
                 if av_id in self.av_id_list or av_id in self.assign_ids:
                     threading_list.append(threading.Thread(
                         target=self.check_rank, args=(av_id,)))
-                elif index % 5 == 2:
+                elif index % 20 == 3:
                     threading_list.append(threading.Thread(
                         target=self.check_rank, args=(av_id,)))
             for work in threading_list:

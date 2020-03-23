@@ -1,8 +1,9 @@
 [basic]
-basic_av_id = 21061574
+bv_id = BV1GW411g7mc
+av_id = 21061574
 basic_av_p = -1
-up_name = 还有一天就放假了
-up_mid = 
+author = 还有一天就放假了
+mid = 7792521
 rank_id = 119
 tid = 126
 view_abnormal = 1000
@@ -13,6 +14,7 @@ assign_email = 123456@163.com
 
 [assign]
 av_ids = 21061574,11624347
+bv_ids = BV1GW411g7mc
 ;split by ','
 
 [comment]

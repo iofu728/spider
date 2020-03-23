@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-04 10:57:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-14 15:20:25
+# @Last Modified time: 2020-03-24 01:37:39
 
 import pandas as pd
 import numpy as np
@@ -51,6 +51,7 @@ def clean_csv(av_id: int):
     ''' clean csv '''
     csv_path = os.path.join(history_dir, '{}.csv'.format(av_id))
     output_path = os.path.join(history_data_dir, '{}_new.csv'.format(av_id))
+    print(csv_path)
     csv = read_file(csv_path)
     last_time, last_view = csv[0].split(',')[:2]
     result = [csv[0]]

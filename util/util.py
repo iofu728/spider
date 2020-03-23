@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-23 02:19:56
+# @Last Modified time: 2020-03-23 23:46:48
 
 from __future__ import (
     absolute_import,
@@ -27,7 +27,6 @@ import time
 import urllib
 from email.mime.text import MIMEText
 
-import cv2
 import numpy as np
 import requests
 import urllib3
@@ -413,7 +412,9 @@ def decoder_url(url: str, do_decoder: bool = False) -> dict:
         if ii != ""
     }
     if do_decoder:
-        decoder_dict = {key: urllib.parse.unquote(value) for key, value in decoder_dict.items()}
+        decoder_dict = {
+            key: urllib.parse.unquote(value) for key, value in decoder_dict.items()
+        }
     return decoder_dict
 
 
@@ -442,7 +443,7 @@ def encoder_cookie(cookie_dict: {}) -> str:
     return "; ".join(["{}={}".format(ii, jj) for ii, jj in cookie_dict.items()])
 
 
-def get_time_str(time_gap: int, is_gap: bool=True) -> str:
+def get_time_str(time_gap: int, is_gap: bool = True) -> str:
     if not is_gap:
         time_gap = int(time_gap // 60)
     day = int(time_gap // 1440)
@@ -500,7 +501,7 @@ def decoder_fuzz(reg: str, file_path: str, replace_func=replace_params):
 def get_accept(types: str) -> str:
     """ @param: types => html, json, xhr """
     if types == "html":
-        return "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3"
+        return "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
     elif types == "json":
         return "application/json, text/javascript, */*; q=0.01"
     elif types == "xhr":
@@ -522,6 +523,7 @@ def get_content_type(types: str = "utf8") -> str:
 
 
 def change_pic_size(picture_path: str, resize: tuple = (600, 600)):
+    import cv2
     if not os.path.exists(picture_path):
         echo(0, "picture not found in", picture_path)
         return

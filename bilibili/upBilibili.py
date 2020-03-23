@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-24 01:24:46
+# @Last Modified time: 2020-03-24 01:27:35
 
 
 import codecs
@@ -170,7 +170,7 @@ class Up(BasicBilibili):
                 clean_csv(bv_id)
         self.last_view[bv_id] = data["view"]
         now_time = time_stamp()
-        if not bv_id in self.public["T"] or bv_id not in self.bv_ids:
+        if not bv_id in self.public["T"] or bv_id not in self.assign_ids:
             return
         time_gap = (now_time - self.public["T"][bv_id][0]) / 60
         echo("0|debug", bv_id, time_gap < (4.5 * one_day / 60), self.public["T"][bv_id])

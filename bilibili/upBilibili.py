@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-24 01:27:35
+# @Last Modified time: 2020-03-24 02:21:21
 
 
 import codecs
@@ -242,7 +242,7 @@ class Up(BasicBilibili):
                 data_info[3],
                 data_info[4],
                 data_info[7],
-                self.bv_ids[av]["play"],
+                self.bv_ids[bv]["play"],
                 self.get_history_rank(data_info),
                 time_str(self.bv_ids[bv]["created"]),
             )

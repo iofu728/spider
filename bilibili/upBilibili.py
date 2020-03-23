@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-24 00:38:04
+# @Last Modified time: 2020-03-24 01:24:46
 
 
 import codecs
@@ -154,7 +154,7 @@ class Up(BasicBilibili):
 
         if (
             bv_id in self.last_check
-            and int(time_stamp()) - self.last_check[bv_id] > one_day
+            and int(time_stamp()) - self.last_check[bv_id] > one_day / 2
         ):
             self.del_map[bv_id] = 1
             del self.rank_map[bv_id]
@@ -381,8 +381,8 @@ class Up(BasicBilibili):
         )
         if bv_id in self.bv_ids:
             created = self.bv_ids[bv_id]["created"]
-            ts = get_time_str(time.time() - created)
-            ts_str = time_str(created)
+            ts = get_time_str((time.time() - created) / 60)
+            ts_str = time_str(created) + "-" + time_str()
         else:
             ts, ts_str = "", ""
         rank_context = rank_str % ts_str

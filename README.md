@@ -22,7 +22,7 @@
 | jianshu.com/csdn.net | [blog](#blog)                             | 20-01-04           |
 | elective.pku.edu.cn  | [Brush Class](#brush-class)               | 19-10-11           |
 | zimuzu.tv            | [zimuzu](#zimuzu)                         | 19-04-13           |
-| bilibili.com         | [Bilibili](#bilibili)                     | 19-10-14           |
+| bilibili.com         | [Bilibili](#bilibili)                     | 20-03-24           |
 | exam.shaoq.com       | [shaoq](#shaoq)                           | 19-03-21           |
 | data.eastmoney.com   | [Eastmoney](#eastmoney)                   | 19-03-29           |
 | hotel.ctrip.com      | [Ctrip Hotel Detail](#ctrip-hotel-detail) | 19-10-11           |

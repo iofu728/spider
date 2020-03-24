@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-24 17:04:36
+# @Last Modified time: 2020-03-24 18:25:24
 
 
 import codecs
@@ -402,7 +402,6 @@ class Up(BasicBilibili):
 
     def load_rank_index(self, index: int, day_index: int):
         """ load rank """
-        self.have_assign[day_index] = []
         url = self.RANKING_URL % (self.assign_rank_id, day_index, index)
         text = self.get_api_req(url, self.basic_bv_id, 1)
         if text is None:

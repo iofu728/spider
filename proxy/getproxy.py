@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-22 01:04:56
+# @Last Modified time: 2020-03-24 14:27:41
 
 
 import argparse
@@ -68,6 +68,7 @@ class GetFreeProxy:
         )
         self.select_sql = """SELECT `id`, address, `is_failured` from ip_proxy WHERE `address` in %s """
         self.select_all = """SELECT `address`, `http_type` from ip_proxy WHERE `is_failured` != 5 and http_type in %s"""
+        self.random_select = """SELECT `address`, `http_type` FROM ip_proxy WHERE `is_failured` >= 5 and (`id` >= ((SELECT MAX(`id`) FROM ip_proxy)-(SELECT MIN(`id`) FROM ip_proxy)) * RAND() + (SELECT MIN(`id`) FROM ip_proxy)) and http_type in %s LIMIT 6000"""
         self.replace_ip = """REPLACE INTO ip_proxy(`id`, `address`, `http_type`, `is_failured`) VALUES %s"""
         self.can_use_ip = {}
         self.waitjudge = []
@@ -362,10 +363,14 @@ class GetFreeProxy:
         else:
             typestr = "(0,2)"
         results = self.Db.select_db(self.select_all % typestr)
-        if results:
-            for index in results:
-                self.waitjudge.append(index[0])
-            self.thread_judge()
+        random_select = self.Db.select_db(self.random_select % typestr)
+        if not results:
+            results = []
+        if not random_select:
+            random_select = []
+        for index in results + random_select:
+            self.waitjudge.append(index[0])
+        self.thread_judge()
         self.init_proxy()
         end_time(version, 2)
 

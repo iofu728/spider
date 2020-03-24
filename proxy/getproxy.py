@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-10-25 22:48:35
+# @Last Modified time: 2020-03-24 14:27:41
 
 
 import argparse
@@ -68,6 +68,7 @@ class GetFreeProxy:
         )
         self.select_sql = """SELECT `id`, address, `is_failured` from ip_proxy WHERE `address` in %s """
         self.select_all = """SELECT `address`, `http_type` from ip_proxy WHERE `is_failured` != 5 and http_type in %s"""
+        self.random_select = """SELECT `address`, `http_type` FROM ip_proxy WHERE `is_failured` >= 5 and (`id` >= ((SELECT MAX(`id`) FROM ip_proxy)-(SELECT MIN(`id`) FROM ip_proxy)) * RAND() + (SELECT MIN(`id`) FROM ip_proxy)) and http_type in %s LIMIT 6000"""
         self.replace_ip = """REPLACE INTO ip_proxy(`id`, `address`, `http_type`, `is_failured`) VALUES %s"""
         self.can_use_ip = {}
         self.waitjudge = []
@@ -362,10 +363,14 @@ class GetFreeProxy:
         else:
             typestr = "(0,2)"
         results = self.Db.select_db(self.select_all % typestr)
-        if results:
-            for index in results:
-                self.waitjudge.append(index[0])
-            self.thread_judge()
+        random_select = self.Db.select_db(self.random_select % typestr)
+        if not results:
+            results = []
+        if not random_select:
+            random_select = []
+        for index in results + random_select:
+            self.waitjudge.append(index[0])
+        self.thread_judge()
         self.init_proxy()
         end_time(version, 2)
 
@@ -536,17 +541,16 @@ class GetFreeProxy:
             So you need reactive the cookie by this function.
         """
         headers = {
-            "Host": "www.gatherproxy.com",
-            "Origin": "http://www.gatherproxy.com",
-            "Referer": "http://www.gatherproxy.com/proxylist/anonymity/?t=Transparent",
             "Cookie": "_lang=en-US; _ga=GA1.2.1084455496.1548351129; _gid=GA1.2.1515017701.1552361687; ASP.NET_SessionId=ckin3pzyqyoyt3zg54zrtrct; _gat=1; arp_scroll_position=57",
-            "Content-Type": get_content_type(),
-            "Accept": get_accept("html"),
+            "Accept": get_accept("html") + ";q=0.9",
         }
         login_url = "http://www.gatherproxy.com/subscribe/login"
 
         cookie_html = basic_req(login_url, 3, header=headers)
-        verify_text = re.findall('<span class="blue">(.*?)</span>', cookie_html)[0]
+        try:
+            verify_text = re.findall('<span class="blue">(.*?)</span>', cookie_html)[0]
+        except:
+            return
         verify_list = verify_text.replace("= ", "").strip().split()
         num_map = {
             "Zero": 0,
@@ -554,7 +558,7 @@ class GetFreeProxy:
             "Two": 2,
             "Three": 3,
             "Four": 4,
-            "Fine": 5,
+            "Five": 5,
             "Six": 6,
             "Seven": 7,
             "Eight": 8,
@@ -568,7 +572,7 @@ class GetFreeProxy:
             elif num in num_map:
                 verify_num[index] = num_map[num]
             else:
-                echo("0|error", "Error", index)
+                echo("0|error", "Error", num)
                 # return False
         verify_code = 0
         error = True
@@ -611,12 +615,8 @@ class GetFreeProxy:
         If failured, you should reactive the cookie.
         """
         headers = {
-            "Host": "www.gatherproxy.com",
-            "Origin": "http://www.gatherproxy.com",
-            "Referer": "http://www.gatherproxy.com/proxylist/anonymity/?t=Transparent",
             "Cookie": "_lang=en-US; _ga=GA1.2.1084455496.1548351129; _gid=GA1.2.1515017701.1552361687; ASP.NET_SessionId=ckin3pzyqyoyt3zg54zrtrct; _gat=1; arp_scroll_position=57",
-            "Content-Type": get_content_type(),
-            "Accept": get_accept("html"),
+            "Accept": get_accept("html") + ";q=0.9",
         }
         url = "http://www.gatherproxy.com/subscribe/infos"
         try:

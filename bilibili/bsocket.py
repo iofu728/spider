@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2019-09-17 01:14:28
+# @Last Modified time: 2020-03-23 23:42:04
 
 
 import asyncio
@@ -302,7 +302,7 @@ if __name__ == '__main__':
     else:
         cfg = ConfigParser()
         cfg.read(assign_path, 'utf-8')
-        av_id = cfg.getint('basic', 'basic_av_id')
+        av_id = cfg.getint('basic', 'av_id')
         p = cfg.getint('basic', 'basic_av_p') if len(
             cfg['basic']['basic_av_p']) else -1
 

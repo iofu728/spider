@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-24 02:21:21
+# @Last Modified time: 2020-03-24 17:04:36
 
 
 import codecs
@@ -491,7 +491,7 @@ class Up(BasicBilibili):
         have_assign = assign_1 + assign_2
         echo("4|debug", assign_1, assign_2, have_assign)
         not_ranks = [ii for ii in self.have_assign["T"] if not ii in have_assign]
-        self.have_assign = have_assign
+        self.have_assign["T"] = have_assign
 
         echo(
             "4|debug",

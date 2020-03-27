@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-19 11:12:30
+# @Last Modified time: 2020-03-25 12:19:13
 
 import hashlib
 import json
@@ -227,6 +227,7 @@ class ActivateArticle(TBK):
         self.idx = []
         self.empty_content = ""
         self.tpwd_exec = ThreadPoolExecutor(max_workers=20)
+        self.lock = threading.Lock()
         self.get_share_list()
 
     def load_process(self):
@@ -415,6 +416,7 @@ class ActivateArticle(TBK):
         return share_map
 
     def load_article2db(self, article_id: str):
+        self.lock.acquire()
         m = self.tpwd_map[article_id]
         m = {ii: jj for ii, jj in m.items() if jj["url"]}
         tpwds = list(set(self.tpwds[article_id]))
@@ -450,6 +452,8 @@ class ActivateArticle(TBK):
         if len(insert_list):
             self.load_ids()
             self.load_article_list()
+        time.sleep(np.random.rand() * 10)
+        self.lock.release()
 
     def update_tpwd(self, mode: int = 0, is_renew: bool = True, a_id: str = None):
         update_num = 0
@@ -1464,4 +1468,3 @@ if __name__ == "__main__":
     ba = ActivateArticle()
     ba.load_process()
     ba.load_click()
-

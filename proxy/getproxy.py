@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-24 14:27:41
+# @Last Modified time: 2020-06-01 13:44:56
 
 
 import argparse
@@ -140,7 +140,7 @@ class GetFreeProxy:
                             test_func=test_func,
                             need_cookie=need_cookie,
                             config=config,
-                            proxies=proxies
+                            proxies=proxies,
                         )
                     else:
                         self.failured_time[url] = 0
@@ -166,7 +166,7 @@ class GetFreeProxy:
                     header=header,
                     need_cookie=need_cookie,
                     config=config,
-                    proxies=proxies
+                    proxies=proxies,
                 )
 
     def check_retry(self, url: str) -> bool:
@@ -312,7 +312,7 @@ class GetFreeProxy:
             data = basic_req(test_url, 1, proxies)
             result = data["result"]
             tracks = result["tracks"]
-            if len(tracks) == 56:
+            if len(tracks) == 10:
                 if times < 0:
                     self.judge_url(urls, index, times + 1)
                 else:
@@ -682,6 +682,66 @@ class GetFreeProxy:
         else:
             return ""
 
+    def get_free_proxy(self, url: str):
+        req = basic_req(url, 2)
+        if req is None:
+            return []
+        tt = req.text
+        t_list = re.findall("<tr><td>(\d*\.\d*\.\d*\.\d*)</td><td>(\d*?)</td>", tt)
+        echo(2, "Get Free proxy List", url, len(t_list))
+        return ["{}:{}".format(ii, jj) for ii, jj in t_list]
+
+    def get_proxy_free(self):
+        urls = [
+            "https://www.sslproxies.org",
+            "https://free-proxy-list.net",
+            "https://www.us-proxy.org",
+            "https://free-proxy-list.net/uk-proxy.html",
+            "https://free-proxy-list.net/anonymous-proxy.html",
+            "http://www.google-proxy.net",
+        ]
+        t_list = []
+        for url in urls:
+            t_list.extend(self.get_free_proxy(url))
+        t_list.extend(self.get_api())
+        for ii in ["http", "https"]:
+            t_list.extend(self.get_download(ii))
+        t_list = list(set(t_list))
+        with open(data_dir + "gatherproxy", "w") as f:
+            f.write("\n".join(t_list))
+
+    def ip_decoder(self, data: str):
+        data = re.sub("\+", "\x20", data)
+        data = re.sub(
+            "%([a-fA-F0-9][a-fA-F0-9])",
+            lambda i: chr(int("0x" + i.group()[1:], 16)),
+            data,
+        )
+        return re.findall(">(.*?)</a", data)
+
+    def get_api(self):
+        API_KEY = "xxx"
+        url = "http://api.scraperapi.com/?api_key={}&url=http://httpbin.org/ip".format(
+            API_KEY
+        )
+        t_list = []
+        for ii in range(38):
+            tt = basic_req(url, 1)
+            if tt is None:
+                continue
+            t_list.append(tt["origin"])
+        echo(2, "Get scraperapi", len(t_list))
+        return t_list
+
+    def get_download(self, types: str):
+        url = "https://www.proxy-list.download/api/v0/get?l=en&t=" + types
+        tt = basic_req(url, 1)
+        if tt is None:
+            return []
+        tt_list = tt[0]["LISTA"][0]
+        echo(2, "Get download", types, len(tt_list))
+        return ["{}:{}".format(ii["IP"], ii["PORT"]) for ii in tt_list]
+
     def get_other_proxies(self, url: str):
         """ get other proxies """
         pages = re.findall(
@@ -735,7 +795,7 @@ if __name__ == "__main__":
     model = parser.parse_args().model
     a = GetFreeProxy()
     if model == 1:
-        a.load_gather()
+        a.get_proxy_free()
     elif model == 0:
         a.load_proxies_test()
         a.test_db(2)

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-01 13:44:56
+# @Last Modified time: 2020-06-01 13:50:44
 
 
 import argparse
@@ -688,7 +688,7 @@ class GetFreeProxy:
             return []
         tt = req.text
         t_list = re.findall("<tr><td>(\d*\.\d*\.\d*\.\d*)</td><td>(\d*?)</td>", tt)
-        echo(2, "Get Free proxy List", url, len(t_list))
+        echo(1, "Get Free proxy List", url, len(t_list))
         return ["{}:{}".format(ii, jj) for ii, jj in t_list]
 
     def get_proxy_free(self):
@@ -730,7 +730,7 @@ class GetFreeProxy:
             if tt is None:
                 continue
             t_list.append(tt["origin"])
-        echo(2, "Get scraperapi", len(t_list))
+        echo(1, "Get scraperapi", len(t_list))
         return t_list
 
     def get_download(self, types: str):
@@ -738,8 +738,8 @@ class GetFreeProxy:
         tt = basic_req(url, 1)
         if tt is None:
             return []
-        tt_list = tt[0]["LISTA"][0]
-        echo(2, "Get download", types, len(tt_list))
+        tt_list = tt[0]["LISTA"]
+        echo(1, "Get download", types, len(tt_list))
         return ["{}:{}".format(ii["IP"], ii["PORT"]) for ii in tt_list]
 
     def get_other_proxies(self, url: str):

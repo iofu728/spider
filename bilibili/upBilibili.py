@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-06 12:15:22
+# @Last Modified time: 2020-06-06 12:51:05
 
 
 import codecs
@@ -84,7 +84,7 @@ class Up(BasicBilibili):
 
     def load_bv_list(self):
         url = self.SPACE_AVS_URL % self.assign_mid
-        bv_list = self.get_api_req(url, self.basic_bv_id)
+        bv_list = self.get_api_req(url, self.basic_bv_id, is_proxy=False)
         if bv_list is None:
             return
         bv_ids = {ii["bvid"]: ii for ii in bv_list["list"]["vlist"]}

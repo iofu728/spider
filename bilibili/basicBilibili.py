@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-24 00:37:25
+# @Last Modified time: 2020-06-06 12:48:53
 
 import json
 import os
@@ -13,7 +13,7 @@ from configparser import ConfigParser
 
 sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
-from util.util import can_retry, get_accept
+from util.util import can_retry, get_accept, basic_req
 
 
 one_day = 86400
@@ -91,11 +91,12 @@ class BasicBilibili(object):
         self.username = urllib.parse.quote_plus(cfg.get("login", "username"))
         self.password = cfg.get("login", "password")
 
-    def get_api_req(self, url: str, bv_id: str, types: int = 0):
+    def get_api_req(self, url: str, bv_id: str, types: int = 0, is_proxy: bool = True):
+        r_req = self.proxy_req if is_proxy else basic_req
         if types == 0:
-            req = self.proxy_req(url, 1, header=self.get_api_headers(bv_id))
+            req = r_req(url, 1, header=self.get_api_headers(bv_id))
         else:
-            req = self.proxy_req(url, 3, header=self.get_api_headers(bv_id))
+            req = r_req(url, 3, header=self.get_api_headers(bv_id))
             req = self.decoder_jp(req)
         if req is None or list(req.keys()) != self.JSON_KEYS:
             if can_retry(url):

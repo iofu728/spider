@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-19 11:12:30
+# @Last Modified time: 2020-06-06 12:30:29
 
 import hashlib
 import json
@@ -227,6 +227,7 @@ class ActivateArticle(TBK):
         self.idx = []
         self.empty_content = ""
         self.tpwd_exec = ThreadPoolExecutor(max_workers=20)
+        self.lock = threading.Lock()
         self.get_share_list()
 
     def load_process(self):
@@ -407,6 +408,8 @@ class ActivateArticle(TBK):
 
     def get_share_list(self):
         share_list = self.Db.select_db(self.S_LIST_SQL)
+        if share_list == False:
+            return
         share_map = {}
         for ii, jj in enumerate(share_list):
             t = jj[-1].strftime("%Y-%m-%d %H:%M:%S")
@@ -1370,27 +1373,33 @@ class ActivateArticle(TBK):
         self.load_process()
 
     def load_article_new(self):
+        N = len(self.idx)
         article_exec = ThreadPoolExecutor(max_workers=3)
-        a_list = [article_exec.submit(self.load_article, ii) for ii in self.idx]
-        list(as_completed(a_list))
-        self.send_repeat_email()
+        np.random.shuffle(self.idx)
+        for i in range(int(N // 1)):
+            a_list = [
+                article_exec.submit(self.load_article, ii)
+                for ii in self.idx[i * 3 : i * 3 + 3]
+            ]
+            list(as_completed(a_list))
+            time.sleep(np.random.rand() * 20)
+        # self.send_repeat_email()
 
     def load_click(self, num=1000000):
         """ schedule click """
-
         for index in range(num):
             threading_list = []
-            if index % 12 != 1:
+            if index % 6 != 1:
                 threading_list.append(
                     threading.Thread(target=self.load_article_new, args=())
                 )
-            if index % 12 == 1:
+            if index % 6 == 1:
                 threading_list.append(
                     threading.Thread(target=self.load_share_total, args=())
                 )
             for work in threading_list:
                 work.start()
-            time.sleep(self.ONE_HOURS / 2)
+            time.sleep(self.ONE_HOURS)
 
     def does_update(self, do_it: bool) -> int:
         if do_it:
@@ -1464,4 +1473,3 @@ if __name__ == "__main__":
     ba = ActivateArticle()
     ba.load_process()
     ba.load_click()
-

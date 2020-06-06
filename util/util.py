@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-23 23:46:48
+# @Last Modified time: 2020-06-06 14:10:31
 
 from __future__ import (
     absolute_import,
@@ -21,10 +21,12 @@ import pickle
 import platform
 import random
 import re
+import shutil
 import smtplib
 import threading
 import time
 import urllib
+from configparser import ConfigParser
 from email.mime.text import MIMEText
 
 import numpy as np
@@ -211,17 +213,22 @@ def can_retry(url: str, time: int = 3) -> bool:
         return False
 
 
+def send_server_chan(context: str, subject: str):
+    if SCKEY == "":
+        return
+    url = BASIC_SCURL % SCKEY
+    data = {"text": subject, "desp": context}
+    req = basic_req(url, 11, data=data)
+    if req and req.get("errmsg", "error") == "success":
+        echo("2|warning", "Send sever chan success!!")
+
+
 def send_email(context: str, subject: str, add_rec=None, assign_rec=None) -> bool:
     """ send email """
-
-    if not os.path.exists("{}emailSend".format(data_dir)) or not os.path.exists(
-        "{}emailRec".format(data_dir)
-    ):
-        echo("0|warning", "email send/Rec list not exist!!!")
-        return
-    origin_file = [ii.split(",") for ii in read_file("{}emailRec".format(data_dir))]
-    email_rec = [ii for ii, jj in origin_file if jj == "0"]
-    email_cc = [ii for ii, jj in origin_file if jj == "1"]
+    load_configure()
+    send_server_chan(context, subject)
+    email_rec = [ii for ii, jj in rec_lists if jj == "0"]
+    email_cc = [ii for ii, jj in rec_lists if jj == "1"]
     if assign_rec is not None:
         email_rec = assign_rec
     send_email_once(email_rec, email_cc, context, subject)
@@ -230,11 +237,9 @@ def send_email(context: str, subject: str, add_rec=None, assign_rec=None) -> boo
 
 
 def send_email_once(email_rec: list, email_cc: list, context: str, subject: str):
-    email_send = [ii.split(",") for ii in read_file("{}emailSend".format(data_dir))]
-    send_index = random.randint(0, len(email_send) - 1)
+    send_index = random.randint(0, len(send_lists) - 1)
     mail_host = "smtp.163.com"
-    mail_user = email_send[send_index][0]
-    mail_pass = email_send[send_index][1]
+    mail_user, mail_pass = send_lists[send_index]
     sender = "{}@163.com".format(mail_user)
 
     sign = EMAIL_SIGN % time_str(time_format="%B %d")
@@ -524,6 +529,7 @@ def get_content_type(types: str = "utf8") -> str:
 
 def change_pic_size(picture_path: str, resize: tuple = (600, 600)):
     import cv2
+
     if not os.path.exists(picture_path):
         echo(0, "picture not found in", picture_path)
         return
@@ -534,6 +540,22 @@ def change_pic_size(picture_path: str, resize: tuple = (600, 600)):
     cv2.imwrite(output_path, pic)
 
 
+def load_configure():
+    """ load configure """
+    global LAST_CONFIG, rec_lists, send_lists, SCKEY
+    if time_stamp() - LAST_CONFIG < 300:
+        return
+    if not os.path.exists(configure_path):
+        shutil.copy(configure_path + ".tmp", configure_path)
+    cfg = ConfigParser()
+    cfg.read(configure_path, "utf-8")
+    rec_list = cfg.get("email", "rec_lists").split(",")
+    send_list = cfg.get("email", "send_lists").split(",")
+    rec_lists = [ii.split(":") for ii in rec_list]
+    send_lists = [ii.split(":") for ii in send_list]
+    SCKEY = cfg.get("ServerChan", "SCKEY")
+
+
 headers = {
     "Cookie": "",
     "Accept": get_accept("html"),
@@ -542,6 +564,10 @@ headers = {
 }
 data_dir = "util/data/"
 log_path = "service.log"
+LAST_CONFIG = -1
+rec_lists, send_lists, SCKEY = [], [], ""
+configure_path = "util/util.ini"
+BASIC_SCURL = "https://sc.ftqq.com/%s.send"
 mkdir(data_dir)
 agent_lists = [
     " ".join(index.split()[1:])[1:-1] for index in read_file("{}agent".format(data_dir))
@@ -558,3 +584,4 @@ failure_map = {}
 is_service = False
 LOG_DIR = "log/"
 EMAIL_SIGN = "\n\n\nBest wish!!\n%s\n\n————————————————————\n• Send from script designed by gunjianpan."
+load_configure()

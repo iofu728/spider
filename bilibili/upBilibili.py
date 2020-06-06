@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-24 02:21:21
+# @Last Modified time: 2020-06-06 12:51:05
 
 
 import codecs
@@ -84,7 +84,7 @@ class Up(BasicBilibili):
 
     def load_bv_list(self):
         url = self.SPACE_AVS_URL % self.assign_mid
-        bv_list = self.get_api_req(url, self.basic_bv_id)
+        bv_list = self.get_api_req(url, self.basic_bv_id, is_proxy=False)
         if bv_list is None:
             return
         bv_ids = {ii["bvid"]: ii for ii in bv_list["list"]["vlist"]}
@@ -402,7 +402,6 @@ class Up(BasicBilibili):
 
     def load_rank_index(self, index: int, day_index: int):
         """ load rank """
-        self.have_assign[day_index] = []
         url = self.RANKING_URL % (self.assign_rank_id, day_index, index)
         text = self.get_api_req(url, self.basic_bv_id, 1)
         if text is None:
@@ -491,7 +490,7 @@ class Up(BasicBilibili):
         have_assign = assign_1 + assign_2
         echo("4|debug", assign_1, assign_2, have_assign)
         not_ranks = [ii for ii in self.have_assign["T"] if not ii in have_assign]
-        self.have_assign = have_assign
+        self.have_assign["T"] = have_assign
 
         echo(
             "4|debug",
@@ -564,12 +563,10 @@ class Up(BasicBilibili):
         """ check comment """
         self.delay_load_history_data()
         bv_list = [
-            [ii["bvid"], ii["aid"], ii["comment"]]
-            for ii in self.bv_ids.values()
-            if not regex.findall(self.ignore_list, str(ii["aid"]))
-        ]
+            [ii["bvid"], ii["aid"], ii["comment"]] for ii in self.bv_ids.values()
+        ][:3]
         bv_map = {ii["bvid"]: ii for ii in self.bv_ids.values()}
-        if self.bv_list and len(self.bv_list) and len(self.bv_list) != len(bv_list):
+        if self.bv_list and len(self.bv_list) and self.bv_list != bv_list:
             new_bv_list = [
                 (ii, jj)
                 for ii, jj, _ in bv_list
@@ -579,8 +576,8 @@ class Up(BasicBilibili):
             echo("1|error", "New Bv av ids:", new_bv_list)
             for bv_id, av_id in new_bv_list:
                 rank_info = bv_map[bv_id]
-                shell_str = "nohup python3 bilibili/bsocket.py {} %d >> log.txt 2>&1 &".format(
-                    av_id
+                shell_str = "nohup python3 bilibili/bsocket.py {} {} %d >> log.txt 2>&1 &".format(
+                    av_id, bv_id
                 )
                 echo("0|error", "Shell str:", shell_str)
                 os.system(shell_str % 1)
@@ -600,7 +597,6 @@ class Up(BasicBilibili):
                 self.update_ini(bv_id, av_id)
                 self.public["T"][bv_id] = [rank_info["created"], rank_info["mid"]]
                 self.last_check[bv_id] = int(time_stamp())
-
         self.bv_list = [ii for (ii, _, _) in bv_list]
         now_hour = int(time_str(time_format="%H"))
         now_min = int(time_str(time_format="%M"))

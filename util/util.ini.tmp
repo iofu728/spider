@@ -1,0 +1,10 @@
+[mysql]
+hostname = localhost
+username = root
+passwd =
+charset = utf8mb4
+[email]
+rec_lists = 
+send_lists = 
+[ServerChan]
+SCKEY = 

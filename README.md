@@ -14,7 +14,7 @@
 
 | site                 | document                                  | Last Modified time |
 | -------------------- | ----------------------------------------- | ------------------ |
-| gatherproxy.com,etc. | [Proxy pool](#proxy-pool)                 | 19-10-25           |
+| some proxy site,etc. | [Proxy pool](#proxy-pool)                 | 20-06-01           |
 | music.163.com        | [Netease](#netease)                       | 18-10-21           |
 | -                    | [Press Test System](#press-test-system)   | 18-11-10           |
 | news.baidu.com       | [News](#news)                             | 19-01-25           |
@@ -22,7 +22,7 @@
 | jianshu.com/csdn.net | [blog](#blog)                             | 20-01-04           |
 | elective.pku.edu.cn  | [Brush Class](#brush-class)               | 19-10-11           |
 | zimuzu.tv            | [zimuzu](#zimuzu)                         | 19-04-13           |
-| bilibili.com         | [Bilibili](#bilibili)                     | 20-03-24           |
+| bilibili.com         | [Bilibili](#bilibili)                     | 20-06-06           |
 | exam.shaoq.com       | [shaoq](#shaoq)                           | 19-03-21           |
 | data.eastmoney.com   | [Eastmoney](#eastmoney)                   | 19-03-29           |
 | hotel.ctrip.com      | [Ctrip Hotel Detail](#ctrip-hotel-detail) | 19-10-11           |
@@ -410,7 +410,7 @@ $ python blog/titleviews.py --model=0 >> log 2>&1 # model = 0: update gather mod
       pIWEz: function a260(a256, a284) {
         return a256 + a284;
       },
-      jXvnT: ";path=/"
+      jXvnT: ";path=/",
     };
     if (a120["KWcVI"] !== a120["KWcVI"]) {
       var a67 = new Date();

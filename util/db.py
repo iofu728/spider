@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-04-03 12:38:54
+# @Last Modified time: 2020-06-06 13:11:46
 
 import os
 import shutil
@@ -16,7 +16,7 @@ import time
 sys.path.append(os.getcwd())
 from util.util import echo, read_file
 
-configure_path = "util/db.ini"
+configure_path = "util/util.ini"
 
 
 class Db(object):

@@ -2,14 +2,17 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-03-27 18:37:27
+# @Last Modified time: 2020-04-03 12:38:54
 
 import os
 import shutil
 import sys
+import threading
 from configparser import ConfigParser
 
 import pymysql
+import time
+
 sys.path.append(os.getcwd())
 from util.util import echo, read_file
 
@@ -21,9 +24,10 @@ class Db(object):
 
     def __init__(self, database: str, return_type: str = "list"):
         self.load_configure()
-        self.connect_db(database, return_type)
         self.database = database
         self.return_type = return_type
+        self.lock = threading.Lock()
+        self.reconnect()
 
     def load_configure(self):
         """ load configure """
@@ -52,18 +56,40 @@ class Db(object):
                 charset=self.mysql_char,
                 cursorclass=cursorclass,
             )
+            self.cursor = self.db.cursor()
         except pymysql.OperationalError:
             echo(0, "Please change mysql info in util/db.ini!!!")
             self.db = False
+            self.cursor = None
         except pymysql.InternalError:
             echo(2, "Try to create database in mysql.........")
             if self.create_db(database):
                 self.connect_db(database, return_type)
             else:
                 self.db = False
+                self.cursor = None
         except:
             echo(0, "Other db error!!!")
             self.db = False
+            self.cursor = None
+
+    def reconnect(self):
+        self.connect_db(self.database, self.return_type)
+
+    def _reConn(self, num: int = 28800, stime: int = 3):
+        _number = 0
+        _status = True
+        while _status and _number <= num:
+            try:
+                self.conn.ping()
+                _status = False
+            except:
+                self.reconnect()
+                if self.db != False:
+                    _status = False
+                    break
+                _number += 1
+                time.sleep(stime)
 
     def create_db(self, database: str):
         """ crete database """
@@ -100,47 +126,57 @@ class Db(object):
     def select_db(self, sql: str):
         """  select sql @return False: Expection; list: Success """
         try:
-            cursor = self.db.cursor()
-            cursor.execute(sql)
-            return cursor.fetchall()
+            self._reConn()
+            with self.db.cursor() as cursor:
+                cursor.execute(sql)
+                result = cursor.fetchall()
+                self.db.commit()
+                return result
         except Exception as e:
-            self.connect_db(self.database, self.return_type)
             echo(0, "execute sql {} error".format(sql), e)
             return False
 
     def select_one(self, sql: str):
         """ select one @return False: Expection; list: Success """
         try:
-            cursor = self.db.cursor()
-            cursor.execute(sql)
-            return cursor.fetchone()
+            self._reConn()
+            with self.db.cursor() as cursor:
+                cursor.execute(sql)
+                result = cursor.fetchone()
+                self.db.commit()
+                return result
         except Exception as e:
-            self.connect_db(self.database, self.return_type)
             echo(0, "execute sql {} error".format(sql), e)
             return False
 
     def insert_db(self, sql: str):
         """ insert sql @return False: Expection; True: Success """
+        self.lock.acquire()
         try:
-            cursor = self.db.cursor()
-            cursor.execute(sql)
-            self.db.commit()
-            return True
+            self._reConn()
+            with self.db.cursor() as cursor:
+                cursor.execute(sql)
+                self.db.commit()
+                self.lock.release()
+                return True
         except Exception as e:
-            self.connect_db(self.database, self.return_type)
+            self.lock.release()
             echo(0, "execute sql {} error".format(sql), e)
             self.db.rollback()
             return False
 
     def update_db(self, sql: str):
         """  update sql @return False: Expection; True: Success """
+        self.lock.acquire()
         try:
-            cursor = self.db.cursor()
-            cursor.execute(sql)
-            self.db.commit()
-            return True
+            self._reConn()
+            with self.db.cursor() as cursor:
+                cursor.execute(sql)
+                self.db.commit()
+                self.lock.release()
+                return True
         except Exception as e:
-            self.connect_db(self.database, self.return_type)
+            self.lock.release()
             echo(0, "execute sql {} error".format(sql), e)
             self.db.rollback()
             return False

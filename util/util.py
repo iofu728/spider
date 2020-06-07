@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-06 14:10:31
+# @Last Modified time: 2020-06-07 09:37:07
 
 from __future__ import (
     absolute_import,
@@ -217,7 +217,8 @@ def send_server_chan(context: str, subject: str):
     if SCKEY == "":
         return
     url = BASIC_SCURL % SCKEY
-    data = {"text": subject, "desp": context}
+    context = context + SIGN
+    data = {"text": subject, "desp": context.replace("\n", "\n\n")}
     req = basic_req(url, 11, data=data)
     if req and req.get("errmsg", "error") == "success":
         echo("2|warning", "Send sever chan success!!")
@@ -242,8 +243,7 @@ def send_email_once(email_rec: list, email_cc: list, context: str, subject: str)
     mail_user, mail_pass = send_lists[send_index]
     sender = "{}@163.com".format(mail_user)
 
-    sign = EMAIL_SIGN % time_str(time_format="%B %d")
-    message = MIMEText("{}{}".format(context, sign), "plain", "utf-8")
+    message = MIMEText("{}{}".format(context, SIGN), "plain", "utf-8")
     message["Subject"] = subject
     message["From"] = sender
     message["To"] = ", ".join(email_rec)
@@ -542,7 +542,7 @@ def change_pic_size(picture_path: str, resize: tuple = (600, 600)):
 
 def load_configure():
     """ load configure """
-    global LAST_CONFIG, rec_lists, send_lists, SCKEY
+    global LAST_CONFIG, rec_lists, send_lists, SCKEY, SIGN
     if time_stamp() - LAST_CONFIG < 300:
         return
     if not os.path.exists(configure_path):
@@ -554,6 +554,7 @@ def load_configure():
     rec_lists = [ii.split(":") for ii in rec_list]
     send_lists = [ii.split(":") for ii in send_list]
     SCKEY = cfg.get("ServerChan", "SCKEY")
+    SIGN = EMAIL_SIGN % time_str(time_format="%B %d")
 
 
 headers = {
@@ -565,7 +566,7 @@ headers = {
 data_dir = "util/data/"
 log_path = "service.log"
 LAST_CONFIG = -1
-rec_lists, send_lists, SCKEY = [], [], ""
+rec_lists, send_lists, SCKEY, SIGN = [], [], "", ""
 configure_path = "util/util.ini"
 BASIC_SCURL = "https://sc.ftqq.com/%s.send"
 mkdir(data_dir)

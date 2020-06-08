@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-06 12:51:05
+# @Last Modified time: 2020-06-08 19:13:23
 
 
 import codecs
@@ -146,7 +146,7 @@ class Up(BasicBilibili):
             "day",
         ]
         output = [str(data[ii]) for ii in need if ii in data]
-        output = output + [str(v) for k, v in data.items() if k not in need]
+        # output = output + [str(v) for k, v in data.items() if k not in need]
         with codecs.open(
             "{}{}.csv".format(history_dir, bv_id), "a", encoding="utf-8"
         ) as f:
@@ -201,7 +201,7 @@ class Up(BasicBilibili):
         ] + 1
         other_result = [
             (jj + 1, av_ids[ii])
-            for jj, ii in enumerate(ov_sort_idx[:4])
+            for jj, ii in enumerate(ov_sort_idx[: self.rank_len + 1])
             if ii != other_views_len
         ]
         time_tt = get_time_str(time_gap)
@@ -218,7 +218,7 @@ class Up(BasicBilibili):
             now_info["favorite"],
             now_info["danmaku"],
         )
-        email_title = "bv{}发布{}, 本年度排名No.{}/{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}".format(
+        email_title = "{}发布{}, 本年度排名No.{}/{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}".format(
             bv_id,
             time_tt,
             now_sorted,
@@ -231,9 +231,9 @@ class Up(BasicBilibili):
         )
         email_title += self.get_history_rank(now_info)
         context = "{}\n\n".format(email_title)
-        for no, bv in other_result[:3]:
+        for no, bv in other_result[: self.rank_len]:
             data_info = history_map[bv]
-            context += "{}, bv{}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}, 累计播放: {}{}, 发布时间: {}\n".format(
+            context += "{}, {}, 本年度No.{}, 播放量: {}, 点赞: {}, 硬币: {}, 收藏: {}, 弹幕: {}, 累计播放: {}{}, 发布时间: {}\n".format(
                 self.bv_ids[bv]["title"].split("|", 1)[0],
                 bv,
                 no,
@@ -566,12 +566,17 @@ class Up(BasicBilibili):
             [ii["bvid"], ii["aid"], ii["comment"]] for ii in self.bv_ids.values()
         ][:3]
         bv_map = {ii["bvid"]: ii for ii in self.bv_ids.values()}
-        if self.bv_list and len(self.bv_list) and self.bv_list != bv_list:
-            new_bv_list = [
-                (ii, jj)
-                for ii, jj, _ in bv_list
-                if not ii in self.bv_list and not ii in self.del_map
-            ]
+        new_bv_list = [
+            (ii, jj)
+            for ii, jj, _ in bv_list
+            if not ii in self.bv_list and not ii in self.del_map
+        ]
+        if (
+            self.bv_list
+            and len(self.bv_list)
+            and self.bv_list != bv_list
+            and len(new_bv_list)
+        ):
             self.rank_map = {**self.rank_map, **{ii: {} for ii, _ in new_bv_list}}
             echo("1|error", "New Bv av ids:", new_bv_list)
             for bv_id, av_id in new_bv_list:
@@ -748,21 +753,20 @@ class Up(BasicBilibili):
         title = rank_info["title"].split("|", 1)[0]
         sort = "热门" if sort else "时间"
 
-        email_content = "Date: {}\nUrl: {}\nTitle: {},\nPage: {} #{}@{},\nUser: {},\nSex: {},\nsign: {}\nlike: {}\nplat: {}\nlevel:{}\nconetnt: {},\n".format(
-            ctime,
-            title,
-            url,
-            pn,
-            idx,
-            rpid,
-            uname,
-            sex,
-            sign,
-            like,
-            plat,
-            current_level,
-            content,
-        )
+        email_content = [
+            "Date: {}".format(ctime),
+            "Url: {}/#reply{}".format(url, rpid.split("-")[0]),
+            "Title: {}".format(title),
+            "Page: {} #{}@{}".format(pn, idx, rpid),
+            "User: {}".format(uname),
+            "Sex: {}".format(sex),
+            "sign: {}".format(sign),
+            "like: {}".format(like),
+            "plat: {}".format(plat),
+            "level: {}".format(current_level),
+            "content: {}".format(content),
+        ]
+        email_content = ",\n".join(email_content)
         email_subject = "评论({}){}{}{}#{}".format(ctimes, title, sort, pn, idx)
         echo("4|warning", email_content, email_subject)
         send_email(email_content, email_subject, assign_rec=self.assign_rec)

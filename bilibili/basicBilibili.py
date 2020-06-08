@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-06 12:48:53
+# @Last Modified time: 2020-06-08 17:15:11
 
 import json
 import os
@@ -90,6 +90,7 @@ class BasicBilibili(object):
         self.assign_rec = cfg.get("basic", "assign_email").split(",")
         self.username = urllib.parse.quote_plus(cfg.get("login", "username"))
         self.password = cfg.get("login", "password")
+        self.rank_len = cfg.getint("basic", "rank_len")
 
     def get_api_req(self, url: str, bv_id: str, types: int = 0, is_proxy: bool = True):
         r_req = self.proxy_req if is_proxy else basic_req

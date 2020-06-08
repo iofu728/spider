@@ -11,6 +11,7 @@ history_check_list = 1,3,6
 ;split by ','
 special_info_email = 123456@163.com
 assign_email = 123456@163.com
+rank_len = 3
 
 [assign]
 av_ids = 21061574,11624347

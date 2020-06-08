@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-07 09:37:07
+# @Last Modified time: 2020-06-09 00:13:14
 
 from __future__ import (
     absolute_import,
@@ -188,7 +188,7 @@ def end_time(version: int, mode: int = 1):
     time_spend = time_stamp() - start[version]
     if not mode:
         return time_spend
-    time_spend = get_time_str(time_spend)
+    time_spend = get_time_str(time_spend, False)
     if mode == 2:
         echo("2|info", time_spend)
     return time_spend
@@ -450,6 +450,7 @@ def encoder_cookie(cookie_dict: {}) -> str:
 
 def get_time_str(time_gap: int, is_gap: bool = True) -> str:
     if not is_gap:
+        second = time_gap % 60
         time_gap = int(time_gap // 60)
     day = int(time_gap // 1440)
     hour = int(time_gap / 60) % 24
@@ -463,6 +464,8 @@ def get_time_str(time_gap: int, is_gap: bool = True) -> str:
         if day and not hour:
             result += "{:02d}h ".format(hour)
         result += "{:02d}min".format(minute)
+    if not is_gap:
+        result += "{:.2f}s".format(second)
     return result.strip()
 
 

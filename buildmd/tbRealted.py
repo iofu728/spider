@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2020-06-08 21:23:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-09 01:08:08
+# @Last Modified time: 2020-06-09 13:28:42
 
 
 import json
@@ -62,7 +62,7 @@ class TBRelated(object):
         return req
 
     def get_itemlist(self):
-        res, pn = [], 1
+        self.res, self.error, pn = [], [], 1
         while pn <= self.total_count:
             version = begin_time()
             echo(2, "======Page No.{} begin getting!======".format(pn))
@@ -70,16 +70,23 @@ class TBRelated(object):
             pn += 1
             if mainOrders is None or type(mainOrders) == dict:
                 return
+            if not len(mainOrders):
+                self.error.append(pn)
             for order in mainOrders:
                 createTime = order["orderInfo"]["createTime"]
                 actualFee = order["payInfo"]["actualFee"]
-                shopName = order["seller"].get(
-                    "shopName", order["seller"].get("nick", "")
-                )
-                shopUrl = "https:" + order["seller"].get("shopUrl", "")
+                if "seller" in order:
+                    shopName = order["seller"].get(
+                        "shopName", order["seller"].get("nick", "")
+                    )
+                    shopUrl = "https:" + order["seller"].get("shopUrl", "")
+                else:
+                    shopName, shopUrl = "", "https:"
+                statusInfo = order["statusInfo"]["text"]
                 subOrders = [
                     {
                         "title": sub["itemInfo"]["title"],
+                        "skuText": sub["itemInfo"].get("skuText", []),
                         "itemUrl": "https:" + sub["itemInfo"].get("itemUrl", ""),
                         "price": sub.get("priceInfo", 0),
                         "quantity": sub.get("quantity", 0),
@@ -87,21 +94,22 @@ class TBRelated(object):
                     for sub in order["subOrders"]
                     if len(sub["itemInfo"]) > 3
                 ]
-                res.append(
+                self.res.append(
                     {
                         "createTime": createTime,
                         "actualFee": actualFee,
                         "shopName": shopName,
                         "shopUrl": shopUrl,
+                        "statusInfo": statusInfo,
                         "subOrders": subOrders,
                     }
                 )
             with codecs.open(self.output_path, "w", encoding="utf-8") as f:
-                json.dump(res, f, indent=4, ensure_ascii=False)
+                json.dump(self.res, f, indent=4, ensure_ascii=False)
             echo(
                 1,
                 "======Page No.{} end, spend: {}, get {} orders!======".format(
-                    pn - 1, end_time(version), len(res)
+                    pn - 1, end_time(version), len(self.res)
                 ),
             )
             time.sleep(30 + 10 * np.random.rand() * np.random.randint(10))

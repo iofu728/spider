@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-06 12:30:29
+# @Last Modified time: 2021-03-27 23:34:32
 
 import hashlib
 import json
@@ -14,6 +14,7 @@ import urllib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from configparser import ConfigParser
 from collections import Counter
+from emoji import UNICODE_EMOJI
 
 import numpy as np
 import regex
@@ -66,7 +67,7 @@ class TBK(object):
         super(TBK, self).__init__()
         self.items = {}
         self.load_configure()
-        self.load_tbk_info()
+        # self.load_tbk_info()
 
     def load_configure(self):
         cfg = ConfigParser()
@@ -91,6 +92,7 @@ class TBK(object):
     def load_tbk_info(self):
         favorites = self.get_uatm_favor()
         for ii in favorites:
+            time.sleep
             self.get_uatm_detail(ii)
 
     def get_uatm_favor(self):
@@ -141,7 +143,11 @@ class TBK(object):
         req.text = title
         try:
             tpwds = req.getResponse()
-            return tpwds["tbk_tpwd_create_response"]["data"]["model"][1:-1]
+            words = tpwds["tbk_tpwd_create_response"]["data"]["model"]
+            tpwds = regex.findall("\p{Sc}(\w{8,12}?)\p{Sc}", words)
+            if tpwds:
+                return tpwds[0]
+            return ""
         except Exception as e:
             echo(0, "Generate tpwd failed", url, title, e)
 
@@ -163,6 +169,7 @@ class ActivateArticle(TBK):
         f"{API_P_URL}myshare?method=get&checkBan=true&entryId=%s&keyfrom=web&cstk=%s"
     )
     DECODER_TPWD_URL = "https://api.taokouling.com/tkl/tkljm?apikey=%s&tkl=￥%s￥"
+    DECODER_TPWD_URL_V2 = "https://taodaxiang.com/taopass/parse/get"
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
     MTOP_URL = "https://h5api.m.taobao.com/h5/%s/%d.0/"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
@@ -170,12 +177,13 @@ class ActivateArticle(TBK):
     S_LIST_SQL = "SELECT `id`, article_id, title, q, created_at from article;"
     I_LIST_SQL = "INSERT INTO article (article_id, title, q) VALUES %s;"
     R_LIST_SQL = "REPLACE INTO article (`id`, article_id, title, q, is_deleted, created_at) VALUES %s;"
-    S_ARTICLE_SQL = 'SELECT `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at from article_tpwd WHERE `article_id` = "%s";'
+    S_ARTICLE_SQL = "SELECT `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at from article_tpwd%s;"
     I_ARTICLE_SQL = "INSERT INTO article_tpwd (article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at) VALUES %s;"
     R_ARTICLE_SQL = "REPLACE INTO article_tpwd (`id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at, is_deleted) VALUES %s;"
     END_TEXT = "</text><inline-styles/><styles/></para></body></note>"
     TPWD_REG = "\p{Sc}(\w{8,12}?)\p{Sc}"
     TPWD_REG2 = "(\p{Sc}\w{8,12}\p{Sc})"
+    TPWD_REG3 = "(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》])([a-zA-Z0-9]{8,12}?)(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》])"
     JSON_KEYS = [
         "p",
         "ct",
@@ -199,7 +207,8 @@ class ActivateArticle(TBK):
         15: "empty",
         16: "failure",
     }
-    NEED_KEY = ["content", "url", "validDate", "picUrl"]
+    NEED_KEY_V1 = ["content", "url", "validDate", "picUrl"]
+    NEED_KEY = ["content", "url", "expire", "picUrl"]
     ONE_HOURS = 3600
     ONE_DAY = 24
     M = "_m_h5_tk"
@@ -215,6 +224,8 @@ class ActivateArticle(TBK):
         self.Db = Db("tbk")
         self.Db.create_table(os.path.join(root_dir, "tpwd.sql"))
         self.Db.create_table(os.path.join(root_dir, "article.sql"))
+        self.BASIC_TIMEX_STR = time_str()
+        self.BASIC_TIMEX_STAMP = time_stamp()
         self.tpwd_map = {}
         self.tpwd_db_map = {}
         self.tpwds = {}
@@ -223,10 +234,10 @@ class ActivateArticle(TBK):
         self.share2article = {}
         self.article_list = {}
         self.list_recent = {}
-        self.need_del = {}
         self.idx = []
         self.empty_content = ""
-        self.tpwd_exec = ThreadPoolExecutor(max_workers=20)
+        self.tpwd_exec = ThreadPoolExecutor(max_workers=1)
+        self.spends = []
         self.lock = threading.Lock()
         self.get_share_list()
 
@@ -313,29 +324,50 @@ class ActivateArticle(TBK):
                 self.tpwds[article_id] = tpwds
         else:
             tpwds = self.tpwds[article_id]
-        if article_id not in self.tpwd_map:
-            self.tpwd_map[article_id] = {}
+        need_tpwds = []
+        for tpwd in tpwds:
+            if tpwd in self.tpwd_db_map:
+                t = self.tpwd_db_map[tpwd]
+                need_tpwds.append(tpwd)
+                # if t[-2] >= self.BASIC_TIMEX_STR:
+                #     need_tpwds.append(tpwd)
+            else:
+                need_tpwds.append(tpwd)
         time = 0
         au_list = []
         no_type = [
             ii
-            for ii, jj in self.tpwd_map[article_id].items()
-            if "type" not in jj or jj["item_id"] is None
+            for ii, jj in self.tpwd_map.items()
+            if jj["article_id"] == article_id
+            and "type" not in jj
+            or jj["item_id"] is None
         ]
         while (
-            len(self.tpwd_map[article_id]) < len(tpwds) or (len(no_type) and not time)
+            [1 for ii in need_tpwds if ii not in self.tpwd_map]
+            or (len(no_type) and not time)
         ) and time < 5:
-            thread_list = [ii for ii in tpwds if not ii in self.tpwd_map[article_id]]
-            echo(1, article_id, "tpwds len:", len(tpwds), "need load", len(thread_list))
+            thread_list = [ii for ii in need_tpwds if not ii in self.tpwd_map]
+            self.spends = []
+            echo(
+                1,
+                article_id,
+                "tpwds len:",
+                len(need_tpwds),
+                "need load",
+                len(thread_list),
+            )
             thread_list = [
-                self.tpwd_exec.submit(self.decoder_tpwd_once, article_id, ii)
+                self.tpwd_exec.submit(self.decoder_tpwd_once, article_id, ii, 0, True)
                 for ii in thread_list
             ]
             list(as_completed(thread_list))
+            echo(2, f"Avager spend {np.mean(self.spends):.2f} s.")
             no_type = [
                 ii
-                for ii, jj in self.tpwd_map[article_id].items()
-                if "type" not in jj or jj["item_id"] is None
+                for ii, jj in self.tpwd_map.items()
+                if jj["article_id"] == article_id
+                and "type" not in jj
+                or jj["item_id"] is None
             ]
             au_list.extend(
                 [
@@ -346,7 +378,9 @@ class ActivateArticle(TBK):
             time += 1
         list(as_completed(au_list))
         no_title = [
-            ii for ii, jj in self.tpwd_map[article_id].items() if "title" not in jj
+            ii
+            for ii, jj in self.tpwd_map.items()
+            if jj["article_id"] == article_id and jj["url"] and "title" not in jj
         ]
         time = 0
         while len(no_title) and time < 5:
@@ -358,18 +392,24 @@ class ActivateArticle(TBK):
             list(as_completed(title_list))
             time += 1
             no_title = [
-                ii for ii, jj in self.tpwd_map[article_id].items() if "title" not in jj
+                ii
+                for ii, jj in self.tpwd_map.items()
+                if jj["article_id"] == article_id and jj["url"] and "title" not in jj
             ]
         if is_load2db:
             self.load_article2db(article_id)
 
     def update_title(self, article_id: str):
-        self.tpwd_map[article_id] = {
-            ii[3]: {"content": ii[1], "item_id": ii[0]}
-            for ii in self.article_list[article_id].values()
-        }
+        for ii in self.article_list[article_id].values():
+            self.tpwd_map[ii[3]] = {
+                "content": ii[1],
+                "item_id": ii[0],
+                "article_id": article_id,
+            }
         no_title = [
-            ii for ii, jj in self.tpwd_map[article_id].items() if "title" not in jj
+            ii
+            for ii, jj in self.tpwd_map.items()
+            if jj["article_id"] != article_id and "title" not in jj
         ]
         time = 0
         while len(no_title) and time < 5:
@@ -381,13 +421,17 @@ class ActivateArticle(TBK):
             list(as_completed(title_list))
             time += 1
             no_title = [
-                ii for ii, jj in self.tpwd_map[article_id].items() if "title" not in jj
+                ii
+                for ii, jj in self.tpwd_map.items()
+                if jj["article_id"] != article_id and "title" not in jj
             ]
         update_num = len(
             [
                 1
-                for ii, jj in self.tpwd_map[article_id].items()
-                if "title" in jj and jj["content"] != jj["title"]
+                for ii, jj in self.tpwd_map.items()
+                if jj["article_id"] != article_id
+                and "title" in jj
+                and jj["content"] != jj["title"]
             ]
         )
         echo(2, "Update", article_id, update_num, "Title Success!!!")
@@ -418,8 +462,11 @@ class ActivateArticle(TBK):
         return share_map
 
     def load_article2db(self, article_id: str):
-        m = self.tpwd_map[article_id]
-        m = {ii: jj for ii, jj in m.items() if jj["url"]}
+        m = {
+            ii: jj
+            for ii, jj in self.tpwd_map.items()
+            if jj["article_id"] == article_id and jj["url"]
+        }
         tpwds = list(set(self.tpwds[article_id]))
         data = [
             (
@@ -440,12 +487,15 @@ class ActivateArticle(TBK):
         data_map = {ii[3]: ii for ii in data}
         update_list, insert_list = [], []
         for ii in data:
-            if ii[3] in self.tpwd_db_map[article_id]:
-                t = self.tpwd_db_map[article_id][ii[3]]
-                update_list.append((t[0], *ii, t[-1], 0))
+            if ii[3] in self.tpwd_db_map:
+                t = self.tpwd_db_map[ii[3]]
+                if ii[6] or (not ii[6] and not t["url"]):
+                    update_list.append((t[0], *ii, t[-1], 0))
             else:
                 insert_list.append(ii)
-        for ii, jj in self.tpwd_db_map[article_id].items():
+        for ii, jj in self.tpwd_db_map.items():
+            if jj[1] != article_id:
+                continue
             if ii not in data_map:
                 update_list.append((*jj, 1))
         self.update_db(insert_list, f"article_id {article_id} Insert")
@@ -456,32 +506,40 @@ class ActivateArticle(TBK):
 
     def update_tpwd(self, mode: int = 0, is_renew: bool = True, a_id: str = None):
         update_num = 0
-        for article_id, jj in self.article_list.items():
-            if a_id is not None and article_id != a_id:
+        for o_tpwd, c in self.tpwd_db_map.items():
+            if a_id is not None and c[1] != a_id:
                 continue
-            for o_tpwd, (num_iid, title, domain, tpwd, _, _, url) in jj.items():
-                c = jj[o_tpwd]
-                if (
-                    is_renew
-                    and self.URL_DOMAIN[1] not in url
-                    and self.URL_DOMAIN[2] not in url
-                    and self.URL_DOMAIN[10] not in url
-                ):
-                    renew_type = 2 if self.URL_DOMAIN[5] in url else 1
-                    origin_tpwd = self.convert2tpwd(url, title)
-                    if origin_tpwd is None:
-                        origin_tpwd = tpwd
-                else:
-                    renew_type = 0
+            num_iid, title, domain, tpwd, url = [c[i] for i in [3, 6, 5, 4, 7]]
+
+            if (
+                is_renew
+                and self.URL_DOMAIN[1] not in url
+                and self.URL_DOMAIN[2] not in url
+                and self.URL_DOMAIN[10] not in url
+            ):
+                renew_type = 2 if self.URL_DOMAIN[5] in url else 1
+                origin_tpwd = self.convert2tpwd(url, title)
+                if origin_tpwd is None:
                     origin_tpwd = tpwd
-                if num_iid == "" or domain == 16:
-                    c = (*c[:2], 16, origin_tpwd, 1 if renew_type == 0 else 2, *c[-2:])
-                else:
-                    c = self.generate_tpwd(
-                        title, int(num_iid), origin_tpwd, renew_type, c, mode
-                    )
-                self.article_list[article_id][o_tpwd] = c
-                update_num += int(c[2] < 15 or (renew_type and not mode))
+            else:
+                renew_type = 0
+                origin_tpwd = tpwd
+            if num_iid == "" or domain == 16:
+                c = [
+                    *c[:4],
+                    origin_tpwd,
+                    16,
+                    title,
+                    url,
+                    1 if renew_type == 0 else 2,
+                    *c[-3:],
+                ]
+            else:
+                c = self.generate_tpwd(
+                    title, int(num_iid), origin_tpwd, renew_type, c, mode
+                )
+            self.tpwd_db_map[o_tpwd] = c
+            update_num += int(c[5] < 15 or (renew_type and not mode))
         echo(2, "Update {} Tpwd Info Success!!".format(update_num))
 
     def generate_tpwd(
@@ -503,7 +561,15 @@ class ActivateArticle(TBK):
                 title,
                 num_iid,
             )
-            return (*c[:2], 17, renew_tpwd, 1 if renew_type == 0 else 2, *c[-2:])
+            return [
+                *c[:4],
+                renew_tpwd,
+                17,
+                title,
+                c[7],
+                1 if renew_type == 0 else 2,
+                *c[-3:],
+            ]
         goods = goods[0]
         if "ysyl_click_url" in goods and len(goods["ysyl_click_url"]):
             url = goods["ysyl_click_url"]
@@ -517,12 +583,26 @@ class ActivateArticle(TBK):
         tpwd = self.convert2tpwd(url, title)
         if tpwd is None:
             echo(0, "tpwd error:", tpwd)
-            return (*c[:2], 18, renew_tpwd, 1 if renew_type == 0 else 2, *c[-2:])
-        if mode:
-            return (*c[:3], tpwd, commission_rate, commission_type, c[-1])
+            return [
+                *c[:4],
+                renew_tpwd,
+                18,
+                title,
+                c[7],
+                1 if renew_type == 0 else 2,
+                *c[-3:],
+            ]
         if renew_type == 1:
-            return (*c[:3], tpwd, 2, commission_type, c[-1])
-        return (*c[:3], tpwd, commission_rate, commission_type, c[-1])
+            commission_rate = 2
+
+        return [
+            *c[:4],
+            tpwd,
+            *c[5:8],
+            commission_rate,
+            commission_type,
+            *c[-2:],
+        ]
 
     def load_article_list(self):
         """
@@ -534,15 +614,27 @@ class ActivateArticle(TBK):
                 ii[4]: [ii[3], ii[6], ii[5], ii[4], ii[8], ii[9], ii[7]]
                 for ii in article_list
             }
-            self.tpwd_db_map[article_id] = {ii[4]: ii for ii in article_list}
-            have_id = [ii[0] for ii in self.tpwd_db_map[article_id].values()]
-            need_del_id = [ii[0] for ii in article_list if ii[0] not in have_id]
-            self.need_del[article_id] = need_del_id
-        item_num = sum([len(ii) for ii in self.article_list.values()])
-        echo(1, "Load {} TPWD from db.".format(item_num))
+            for ii in article_list:
+                self.tpwd_db_map[ii[4]] = ii
+        need_update = [
+            1
+            for ii in self.tpwd_db_map.values()
+            if ii[-2] >= self.BASIC_TIMEX_STR
+        ]
+        echo(
+            1,
+            "Load {} TPWD from db, {} TPWD need update.".format(
+                len(self.tpwd_db_map), len(need_update)
+            ),
+        )
 
     def get_article_db(self, article_id: str):
-        article_list = list(self.Db.select_db(self.S_ARTICLE_SQL % article_id))
+        sql = (
+            self.S_ARTICLE_SQL % (f' WHERE `article_id` = "{article_id}"')
+            if article_id
+            else ""
+        )
+        article_list = list(self.Db.select_db(sql))
         for ii, jj in enumerate(article_list):
             t = jj[-1].strftime("%Y-%m-%d %H:%M:%S")
             y = jj[-2].strftime("%Y-%m-%d %H:%M:%S")
@@ -564,29 +656,28 @@ class ActivateArticle(TBK):
         else:
             echo(0, "{} failed".format(types))
 
-    def decoder_tpwd_once(self, article_id: str, tpwd: str, mode: int = 0):
-        req = self.decoder_tpwd(tpwd)
+    def decoder_tpwd_once(self, article_id: str, tpwd: str, mode: int = 0, do_sleep: bool = False):
+        if tpwd in self.tpwd_map:
+            return
+        flag = begin_time()
+        req = self.decoder_tpwd(tpwd, do_sleep)
+        self.spends.append(end_time(flag, 0))
         if req is None or not len(req):
             return
-        temp_map = {ii: req[ii] for ii in self.NEED_KEY}
-        if temp_map["validDate"] == self.ZERO_STAMP or "-" in temp_map["validDate"]:
-            temp_map["validDate"] = 1500000000
+        if "data" not in req or req["code"] != 0:
+            temp_map = {ii: "" for ii in self.NEED_KEY}
+            temp_map["validDate"] = self.BASIC_TIMEX_STR
         else:
-            temp_map["validDate"] = (
-                time_stamp(time_format="%d天%H小时%M分%S秒", time_str=req["validDate"])
-                - self.BASIC_STAMP
-                + time_stamp()
-            )
-        temp_map["validDate"] = time_str(temp_map["validDate"])
+            temp_map = {ii: req[ii] for ii in self.NEED_KEY}
+            temp_map["validDate"] = temp_map["expires"][:-1]
         temp_map["url"] = temp_map["url"].strip()
-        if article_id not in self.tpwd_map:
-            self.tpwd_map[article_id] = {}
-        self.tpwd_map[article_id][tpwd] = temp_map
+        temp_map["article_id"] = article_id
+        self.tpwd_map[tpwd] = temp_map
         if not mode:
             self.decoder_tpwd_url(article_id, tpwd)
 
     def decoder_tpwd_url(self, article_id: str, tpwd: str):
-        temp_map = self.tpwd_map[article_id][tpwd]
+        temp_map = self.tpwd_map[tpwd]
         tpwd_type, item_id = self.analysis_tpwd_url(temp_map["url"])
         if item_id is None:
             return
@@ -594,7 +685,7 @@ class ActivateArticle(TBK):
         temp_map["item_id"] = item_id
         if tpwd_type < 20:
             echo(2, "Domain:", self.URL_DOMAIN[tpwd_type], "item id:", item_id)
-        self.tpwd_map[article_id][tpwd] = temp_map
+        self.tpwd_map[tpwd] = temp_map
 
     def analysis_tpwd_url(self, url: str):
         if self.URL_DOMAIN[5] in url:
@@ -615,12 +706,24 @@ class ActivateArticle(TBK):
         echo("0|warning", "New Domain:", regex.findall("https://(.*?)/", url), url)
         return 20, 0
 
-    def decoder_tpwd(self, tpwd: str):
-        """ decoder the tpwd from taokouling """
+    def decoder_tpwd_v1(self, tpwd: str):
+        """ decoder the tpwd from taokouling from taokouling.com something failure in March 2021"""
         url = self.DECODER_TPWD_URL % (self.api_key, tpwd)
         req = basic_req(url, 1)
         # print(req.keys())
         if req is None or isinstance(req, str) or "ret" not in list(req.keys()):
+            return {}
+        return req
+
+    def decoder_tpwd(self, tpwd: str, do_sleep: bool = False):
+        """ decoder the tpwd from taokouling from https://taodaxiang.com/taopass"""
+        if do_sleep:
+            time.sleep(np.random.rand() * 10 + 2)
+        url = self.DECODER_TPWD_URL_V2
+        data = {"content": f"￥{tpwd}￥"}
+        return {}
+        req = proxy_req(url, 11, data)
+        if req is None or not isinstance(req, dict) or "code" not in list(req.keys()):
             return {}
         return req
 
@@ -733,7 +836,7 @@ class ActivateArticle(TBK):
         return item["title"]
 
     def get_item_title(self, article_id: str, tpwd: str):
-        temp_map = self.tpwd_map[article_id][tpwd]
+        temp_map = self.tpwd_map[tpwd]
         if (
             "item_id" not in temp_map
             or temp_map["item_id"] == ""
@@ -743,7 +846,7 @@ class ActivateArticle(TBK):
         item_id = int(temp_map["item_id"])
         title = self.get_item_title_once(item_id)
         if title != "":
-            self.tpwd_map[article_id][tpwd]["title"] = title
+            self.tpwd_map[tpwd]["title"] = title
 
     def get_item_title_once_v1(self, item_id: int) -> str:
         req = self.get_item_basic(item_id)
@@ -1063,6 +1166,24 @@ class ActivateArticle(TBK):
                 return
         return req
 
+    def replace_tpwd4article_pipeline(self, article_id: str):
+        xml = self.get_xml(article_id)
+        if xml is None:
+            echo("0|warning", "get xml error")
+            return
+        tpwds = set(regex.findall(self.TPWD_REG2, xml))
+        coIDs = regex.findall("<coId>\d{4}-\d*</coId><text>", xml)
+        xml = xml.replace(
+            coIDs[0],
+            coIDs[0]
+            + "PS: IOS14 用户请复制以“3”开头，以“/”结尾的完整淘口令，如3￥---￥/，或复制淘口令至淘宝搜索栏搜索.</text><inline-styles><color><from>0</from><to>36</to><value>#494949</value></color><back-color><from>0</from><to>36</to><value>#ffffff</value></back-color><bold><from>0</from><to>59</to><value>true</value></bold><underline><from>0</from><to>59</to><value>true</value></underline><color><from>36</from><to>43</to><value>#F33232</value></color><back-color><from>36</from><to>43</to><value>#FFB8B8</value></back-color><color><from>43</from><to>51</to><value>#494949</value></color><color><from>51</from><to>56</to><value>#F33232</value></color><back-color><from>51</from><to>56</to><value>#FFB8B8</value></back-color><color><from>56</from><to>59</to><value>#494949</value></color></inline-styles><styles/></para><para><coId>RpqK-1607447157739</coId><text/><inline-styles/><styles/></para><para><coId>Mx3M-1607447157739</coId><text>",
+        )
+        for ii in tpwds:
+            xml = xml.replace(ii, f"3{ii}/")
+        flag = self.update_article(article_id, xml)
+        if flag:
+            echo(1, f"Update {article_id} Success!! replace {len(tpwds)} tpwds")
+
     def update_article_pipeline(self, article_id: str):
         xml = self.get_xml(article_id)
         if xml is None:
@@ -1076,9 +1197,29 @@ class ActivateArticle(TBK):
         if flag:
             need_num = len(regex.findall("\(已失效\)", xml))
             self.email_update_result(article_id, r_log, r_num, need_num)
-            self.update_valid(article_id)
+            # self.update_valid(article_id)
             self.update_article2db(article_id, True)
             self.share_article(article_id)
+
+    def fix_failure(self, article_id: str, store: bool = False):
+        xml = self.get_xml(article_id)
+        if xml is None:
+            echo("0|warning", "get xml error")
+            return
+        x = regex.findall("(\\p{Sc}\\w{8,12}/\\p{Sc})", xml)
+        for ii in x:
+            xml = xml.replace(ii, ii[:-2] + ii[-1:])
+        tpwds = regex.findall("(\\p{Sc}\\w{8,12}\\p{Sc}.)", xml)
+        num = 0
+        for ii, jj in enumerate(tpwds):
+            if not jj.endswith("/"):
+                num += 1
+                xml = xml.replace(jj, jj[:-1] + "/" + jj[-1:])
+        if num or store:
+            flag = self.update_article(article_id, xml)
+            echo("1", flag, "Success fix {} tpwds in {}.".format(num, article_id))
+        else:
+            echo("2", "No need fix in {}.".format(article_id))
 
     def email_update_result(
         self, article_id: str, r_log: list, r_num: int, need_num: int
@@ -1105,12 +1246,8 @@ class ActivateArticle(TBK):
         send_email(content, subject, assign_rec=self.assign_rec)
 
     def update_valid(self, article_id: str):
-        if article_id not in self.tpwd_map:
-            self.tpwd_map[article_id] = {}
         wait_list = [
-            ii
-            for ii in self.article_list[article_id].keys()
-            if ii not in self.tpwd_map[article_id]
+            ii for ii in self.article_list[article_id].keys() if ii not in self.tpwd_map
         ]
         update_time = 0
         while len(wait_list) and update_time < 5:
@@ -1123,7 +1260,7 @@ class ActivateArticle(TBK):
             wait_list = [
                 ii
                 for ii in self.article_list[article_id].keys()
-                if ii not in self.tpwd_map[article_id]
+                if ii not in self.tpwd_map
             ]
             update_time += 1
 
@@ -1131,8 +1268,11 @@ class ActivateArticle(TBK):
         def valid_t(types: str, maps: dict):
             return types in maps and maps[types] != ""
 
-        m = {ii[4]: ii for ii in self.get_article_db(article_id)}
+        # m = {ii[4]: ii for ii in self.get_article_db("")}
         data = []
+        for o_tpwd in self.tpwds[article_id]:
+            n = self.tpwd_db_map[o_tpwd]
+
         for (
             o_tpwd,
             (num_iid, title, domain, tpwd, commission_rate, commission_type, ur),
@@ -1141,49 +1281,20 @@ class ActivateArticle(TBK):
             `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at, is_deleted
             """
             n = m[o_tpwd]
-            if o_tpwd in self.tpwd_map[article_id]:
-                t = self.tpwd_map[article_id][o_tpwd]
-                content = (
-                    t["title"]
-                    if valid_t("title", t)
-                    else (t["content"] if valid_t("content", t) else n[6])
+            data.append(
+                (
+                    *n[:-2],
+                    time_str(self.BASIC_TIMEX_STAMP + ONE_DAY * ONE_HOURS * 5),
+                    n[:-1],
+                    0,
                 )
-                url = t["url"] if valid_t("url", t) else n[7]
-                validDate = t["validDate"] if valid_t("validDate", t) else n[-2]
-                data.append(
-                    (
-                        *n[:4],
-                        tpwd if is_tpwd_update else o_tpwd,
-                        domain,
-                        content,
-                        url,
-                        commission_rate,
-                        commission_type,
-                        validDate,
-                        n[-1],
-                        0,
-                    )
-                )
-            else:
-                data.append(
-                    (
-                        *n[:4],
-                        tpwd if is_tpwd_update else o_tpwd,
-                        domain,
-                        n[6],
-                        n[7],
-                        commission_rate,
-                        commission_type,
-                        n[-2],
-                        n[-1],
-                        0,
-                    )
-                )
+            )
         self.update_db(data, "Update Article {} TPWD".format(article_id))
 
     def replace_tpwd(self, article_id: str, xml: str):
         tpwds = regex.findall(self.TPWD_REG2, xml)
-        m = self.article_list[article_id]
+        self.tpwds[article_id] = list(set(tpwds))
+        m = self.tpwd_db_map
         r_log, r_num = [], 0
         EXIST = "PASSWORD_NOT_EXIST::口令不存在"
         DECODER_EXC = "DECODER_EXCEPTION::商品已下架"
@@ -1196,8 +1307,8 @@ class ActivateArticle(TBK):
                 r_log.append("{}{}".format(no_t, EXIST))
                 continue
                 # tpwd = 'NOTNOTEXIST'
-            num_iid, title, domain, tpwd, commission_rate, commission_type, ur = m[
-                pure_jj
+            title, domain, tpwd, commission_rate, commission_type = [
+                m[pure_jj][i] for i in [6, 5, 4, 8, 9]
             ]
             if domain >= 15:
                 if domain == 15:
@@ -1210,15 +1321,17 @@ class ActivateArticle(TBK):
                     applied = "{},{}".format(TPWD_ERROR, title)
             else:
                 applied = title
-            if "{}(已失效)".format(jj) in xml:
-                jj = "{}(已失效)".format(jj)
-            xml = xml.replace(jj, "￥{}￥".format(tpwd))
+            f = False
+            if "{}/(已失效)".format(jj) in xml:
+                f = True
+                jj = "{}/(已失效)".format(jj)
+            xml = xml.replace(jj, "￥{}￥{}".format(tpwd, "/" if f else ""))
             if tpwd == pure_jj:
                 commission_rate = 1
             if commission_rate == 2:
                 COMMISSION = "->￥{}￥ SUCCESS, 保持原链接, {}".format(tpwd, applied)
             elif commission_rate == 1:
-                xml = xml.replace("￥{}￥".format(tpwd), "￥{}￥(已失效)".format(tpwd))
+                xml = xml.replace("￥{}￥/".format(tpwd), "￥{}￥/(已失效)".format(tpwd))
                 COMMISSION = "未能更新淘口令, {}".format(applied)
             else:
                 COMMISSION = "->￥{}￥ SUCCESS, 佣金: {}, 类型: {}, {}".format(
@@ -1295,11 +1408,9 @@ class ActivateArticle(TBK):
             self.tpwds[file_path] = tpwds
         else:
             tpwds = self.tpwds[file_path]
-        if file_path not in self.tpwd_map:
-            self.tpwd_map[file_path] = {}
         time = 0
-        while (len(self.tpwd_map[file_path]) < len(tpwds)) and time < 5:
-            thread_list = [ii for ii in tpwds if not ii in self.tpwd_map[file_path]]
+        while [1 for ii in tpwds if ii not in self.tpwd_map] and time < 5:
+            thread_list = [ii for ii in tpwds if not ii in self.tpwd_map]
             echo(1, file_path, "tpwds len:", len(tpwds), "need load", len(thread_list))
             thread_list = [
                 self.tpwd_exec.submit(self.decoder_tpwd_once, file_path, ii, 1)
@@ -1318,9 +1429,9 @@ class ActivateArticle(TBK):
         mkdir("picture")
         tpk_list = self.tpwds[file_path]
         picture_url = [
-            (self.tpwd_map[file_path][tpk]["picUrl"], idx)
+            (self.tpwd_map[tpk]["picUrl"], idx)
             for idx, tpk in enumerate(tpk_list)
-            if tpk in self.tpwd_map[file_path]
+            if tpk in self.tpwd_map
         ]
         picture_url = [
             (ii, idx)
@@ -1339,10 +1450,7 @@ class ActivateArticle(TBK):
             return dif_time > 0 and dif_time <= self.ONE_HOURS * self.ONE_DAY
 
         overdue_article = [
-            (article_id, article_list[4])
-            for article_id, ii in self.tpwd_db_map.items()
-            for article_list in ii.values()
-            if check_overdue_once(article_list)
+            (jj[1], ii) for ii, jj in self.tpwd_db_map.items() if check_overdue_once(jj)
         ]
         overdue_id = set([article_id for article_id, _ in overdue_article])
         overdue_list = [
@@ -1373,16 +1481,16 @@ class ActivateArticle(TBK):
         self.load_process()
 
     def load_article_new(self):
-        N = len(self.idx)
         article_exec = ThreadPoolExecutor(max_workers=3)
         np.random.shuffle(self.idx)
-        for i in range(int(N // 1)):
+        N = len(self.idx)
+        for i in range(int(N // 6)):
             a_list = [
                 article_exec.submit(self.load_article, ii)
                 for ii in self.idx[i * 3 : i * 3 + 3]
             ]
             list(as_completed(a_list))
-            time.sleep(np.random.rand() * 20)
+            time.sleep(np.random.rand() * 20 * 3 + 10)
         # self.send_repeat_email()
 
     def load_click(self, num=1000000):
@@ -1399,7 +1507,7 @@ class ActivateArticle(TBK):
                 )
             for work in threading_list:
                 work.start()
-            time.sleep(self.ONE_HOURS)
+            time.sleep(self.ONE_HOURS * 4)
 
     def does_update(self, do_it: bool) -> int:
         if do_it:
@@ -1467,6 +1575,20 @@ class ActivateArticle(TBK):
         )
         dump_bigger([self.tpwd_list, content, subject], TPWDLIST_PATH)
         send_email(content, subject)
+
+    def change_tpwd(self, article_path):
+        origin = read_file(article_path)
+        origin = [
+            "".join(["￥" if jj in UNICODE_EMOJI else jj for jj in ii]) for ii in origin
+        ]
+        for ii in range(len(origin)):
+            text = origin[ii]
+            tpwds = regex.findall(self.TPWD_REG3, text)
+            if tpwds:
+                text = f"3￥{tpwds[0][1]}￥/"
+                origin[ii] = text
+        with open(article_path, "w") as f:
+            f.write("\n".join(origin))
 
 
 if __name__ == "__main__":

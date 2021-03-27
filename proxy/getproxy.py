@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-01 13:50:44
+# @Last Modified time: 2021-03-27 23:38:47
 
 
 import argparse
@@ -301,7 +301,7 @@ class GetFreeProxy:
         2. response.result.tracks.size() != 1
         """
 
-        http_type = urls[4] == "s"
+        http_type = "https" in urls
         proxies = {type_map[http_type]: urls}
 
         test_url = (
@@ -706,6 +706,8 @@ class GetFreeProxy:
         t_list.extend(self.get_api())
         for ii in ["http", "https"]:
             t_list.extend(self.get_download(ii))
+        for ii in range(15):
+            t_list.extend(self.get_hideme(ii))
         t_list = list(set(t_list))
         with open(data_dir + "gatherproxy", "w") as f:
             f.write("\n".join(t_list))
@@ -725,7 +727,7 @@ class GetFreeProxy:
             API_KEY
         )
         t_list = []
-        for ii in range(38):
+        for ii in range(7):
             tt = basic_req(url, 1)
             if tt is None:
                 continue
@@ -735,12 +737,36 @@ class GetFreeProxy:
 
     def get_download(self, types: str):
         url = "https://www.proxy-list.download/api/v0/get?l=en&t=" + types
-        tt = basic_req(url, 1)
+        t = int(time_str(time_format="%d"))
+        if t % 3 == 0:
+            tt = basic_req(url, 1)
+        else:
+            tt = self.proxy_req(url, 1)
         if tt is None:
             return []
         tt_list = tt[0]["LISTA"]
         echo(1, "Get download", types, len(tt_list))
         return ["{}:{}".format(ii["IP"], ii["PORT"]) for ii in tt_list]
+
+    def get_freeproxylists_net(self, pn: int):
+        url = "http://www.freeproxylists.net/?page={}".format(pn)
+        header = {
+            "Host": "www.freeproxylists.net",
+            "Proxy-Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_16_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4185.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+
+    def get_hideme(self, pn: int):
+        url = "https://hidemy.name/en/proxy-list/"
+        if pn:
+            url += "?start={}".format((pn + 1) * 64)
+        tt = basic_req(url, 3)
+        res = re.findall("<tr><td>([0-9\.]*?)</td><td>([0-9\.]*?)</td>", tt)
+        echo(1, "Get Hideme page: No.{} {} items.".format(pn + 1, len(res)))
+        return ["{}:{}".format(ii, jj) for ii, jj in res]
 
     def get_other_proxies(self, url: str):
         """ get other proxies """

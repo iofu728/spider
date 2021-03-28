@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-03-28 15:58:38
+# @Last Modified time: 2021-03-28 16:38:30
 
 import hashlib
 import json
@@ -692,7 +692,7 @@ class ActivateArticle(TBK):
         if self.URL_DOMAIN[5] in url:
             return 5, self.get_uland_url(url)
         elif self.URL_DOMAIN[12] in url:
-            return 12, self.get_tb_m_url(url)
+            return 12, self.get_item_detail(url)
         elif self.URL_DOMAIN[11] in url:
             return 11, self.get_a_m_url(url)
         elif self.URL_DOMAIN[0] in url:
@@ -824,12 +824,12 @@ class ActivateArticle(TBK):
                 return
         return self.get_item_detail(req.url)
 
-    def get_item_detail(self, item_url: str) -> str:
+    def get_item_detail(self, item_url: str) -> int:
         item = decoder_url(item_url)
-        if not "id" in item:
+        if not "id" in item or not item["id"].isdigit():
             echo(0, "id not found:", item_url)
             return ""
-        return item["id"]
+        return int(item["id"])
 
     def get_item_title_once(self, item_id: int) -> str:
         item = self.get_tb_getdetail(item_id)
@@ -904,18 +904,6 @@ class ActivateArticle(TBK):
                 return self.get_a_m_basic(a_m_url)
             return
         return req
-
-    def get_tb_m_url(self, tb_m_url: str):
-        """ tb m url @2021.03.28 ✔️Tested"""
-        item = decoder_url(tb_m_url)
-        if not "id" in item or not item["id"].isdigit():
-            echo(0, "id not found:", tb_m_url)
-            return ""
-        item_id = int(item["id"])
-        item = self.get_tb_getdetail(item_id)
-        if item is None:
-            return ""
-        return item["title"]
 
     def get_m_h5_tk(self):
         self.m_time = time_stamp()

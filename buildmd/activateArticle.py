@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-03-28 16:38:30
+# @Last Modified time: 2021-03-28 18:52:09
 
 import hashlib
 import json
@@ -204,7 +204,7 @@ class ActivateArticle(TBK):
         5: "uland.taobao.com",
         10: "taoquan.taobao.com",
         11: "a.m.taobao.com",
-        12: "h5.m.taobao.com",
+        13: "id=",
         15: "empty",
         16: "failure",
     }
@@ -691,18 +691,16 @@ class ActivateArticle(TBK):
     def analysis_tpwd_url(self, url: str):
         if self.URL_DOMAIN[5] in url:
             return 5, self.get_uland_url(url)
-        elif self.URL_DOMAIN[12] in url:
-            return 12, self.get_item_detail(url)
         elif self.URL_DOMAIN[11] in url:
             return 11, self.get_a_m_url(url)
         elif self.URL_DOMAIN[0] in url:
             return 0, self.get_s_click_url(url)
         elif self.URL_DOMAIN[10] in url:
             return 10, 0
-        elif self.URL_DOMAIN[1] in url:
+        elif self.URL_DOMAIN[13] in url:
             good_id = self.get_item_detail(url)
             if good_id != "":
-                return 1, good_id
+                return 1 if self.URL_DOMAIN[1] in url else 13, good_id
             return 16, 0
         elif url == "":
             return 15, 0

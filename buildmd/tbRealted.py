@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2020-06-08 21:23:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-09 13:28:42
+# @Last Modified time: 2020-07-13 22:47:54
 
 
 import json
@@ -82,7 +82,7 @@ class TBRelated(object):
                     shopUrl = "https:" + order["seller"].get("shopUrl", "")
                 else:
                     shopName, shopUrl = "", "https:"
-                statusInfo = order["statusInfo"]["text"]
+                statusInfo = order["statusInfo"].get("text", "0")
                 subOrders = [
                     {
                         "title": sub["itemInfo"]["title"],

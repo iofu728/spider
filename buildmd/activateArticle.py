@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-03-27 23:34:32
+# @Last Modified time: 2021-03-28 15:58:38
 
 import hashlib
 import json
@@ -204,6 +204,7 @@ class ActivateArticle(TBK):
         5: "uland.taobao.com",
         10: "taoquan.taobao.com",
         11: "a.m.taobao.com",
+        12: "h5.m.taobao.com",
         15: "empty",
         16: "failure",
     }
@@ -617,9 +618,7 @@ class ActivateArticle(TBK):
             for ii in article_list:
                 self.tpwd_db_map[ii[4]] = ii
         need_update = [
-            1
-            for ii in self.tpwd_db_map.values()
-            if ii[-2] >= self.BASIC_TIMEX_STR
+            1 for ii in self.tpwd_db_map.values() if ii[-2] >= self.BASIC_TIMEX_STR
         ]
         echo(
             1,
@@ -656,7 +655,9 @@ class ActivateArticle(TBK):
         else:
             echo(0, "{} failed".format(types))
 
-    def decoder_tpwd_once(self, article_id: str, tpwd: str, mode: int = 0, do_sleep: bool = False):
+    def decoder_tpwd_once(
+        self, article_id: str, tpwd: str, mode: int = 0, do_sleep: bool = False
+    ):
         if tpwd in self.tpwd_map:
             return
         flag = begin_time()
@@ -664,12 +665,12 @@ class ActivateArticle(TBK):
         self.spends.append(end_time(flag, 0))
         if req is None or not len(req):
             return
-        if "data" not in req or req["code"] != 0:
+        if "data" not in req or req["code"]:
             temp_map = {ii: "" for ii in self.NEED_KEY}
             temp_map["validDate"] = self.BASIC_TIMEX_STR
         else:
-            temp_map = {ii: req[ii] for ii in self.NEED_KEY}
-            temp_map["validDate"] = temp_map["expires"][:-1]
+            temp_map = {ii: req["data"][ii] for ii in self.NEED_KEY}
+            temp_map["validDate"] = temp_map["expire"]
         temp_map["url"] = temp_map["url"].strip()
         temp_map["article_id"] = article_id
         self.tpwd_map[tpwd] = temp_map
@@ -690,6 +691,8 @@ class ActivateArticle(TBK):
     def analysis_tpwd_url(self, url: str):
         if self.URL_DOMAIN[5] in url:
             return 5, self.get_uland_url(url)
+        elif self.URL_DOMAIN[12] in url:
+            return 12, self.get_tb_m_url(url)
         elif self.URL_DOMAIN[11] in url:
             return 11, self.get_a_m_url(url)
         elif self.URL_DOMAIN[0] in url:
@@ -718,11 +721,10 @@ class ActivateArticle(TBK):
     def decoder_tpwd(self, tpwd: str, do_sleep: bool = False):
         """ decoder the tpwd from taokouling from https://taodaxiang.com/taopass"""
         if do_sleep:
-            time.sleep(np.random.rand() * 10 + 2)
+            time.sleep(np.random.rand() * 20 + 5)
         url = self.DECODER_TPWD_URL_V2
         data = {"content": f"￥{tpwd}￥"}
-        return {}
-        req = proxy_req(url, 11, data)
+        req = proxy_req(url, 11, data=data)
         if req is None or not isinstance(req, dict) or "code" not in list(req.keys()):
             return {}
         return req
@@ -903,6 +905,18 @@ class ActivateArticle(TBK):
             return
         return req
 
+    def get_tb_m_url(self, tb_m_url: str):
+        """ tb m url @2021.03.28 ✔️Tested"""
+        item = decoder_url(tb_m_url)
+        if not "id" in item or not item["id"].isdigit():
+            echo(0, "id not found:", tb_m_url)
+            return ""
+        item_id = int(item["id"])
+        item = self.get_tb_getdetail(item_id)
+        if item is None:
+            return ""
+        return item["title"]
+
     def get_m_h5_tk(self):
         self.m_time = time_stamp()
 
@@ -947,7 +961,8 @@ class ActivateArticle(TBK):
         if req is not None:
             req_text = req.text
             re_json = json.loads(req_text[req_text.find("{") : -1])
-            return re_json["data"]["item"]
+            if "data" in re_json and "item" in re_json["data"]:
+                return re_json["data"]["item"]
 
     def get_tb_getdetail_once(self, item_id: int, cookies: dict = {}):
         refer_url = self.DETAIL_URL % item_id
@@ -1491,6 +1506,7 @@ class ActivateArticle(TBK):
             ]
             list(as_completed(a_list))
             time.sleep(np.random.rand() * 20 * 3 + 10)
+        self.check_overdue()
         # self.send_repeat_email()
 
     def load_click(self, num=1000000):

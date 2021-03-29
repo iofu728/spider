@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-03-29 18:57:58
+# @Last Modified time: 2021-03-30 00:16:41
 
 import hashlib
 import json
@@ -1265,27 +1265,19 @@ class ActivateArticle(TBK):
             update_time += 1
 
     def update_article2db(self, article_id: str, is_tpwd_update: bool = False):
-        def valid_t(types: str, maps: dict):
-            return types in maps and maps[types] != ""
-
-        # m = {ii[4]: ii for ii in self.get_article_db("")}
         data = []
         for o_tpwd in self.tpwds[article_id]:
-            n = self.tpwd_db_map[o_tpwd]
-
-        for (
-            o_tpwd,
-            (num_iid, title, domain, tpwd, commission_rate, commission_type, ur),
-        ) in self.article_list[article_id].items():
             """
             `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at, is_deleted
             """
-            n = m[o_tpwd]
+            n = self.tpwd_db_map[o_tpwd[1:-1]]
             data.append(
                 (
                     *n[:-2],
-                    time_str(self.BASIC_TIMEX_STAMP + ONE_DAY * ONE_HOURS * 5),
-                    n[:-1],
+                    time_str(
+                        self.BASIC_TIMEX_STAMP + self.ONE_DAY * self.ONE_HOURS * 5
+                    ),
+                    n[-1],
                     0,
                 )
             )

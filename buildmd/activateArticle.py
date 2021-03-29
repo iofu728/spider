@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-03-29 13:32:47
+# @Last Modified time: 2021-03-29 18:57:58
 
 import hashlib
 import json
@@ -341,8 +341,7 @@ class ActivateArticle(TBK):
             ii
             for ii, jj in self.tpwd_map.items()
             if jj["article_id"] == article_id
-            and "type" not in jj
-            or jj["item_id"] is None
+            and ("type" not in jj or "item_id" not in jj or jj["item_id"] is None)
         ]
         while (
             [1 for ii in need_tpwds if ii not in self.tpwd_map]
@@ -368,8 +367,7 @@ class ActivateArticle(TBK):
                 ii
                 for ii, jj in self.tpwd_map.items()
                 if jj["article_id"] == article_id
-                and "type" not in jj
-                or jj["item_id"] is None
+                and ("type" not in jj or "item_id" not in jj or jj["item_id"] is None)
             ]
             au_list.extend(
                 [
@@ -1514,8 +1512,12 @@ class ActivateArticle(TBK):
                 work.start()
             for work in threading_list:
                 work.join()
-            echo(3, f"No. {index + 1} load click speed {get_time_str(end_time(flag), False)}")
-            time.sleep(min(self.ONE_HOURS * 4 - end_time(flag), 0))
+            spend_time = end_time(flag, 0)
+            echo(
+                3,
+                f"No. {index + 1} load click speed {get_time_str(spend_time, False)}",
+            )
+            time.sleep(min(self.ONE_HOURS * 4 - spend_time, 0))
 
     def does_update(self, do_it: bool) -> int:
         if do_it:

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-03-28 18:52:09
+# @Last Modified time: 2021-03-29 13:32:47
 
 import hashlib
 import json
@@ -37,6 +37,7 @@ from util.util import (
     end_time,
     get_accept,
     get_content_type,
+    get_time_str,
     get_use_agent,
     headers,
     json_str,
@@ -1485,12 +1486,13 @@ class ActivateArticle(TBK):
         article_exec = ThreadPoolExecutor(max_workers=3)
         np.random.shuffle(self.idx)
         N = len(self.idx)
-        for i in range(int(N // 6)):
-            a_list = [
-                article_exec.submit(self.load_article, ii)
-                for ii in self.idx[i * 3 : i * 3 + 3]
-            ]
-            list(as_completed(a_list))
+        for i in range(int(N // 3)):
+            self.load_article(self.idx[i])
+            # a_list = [
+            #     article_exec.submit(self.load_article, ii)
+            #     for ii in self.idx[i * 3 : i * 3 + 3]
+            # ]
+            # list(as_completed(a_list))
             time.sleep(np.random.rand() * 20 * 3 + 10)
         self.check_overdue()
         # self.send_repeat_email()
@@ -1499,6 +1501,7 @@ class ActivateArticle(TBK):
         """ schedule click """
         for index in range(num):
             threading_list = []
+            flag = begin_time()
             if index % 6 != 1:
                 threading_list.append(
                     threading.Thread(target=self.load_article_new, args=())
@@ -1509,7 +1512,10 @@ class ActivateArticle(TBK):
                 )
             for work in threading_list:
                 work.start()
-            time.sleep(self.ONE_HOURS * 4)
+            for work in threading_list:
+                work.join()
+            echo(3, f"No. {index + 1} load click speed {get_time_str(end_time(flag), False)}")
+            time.sleep(min(self.ONE_HOURS * 4 - end_time(flag), 0))
 
     def does_update(self, do_it: bool) -> int:
         if do_it:

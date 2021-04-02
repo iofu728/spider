@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-02 22:56:15
+# @Last Modified time: 2021-04-02 23:12:37
 import os
 import sys
 import json
@@ -457,28 +457,31 @@ class Items(object):
             "ask_text": ask_text,
             "props": props,
         }
-
-        self.shops_detail_map[shop_id] = {
-            "shop_id": shop_id,
-            "shop_name": shop_name,
-            "user_id": user_id,
-            "seller_nick": seller_nick,
-            "item_count": item_count,
-            "fans_count": fans_count,
-            "credit_level": credit_level,
-            "good_rate_perc": good_rate_perc,
-            "item_desc_rate": item_desc_rate,
-            "seller_serv_rate": seller_serv_rate,
-            "logistics_serv_rate": logistics_serv_rate,
-            "start_at": start_at,
-        }
+        if not shop_id:
+            self.shops_detail_map[shop_id] = {
+                "shop_id": shop_id,
+                "shop_name": shop_name,
+                "user_id": user_id,
+                "seller_nick": seller_nick,
+                "item_count": item_count,
+                "fans_count": fans_count,
+                "credit_level": credit_level,
+                "good_rate_perc": good_rate_perc,
+                "item_desc_rate": item_desc_rate,
+                "seller_serv_rate": seller_serv_rate,
+                "logistics_serv_rate": logistics_serv_rate,
+                "start_at": start_at,
+            }
         return self.items_detail_map[item_id]
 
     def load_db(self, is_load: bool = True):
         def load_one_table(sql: str, LIST: list, db_map: dict, key: str):
             lines = self.Db.select_db(sql)
             for line in lines:
-                line = {ii: jj for ii, jj in zip(LIST, item)}
+                line = {
+                    ii: jj.strftime("%Y-%m-%d %H:%M:%S") if ii.endswith("_at") else jj
+                    for ii, jj in zip(LIST, line)
+                }
                 db_map[line[key]] = line
             return db_map
 
@@ -525,8 +528,17 @@ class Items(object):
             update_list, insert_list = [], []
             for key, value in detail_map.items():
                 if key in db_map:
-                    if db_map[key] != value:
-                        update_list.append((*[value[ii] for ii in LIST], 0))
+                    value_db = db_map[key]
+                    if value_db != value:
+
+                        update_list.append(
+                            (
+                                value_db[List[0]],
+                                *[value[ii] for ii in LIST[1:-1]],
+                                value_db[List[-1]],
+                                0,
+                            )
+                        )
                 else:
                     insert_list.append(tuple([value[ii] for ii in LIST[1:-1]]))
             self.update_db(update_list, update_sql, f"Update {types.upper()}")
@@ -557,6 +569,7 @@ class Items(object):
             need_items = [
                 item for item in self.items if item not in self.items_detail_map
             ]
+            np.random.shuffle(need_items)
             for item in need_items:
                 self.get_item_detail(item, True)
             self.store_db()

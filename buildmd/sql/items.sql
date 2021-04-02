@@ -1,4 +1,4 @@
-using tbk;
+-- using tbk;
 CREATE TABLE if not exists `items` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT 'auto-increment primary keys.',
   `item_id` varchar(30) NOT NULL DEFAULT '' COMMENT 'item id',

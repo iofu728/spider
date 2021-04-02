@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-02 20:17:39
+# @Last Modified time: 2021-04-02 22:56:15
 import os
 import sys
 import json
@@ -10,6 +10,7 @@ import hashlib
 import time
 import numpy as np
 from configparser import ConfigParser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.append(os.getcwd())
 
@@ -17,10 +18,13 @@ from proxy.getproxy import GetFreeProxy
 from util.db import Db
 from util.util import (
     begin_time,
+    can_retry,
     decoder_url,
     echo,
     encoder_cookie,
+    encoder_url,
     end_time,
+    get_time_str,
     get_use_agent,
     json_str,
     mkdir,
@@ -109,6 +113,7 @@ class Items(object):
         self.items = set()
         self.cookies = {}
         self.load_configure()
+        self.load_db()
         self.items_exec = ThreadPoolExecutor(max_workers=5)
 
     def load_configure(self):
@@ -352,7 +357,7 @@ class Items(object):
             time.sleep(np.random.rand() * 5 + 2)
         if (
             item_id in self.items_detail_map
-            and self.items_detail_map[item_id]["categoryId"]
+            and self.items_detail_map[item_id]["category_id"]
         ):
             return self.items_detail_map[item_id]
         if (
@@ -360,7 +365,7 @@ class Items(object):
             or time_stamp() - self.m_time > self.ONE_HOURS / 2
         ):
             self.get_m_h5_tk()
-        req = self.get_tb_getdetail_req(item_id, self.cookies["uland"])
+        req = self.get_tb_getdetail_req(int(item_id), self.cookies["uland"])
         if req is None:
             return {}
         req_text = req.text
@@ -436,7 +441,7 @@ class Items(object):
             ]
         ]
         item_desc_rate, logistics_serv_rate, seller_serv_rate = [
-            ii.get("score", "0") for ii in evaluates
+            ii.get("score", "0").strip() for ii in evaluates
         ]
 
         self.items_detail_map[item_id] = {
@@ -469,7 +474,7 @@ class Items(object):
         }
         return self.items_detail_map[item_id]
 
-    def load_db(self):
+    def load_db(self, is_load: bool = True):
         def load_one_table(sql: str, LIST: list, db_map: dict, key: str):
             lines = self.Db.select_db(sql)
             for line in lines:
@@ -477,16 +482,25 @@ class Items(object):
                 db_map[line[key]] = line
             return db_map
 
-        self.items = set([ii[0] for ii in self.Db.select_db(self.S_TPWDS_SQL)])
-        self.items_detail_map = load_one_table(
+        self.items = set(
+            [
+                ii[0]
+                for ii in self.Db.select_db(self.S_TPWDS_SQL)
+                if ii[0] and ii[0].isdigit()
+            ]
+        )
+        items = load_one_table(
             self.S_ITEMS_SQL % "", self.ITEMS_LIST, self.items_detail_db_map, "item_id"
-        )
-        self.shops_detail_map = load_one_table(
+        ).copy()
+        shops = load_one_table(
             self.S_SHOPS_SQL % "", self.SHOPS_LIST, self.shops_detail_db_map, "shop_id"
-        )
+        ).copy()
+        if is_load:
+            self.items_detail_map = items
+            self.shops_detail_map = shops
         echo(
             1,
-            f"Load {len(self.items_detail_map)} ITEMS and {len(shops_detail_map)} SHOPS from db.",
+            f"Load {len(self.items)} TPWDS {len(self.items_detail_map)} ITEMS and {len(self.shops_detail_map)} SHOPS from db.",
         )
 
     def update_db(self, data: list, basic_sql: str, types: str):
@@ -514,10 +528,11 @@ class Items(object):
                     if db_map[key] != value:
                         update_list.append((*[value[ii] for ii in LIST], 0))
                 else:
-                    insert_list.append(([value[ii] for ii in LIST[1:-1]]))
+                    insert_list.append(tuple([value[ii] for ii in LIST[1:-1]]))
             self.update_db(update_list, update_sql, f"Update {types.upper()}")
             self.update_db(insert_list, insert_sql, f"Insert {types.upper()}")
 
+        self.load_db(False)
         store_one_table(
             self.R_ITEMS_SQL,
             self.I_ITEMS_SQL,
@@ -540,7 +555,7 @@ class Items(object):
         for idx in range(num):
             flag = begin_time()
             need_items = [
-                item for item in self.items if item not in slef.items_detail_map
+                item for item in self.items if item not in self.items_detail_map
             ]
             for item in need_items:
                 self.get_item_detail(item, True)
@@ -548,7 +563,7 @@ class Items(object):
             spend_time = end_time(flag, 0)
             echo(
                 3,
-                f"No. {index + 1} load items spend {get_time_str(spend_time, False)}",
+                f"No. {idx + 1} load {len(need_items)} items spend {get_time_str(spend_time, False)}",
             )
             time.sleep(max(self.ONE_HOURS * 2 - spend_time, 0))
 
@@ -561,4 +576,5 @@ if __name__ == "__main__":
             "proxy_req": GetFreeProxy().proxy_req,
         }
     )
+    items.get_m_h5_tk()
     items.load_click()

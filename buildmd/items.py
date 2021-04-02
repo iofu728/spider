@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-02 23:12:37
+# @Last Modified time: 2021-04-02 23:19:25
 import os
 import sys
 import json
@@ -352,12 +352,15 @@ class Items(object):
         md5.update(wait_enc.encode())
         return md5.hexdigest()
 
-    def get_item_detail(self, item_id: str, is_wait: bool = False):
+    def get_item_detail(
+        self, item_id: str, is_wait: bool = False, force_update: bool = False
+    ):
         if is_wait:
             time.sleep(np.random.rand() * 5 + 2)
         if (
             item_id in self.items_detail_map
             and self.items_detail_map[item_id]["category_id"]
+            and not force_update
         ):
             return self.items_detail_map[item_id]
         if (
@@ -457,7 +460,7 @@ class Items(object):
             "ask_text": ask_text,
             "props": props,
         }
-        if not shop_id:
+        if shop_id:
             self.shops_detail_map[shop_id] = {
                 "shop_id": shop_id,
                 "shop_name": shop_name,
@@ -533,9 +536,9 @@ class Items(object):
 
                         update_list.append(
                             (
-                                value_db[List[0]],
+                                value_db[LIST[0]],
                                 *[value[ii] for ii in LIST[1:-1]],
-                                value_db[List[-1]],
+                                value_db[LIST[-1]],
                                 0,
                             )
                         )

@@ -2,9 +2,8 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-03-30 00:16:41
+# @Last Modified time: 2021-04-02 19:52:28
 
-import hashlib
 import json
 import os
 import sys
@@ -21,6 +20,7 @@ import regex
 
 sys.path.append(os.getcwd())
 import top
+from buildmd.items import Items
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
 from util.util import (
@@ -32,7 +32,6 @@ from util.util import (
     decoder_cookie,
     decoder_url,
     echo,
-    encoder_cookie,
     encoder_url,
     end_time,
     get_accept,
@@ -40,7 +39,6 @@ from util.util import (
     get_time_str,
     get_use_agent,
     headers,
-    json_str,
     mkdir,
     read_file,
     send_email,
@@ -53,6 +51,7 @@ from util.util import (
 
 proxy_req = GetFreeProxy().proxy_req
 root_dir = os.path.abspath("buildmd")
+sql_dir = os.path.join(root_dir, "sql")
 assign_path = os.path.join(root_dir, "tbk.ini")
 DATA_DIR = os.path.join(root_dir, "data")
 TPWDLIST_PATH = os.path.join(DATA_DIR, "tpwdlist.pkl")
@@ -66,7 +65,7 @@ class TBK(object):
 
     def __init__(self):
         super(TBK, self).__init__()
-        self.items = {}
+        self.tb_items = {}
         self.load_configure()
         # self.load_tbk_info()
 
@@ -120,7 +119,7 @@ class TBK(object):
                 "uatm_tbk_item"
             ]
             items = {ii["num_iid"]: ii for ii in item}
-            self.items = {**self.items, **items}
+            self.tb_items = {**self.tb_items, **items}
         except Exception as e:
             echo(0, favorites_id, "favorite error", e)
 
@@ -154,7 +153,7 @@ class TBK(object):
 
 
 class ActivateArticle(TBK):
-    """ activate article in youdao Cloud"""
+    """ activate article in youdao Cloud and Convert the tpwds to items"""
 
     Y_URL = "https://note.youdao.com/"
     WEB_URL = f"{Y_URL}web/"
@@ -172,15 +171,31 @@ class ActivateArticle(TBK):
     DECODER_TPWD_URL = "https://api.taokouling.com/tkl/tkljm?apikey=%s&tkl=￥%s￥"
     DECODER_TPWD_URL_V2 = "https://taodaxiang.com/taopass/parse/get"
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
-    MTOP_URL = "https://h5api.m.taobao.com/h5/%s/%d.0/"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
-    DETAIL_URL = "https://detail.m.tmall.com/item.htm?id=%d"
+    ARTICLE_LIST = [
+        "`id`",
+        "article_id",
+        "tpwd_id",
+        "item_id",
+        "tpwd",
+        "domain",
+        "content",
+        "url",
+        "commission_rate",
+        "commission_type",
+        "expire_at",
+        "created_at",
+    ]
     S_LIST_SQL = "SELECT `id`, article_id, title, q, created_at from article;"
     I_LIST_SQL = "INSERT INTO article (article_id, title, q) VALUES %s;"
     R_LIST_SQL = "REPLACE INTO article (`id`, article_id, title, q, is_deleted, created_at) VALUES %s;"
-    S_ARTICLE_SQL = "SELECT `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at from article_tpwd%s;"
-    I_ARTICLE_SQL = "INSERT INTO article_tpwd (article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at) VALUES %s;"
-    R_ARTICLE_SQL = "REPLACE INTO article_tpwd (`id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at, is_deleted) VALUES %s;"
+    S_ARTICLE_SQL = "SELECT {} from article_tpwd%s;".format(", ".join(ARTICLE_LIST))
+    I_ARTICLE_SQL = "INSERT INTO article_tpwd ({}) VALUES %s;".format(
+        ", ".join(ARTICLE_LIST[1:-1])
+    )
+    R_ARTICLE_SQL = "REPLACE INTO article_tpwd ({}, is_deleted) VALUES %s;".format(
+        ", ".join(ARTICLE_LIST)
+    )
     END_TEXT = "</text><inline-styles/><styles/></para></body></note>"
     TPWD_REG = "\p{Sc}(\w{8,12}?)\p{Sc}"
     TPWD_REG2 = "(\p{Sc}\w{8,12}\p{Sc})"
@@ -211,9 +226,9 @@ class ActivateArticle(TBK):
     }
     NEED_KEY_V1 = ["content", "url", "validDate", "picUrl"]
     NEED_KEY = ["content", "url", "expire", "picUrl"]
+    TABLE_LISTS = ["twpd.sql", "article.sql"]
     ONE_HOURS = 3600
     ONE_DAY = 24
-    M = "_m_h5_tk"
     ZERO_STAMP = "0天0小时0分0秒"
     T_FORMAT = "%m-%d %H:%M"
     BASIC_STAMP = (
@@ -223,16 +238,22 @@ class ActivateArticle(TBK):
 
     def __init__(self):
         super(ActivateArticle, self).__init__()
-        self.Db = Db("tbk")
-        self.Db.create_table(os.path.join(root_dir, "tpwd.sql"))
-        self.Db.create_table(os.path.join(root_dir, "article.sql"))
         self.BASIC_TIMEX_STR = time_str()
         self.BASIC_TIMEX_STAMP = time_stamp()
+        self.items = Items(
+            {
+                "time_str": self.BASIC_TIMEX_STR,
+                "time_stamp": self.BASIC_TIMEX_STAMP,
+                "proxy_req": proxy_req,
+            }
+        )
+        self.Db = self.items.db
+        for table in self.TABLE_LISTS:
+            self.Db.create_table(os.path.join(sql_dir, table))
         self.tpwd_map = {}
         self.tpwd_db_map = {}
         self.tpwds = {}
         self.tpwd_list = {}
-        self.cookies = {}
         self.share2article = {}
         self.article_list = {}
         self.list_recent = {}
@@ -250,7 +271,7 @@ class ActivateArticle(TBK):
             self.load_ids()
         self.load_article_list()
         # self.update_tpwd()
-        self.get_m_h5_tk()
+        self.items.get_m_h5_tk()
         self.get_ynote_file()
         self.get_ynote_file(1)
 
@@ -377,25 +398,6 @@ class ActivateArticle(TBK):
             )
             time += 1
         list(as_completed(au_list))
-        no_title = [
-            ii
-            for ii, jj in self.tpwd_map.items()
-            if jj["article_id"] == article_id and jj["url"] and "title" not in jj
-        ]
-        time = 0
-        while len(no_title) and time < 5:
-            title_list = [
-                self.tpwd_exec.submit(self.get_item_title, article_id, ii)
-                for ii in no_title
-            ]
-            echo(1, article_id, "need get title:", len(title_list))
-            list(as_completed(title_list))
-            time += 1
-            no_title = [
-                ii
-                for ii, jj in self.tpwd_map.items()
-                if jj["article_id"] == article_id and jj["url"] and "title" not in jj
-            ]
         if is_load2db:
             self.load_article2db(article_id)
 
@@ -447,8 +449,8 @@ class ActivateArticle(TBK):
                 update_list.append((t[0], ii, jj[0], jj[1], 0, t[-1]))
             else:
                 insert_list.append((ii, jj[0], jj[1]))
-        self.update_db(insert_list, "Insert Article List", 1)
-        self.update_db(update_list, "Update Article List", 1)
+        self.items.update_db(insert_list, self.I_LIST_SQL, "Insert Article List")
+        self.items.update_db(update_list, self.R_LIST_SQL, "Update Article List")
 
     def get_share_list(self):
         share_list = self.Db.select_db(self.S_LIST_SQL)
@@ -467,6 +469,8 @@ class ActivateArticle(TBK):
             for ii, jj in self.tpwd_map.items()
             if jj["article_id"] == article_id and jj["url"]
         }
+        if article_id not in self.tpwds:
+            return
         tpwds = list(set(self.tpwds[article_id]))
         data = [
             (
@@ -498,8 +502,12 @@ class ActivateArticle(TBK):
                 continue
             if ii not in data_map:
                 update_list.append((*jj, 1))
-        self.update_db(insert_list, f"article_id {article_id} Insert")
-        self.update_db(update_list, f"article_id {article_id} Update")
+        self.items.update_db(
+            insert_list, self.I_ARTICLE_SQL, f"article_id {article_id} Insert"
+        )
+        self.items.update_db(
+            update_list, self.R_ARTICLE_SQL, f"article_id {article_id} Update"
+        )
         if len(insert_list):
             self.load_ids()
             self.load_article_list()
@@ -510,6 +518,8 @@ class ActivateArticle(TBK):
             if a_id is not None and c[1] != a_id:
                 continue
             num_iid, title, domain, tpwd, url = [c[i] for i in [3, 6, 5, 4, 7]]
+            if num_iid in self.items.items_detail_map:
+                titile = self.items.items_detail_map[num_iid]["title"]
 
             if (
                 is_renew
@@ -639,21 +649,6 @@ class ActivateArticle(TBK):
             article_list[ii] = [*jj[:-2], y, t]
         return article_list
 
-    def update_db(self, data: list, types: str, mode: int = 0):
-        if not len(data):
-            return
-        if "insert" in types.lower():
-            basic_sql = self.I_LIST_SQL if mode else self.I_ARTICLE_SQL
-        else:
-            basic_sql = self.R_LIST_SQL if mode else self.R_ARTICLE_SQL
-
-        i_sql = basic_sql % str(data)[1:-1]
-        insert_re = self.Db.insert_db(i_sql)
-        if insert_re:
-            echo(3, "{} {} info Success".format(types, len(data)))
-        else:
-            echo(0, "{} failed".format(types))
-
     def decoder_tpwd_once(
         self, article_id: str, tpwd: str, mode: int = 0, do_sleep: bool = False
     ):
@@ -697,7 +692,7 @@ class ActivateArticle(TBK):
         elif self.URL_DOMAIN[10] in url:
             return 10, 0
         elif self.URL_DOMAIN[13] in url:
-            good_id = self.get_item_detail(url)
+            good_id = self.get_item_id(url)
             if good_id != "":
                 return 1 if self.URL_DOMAIN[1] in url else 13, good_id
             return 16, 0
@@ -718,7 +713,7 @@ class ActivateArticle(TBK):
     def decoder_tpwd(self, tpwd: str, do_sleep: bool = False):
         """ decoder the tpwd from taokouling from https://taodaxiang.com/taopass"""
         if do_sleep:
-            time.sleep(np.random.rand() * 20 + 5)
+            time.sleep(np.random.rand() * 10 + 2)
         url = self.DECODER_TPWD_URL_V2
         data = {"content": f"￥{tpwd}￥"}
         req = proxy_req(url, 11, data=data)
@@ -733,7 +728,7 @@ class ActivateArticle(TBK):
         if item_url is None:
             echo(3, "s_click_url location Error..")
             return
-        return self.get_item_detail(item_url)
+        return self.get_item_id(item_url)
 
     def get_s_click_url_v1(self, s_click_url: str):
         """ decoder s.click real jump url @validation time: 2019.08.31"""
@@ -819,9 +814,9 @@ class ActivateArticle(TBK):
                 return self.get_s_click_detail(redirect_url, tu_url)
             else:
                 return
-        return self.get_item_detail(req.url)
+        return self.get_item_id(req.url)
 
-    def get_item_detail(self, item_url: str) -> int:
+    def get_item_id(self, item_url: str) -> int:
         item = decoder_url(item_url)
         if not "id" in item or not item["id"].isdigit():
             echo(0, "id not found:", item_url)
@@ -835,6 +830,7 @@ class ActivateArticle(TBK):
         return item["title"]
 
     def get_item_title(self, article_id: str, tpwd: str):
+        ## TODO: REMOVE
         temp_map = self.tpwd_map[tpwd]
         if (
             "item_id" not in temp_map
@@ -874,12 +870,12 @@ class ActivateArticle(TBK):
 
     def get_uland_url(self, uland_url: str):
         if (
-            not "uland" in self.cookies
-            # or not self.M in self.cookies['uland']
+            not "uland" in self.iitems.cookies
+            # or not self.M in self.iitems.cookies['uland']
             or time_stamp() - self.m_time > self.ONE_HOURS / 2
         ):
-            self.get_m_h5_tk()
-        s_req = self.get_uland_url_once(uland_url, self.cookies["uland"])
+            self.items.get_m_h5_tk()
+        s_req = self.items.get_uland_url_once(uland_url, self.iitems.cookies["uland"])
         if s_req is None:
             return ""
         req_text = s_req.text
@@ -891,7 +887,7 @@ class ActivateArticle(TBK):
         if req is None:
             return
         item_url = req.headers["location"]
-        return self.get_item_detail(item_url)
+        return self.get_item_id(item_url)
 
     def get_a_m_basic(self, a_m_url: str):
         headers = self.get_tb_headers(a_m_url)
@@ -901,222 +897,6 @@ class ActivateArticle(TBK):
                 return self.get_a_m_basic(a_m_url)
             return
         return req
-
-    def get_m_h5_tk(self):
-        self.m_time = time_stamp()
-
-        def get_cookie_once(key, func, *param):
-            req = func(*param)
-            if req is not None:
-                self.cookies[key] = req.cookies.get_dict()
-                echo(1, "get {} cookie:".format(key), self.cookies[key])
-
-        get_cookie_once("uland", self.get_uland_url_once, self.uland_url)
-        if False:
-            get_cookie_once("finger", self.get_finger_once, self.test_item_id)
-            get_cookie_once(
-                "baichuan",
-                self.get_baichuan_once,
-                self.test_item_id,
-                self.test_finger_id,
-            )
-
-    def get_baichuan(self, item_id: int):
-        if (
-            not "baichuan" in self.cookies
-            or not self.M in self.cookies["baichuan"]
-            or time_stamp() - self.m_time > self.ONE_HOURS / 2
-        ):
-            self.get_m_h5_tk()
-        finger_id = self.get_finger(item_id)
-        if finger_id is None:
-            return
-        echo(4, "finger id:", finger_id)
-        req = self.get_baichuan_once(item_id, finger_id, self.cookies["baichuan"])
-        if req is not None:
-            return req.json()["data"]
-
-    def get_tb_getdetail(self, item_id: int):
-        if (
-            not "uland" in self.cookies
-            or time_stamp() - self.m_time > self.ONE_HOURS / 2
-        ):
-            self.get_m_h5_tk()
-        req = self.get_tb_getdetail_once(item_id, self.cookies["uland"])
-        if req is not None:
-            req_text = req.text
-            re_json = json.loads(req_text[req_text.find("{") : -1])
-            if "data" in re_json and "item" in re_json["data"]:
-                return re_json["data"]["item"]
-
-    def get_tb_getdetail_once(self, item_id: int, cookies: dict = {}):
-        refer_url = self.DETAIL_URL % item_id
-        data = {"itemNumId": str(item_id)}
-        jsv = "2.4.8"
-        api = "mtop.taobao.detail.getdetail"
-        j_data_t = {
-            "v": 6.0,
-            "ttid": "2017@taobao_h5_6.6.0",
-            "AntiCreep": True,
-            "callback": "mtopjsonp1",
-        }
-        return self.get_tb_h5_api(api, jsv, refer_url, data, j_data_t, cookies)
-
-    def get_baichuan_once(self, item_id: int, finger_id: str, cookies: dict = {}):
-        refer_url = self.DETAIL_URL % item_id
-        data = {
-            "pageCode": "mallDetail",
-            "ua": get_use_agent("mobile"),
-            "params": json_str(
-                {
-                    "url": refer_url,
-                    "referrer": "",
-                    "oneId": None,
-                    "isTBInstalled": "null",
-                    "fid": finger_id,
-                }
-            ),
-        }
-        data_str = (
-            r'{"pageCode":"mallDetail","ua":"%s","params":"{\"url\":\"%s\",\"referrer\":\"\",\"oneId\":null,\"isTBInstalled\":\"null\",\"fid\":\"%s\"}"}'
-            % (get_use_agent("mobile"), refer_url, finger_id)
-        )
-        print(data)
-        api = "mtop.taobao.baichuan.smb.get"
-        jsv = "2.4.8"
-
-        return self.get_tb_h5_api(
-            api, jsv, refer_url, data, cookies=cookies, mode=1, data_str=data_str
-        )
-
-    def get_tb_h5_api(
-        self,
-        api: str,
-        jsv: str,
-        refer_url: str,
-        data: dict,
-        j_data_t: dict = {},
-        cookies: dict = {},
-        mode: int = 0,
-        data_str: str = None,
-    ):
-        """ tb h5 api @2019.11.6 ✔️Tested"""
-        step = self.M in cookies
-        if data_str is None:
-            data_str = json_str(data)
-
-        headers = {
-            "Accept": "application/json",
-            "referer": refer_url,
-            "Agent": get_use_agent("mobile"),
-        }
-        if step:
-            headers["Cookie"] = encoder_cookie(cookies)
-        appkey = "12574478"
-
-        token = cookies[self.M].split("_")[0] if step else ""
-        t = int(time_stamp() * 1000)
-
-        j_data = {
-            "jsv": jsv,
-            "appKey": appkey,
-            "t": t,
-            "sign": self.get_tb_h5_token(token, t, appkey, data_str),
-            "api": api,
-            "v": 1.0,
-            "timeout": 20000,
-            "AntiCreep": True,
-            "AntiFlood": True,
-            "type": "originaljson",
-            "dataType": "jsonp",
-            **j_data_t,
-        }
-        if mode == 0:
-            j_data["data"] = data_str
-        mtop_url = encoder_url(j_data, self.MTOP_URL % (api, int(j_data["v"])))
-        if mode == 0:
-            req = proxy_req(mtop_url, 2, header=headers)
-        else:
-            req = proxy_req(mtop_url, 12, data=data, header=headers)
-        # echo(4, 'request once.')
-        if req is None:
-            if can_retry(self.MTOP_URL % (api, int(j_data["v"]))):
-                return self.get_tb_h5_api(
-                    api, jsv, refer_url, data, j_data_t, cookies, mode
-                )
-            else:
-                return
-        return req
-
-    def get_uland_url_once(self, uland_url: str, cookies: dict = {}):
-        """ tb h5 api @2020.01.18 ✔️Tested"""
-
-        def get_v1_tt(a: dict):
-            """mtop.alimama.union.xt.en.api.entry @2019.11.09"""
-            variableMap = json_str(
-                {"taoAppEnv": "0", "e": uland_params["e"], "scm": uland_params["scm"]}
-            )
-            api = "mtop.alimama.union.xt.en.api.entry"
-            return variableMap, api
-
-        def get_v2_tt(a: dict):
-            """mtop.alimama.union.xt.biz.quan.api.entry @2020.01.18"""
-            variableMap = json_str(
-                {
-                    "e": a["e"],
-                    "ptl": a["ptl"],
-                    "type": "nBuy",
-                    "buyMoreSwitch": "0",
-                    "union_lens": a["union_lens"],
-                    "recoveryId": "201_11.168.242.104_{}".format(time_stamp() * 1000),
-                }
-            )
-            api = "mtop.alimama.union.xt.biz.quan.api.entry"
-            return variableMap, api
-
-        step = self.M in cookies
-        uland_params = decoder_url(uland_url, True)
-        if "scm" in uland_params:
-            variableMap, api = get_v1_tt(uland_params)
-        elif "spm" in uland_params:
-            variableMap, api = get_v2_tt(uland_params)
-        else:
-            echo(0, "UnKnowned ULAND mode,", uland_url)
-            return
-
-        tt = {"floorId": "13193" if step else "13052", "variableMap": variableMap}
-        jsv = "2.4.0"
-        j_data = {"type": "jsonp", "callback": "mtopjsonp{}".format(int(step) + 1)}
-        return self.get_tb_h5_api(api, jsv, uland_url, tt, j_data, cookies)
-
-    def get_finger(self, item_id: int):
-        if (
-            not "finger" in self.cookies
-            or not self.M in self.cookies["finger"]
-            or time_stamp() - self.m_time > self.ONE_HOURS / 2
-        ):
-            self.get_m_h5_tk()
-        s_req = self.get_finger_once(item_id, self.cookies["finger"])
-        if s_req is None:
-            return
-        try:
-            return s_req.json()["data"]["fingerId"]
-        except Exception as e:
-            return
-
-    def get_finger_once(self, item_id: int, cookies: dict = {}):
-        step = self.M in cookies
-        api = "mtop.taobao.hacker.finger.create"
-        refer_url = self.ITEM_URL % item_id
-        jsv = "2.4.11"
-        j_data = {"type": "jsonp", "callback": "mtopjsonp{}".format(int(step) + 1)}
-        return self.get_tb_h5_api(api, jsv, refer_url, {}, cookies=cookies)
-
-    def get_tb_h5_token(self, *data: list):
-        md5 = hashlib.md5()
-        wait_enc = "&".join([str(ii) for ii in data])
-        md5.update(wait_enc.encode())
-        return md5.hexdigest()
 
     def get_ynote_file(self, offset: int = 0):
         url = self.LISTRECENT_URL % (offset, self.cstk)
@@ -1270,6 +1050,8 @@ class ActivateArticle(TBK):
             """
             `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at, is_deleted
             """
+            if o_tpwd[1:-1] not in self.tpwd_db_map:
+                continue
             n = self.tpwd_db_map[o_tpwd[1:-1]]
             data.append(
                 (
@@ -1281,7 +1063,9 @@ class ActivateArticle(TBK):
                     0,
                 )
             )
-        self.update_db(data, "Update Article {} TPWD".format(article_id))
+        self.items.update_db(
+            data, self.R_ARTICLE_SQL, "Update Article {} TPWD".format(article_id)
+        )
 
     def replace_tpwd(self, article_id: str, xml: str):
         tpwds = regex.findall(self.TPWD_REG2, xml)
@@ -1507,9 +1291,9 @@ class ActivateArticle(TBK):
             spend_time = end_time(flag, 0)
             echo(
                 3,
-                f"No. {index + 1} load click speed {get_time_str(spend_time, False)}",
+                f"No. {index + 1} load article spend {get_time_str(spend_time, False)}",
             )
-            time.sleep(min(self.ONE_HOURS * 4 - spend_time, 0))
+            time.sleep(max(self.ONE_HOURS * 4 - spend_time, 0))
 
     def does_update(self, do_it: bool) -> int:
         if do_it:
@@ -1591,6 +1375,33 @@ class ActivateArticle(TBK):
                 origin[ii] = text
         with open(article_path, "w") as f:
             f.write("\n".join(origin))
+
+    def update_items(self):
+        tpwd_list = []
+        items = {}
+        for tpwd, m in self.tpwd_db_map.items():
+            if m[3] and (not m[6] or "打开" in m[6]):
+                tpwd_list.append(tpwd)
+                items[item_id] = ""
+                continue
+            if "?id=" in m[7] or "&id=" in m[7]:
+                item_id = decoder_url(m[7])
+            if "id" not in item_id:
+                continue
+            item_id = item_id["id"]
+            if item_id != m[3] or not m[6]:
+                tpwd_list.append(tpwd)
+                items[item_id] = ""
+        for _ in range(5):
+            need_items = [ii for ii, jj in items.items() if not jj]
+            echo(1, f"Need load {len(need_items)} Titles.")
+            for ii in need_items:
+                item = self.get_tb_getdetail(int(ii))
+                if item is not None:
+                    items[ii] = item["title"]
+        need_items = [ii for ii, jj in items.items() if not jj]
+        echo(1, f"Need load {len(need_items)} Titles.")
+        return items, tpwd_list
 
 
 if __name__ == "__main__":

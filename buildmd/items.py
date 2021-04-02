@@ -2,7 +2,8 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-02 23:19:25
+# @Last Modified time: 2021-04-03 01:14:56
+
 import os
 import sys
 import json
@@ -13,7 +14,6 @@ from configparser import ConfigParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.append(os.getcwd())
-
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
 from util.util import (
@@ -158,7 +158,10 @@ class Items(object):
         req = self.get_tb_getdetail_req(item_id, self.cookies["uland"])
         if req is not None:
             req_text = req.text
-            re_json = json.loads(req_text[req_text.find("{") : -1])
+            try:
+                re_json = json.loads(req_text[req_text.find("{") : -1])
+            except:
+                re_json = {}
             if "data" in re_json and "item" in re_json["data"]:
                 return re_json["data"]["item"]
 
@@ -533,7 +536,6 @@ class Items(object):
                 if key in db_map:
                     value_db = db_map[key]
                     if value_db != value:
-
                         update_list.append(
                             (
                                 value_db[LIST[0]],
@@ -570,7 +572,9 @@ class Items(object):
         for idx in range(num):
             flag = begin_time()
             need_items = [
-                item for item in self.items if item not in self.items_detail_map
+                item
+                for item in self.items
+                if not self.items_detail_map.get(item, "category_id")
             ]
             np.random.shuffle(need_items)
             for item in need_items:

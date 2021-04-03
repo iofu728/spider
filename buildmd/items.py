@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-03 01:14:56
+# @Last Modified time: 2021-04-03 11:42:53
 
 import os
 import sys
@@ -375,7 +375,10 @@ class Items(object):
         if req is None:
             return {}
         req_text = req.text
-        req_json = json.loads(req_text[req_text.find("{") : -1])
+        try:
+            req_json = json.loads(req_text[req_text.find("{") : -1])
+        except:
+            req_json = {}
         if "data" not in req_json:
             return None
         title, category_id, comment_count, favcount = [
@@ -574,7 +577,7 @@ class Items(object):
             need_items = [
                 item
                 for item in self.items
-                if not self.items_detail_map.get(item, "category_id")
+                if not self.items_detail_map.get(item, {}).get("category_id", "")
             ]
             np.random.shuffle(need_items)
             for item in need_items:

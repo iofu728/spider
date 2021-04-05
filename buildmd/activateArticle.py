@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-02 19:52:28
+# @Last Modified time: 2021-04-04 23:39:06
 
 import json
 import os
@@ -875,7 +875,7 @@ class ActivateArticle(TBK):
             or time_stamp() - self.m_time > self.ONE_HOURS / 2
         ):
             self.items.get_m_h5_tk()
-        s_req = self.items.get_uland_url_once(uland_url, self.iitems.cookies["uland"])
+        s_req = self.items.get_uland_url_req(uland_url, self.iitems.cookies["uland"])
         if s_req is None:
             return ""
         req_text = s_req.text

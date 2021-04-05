@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-03 11:42:53
+# @Last Modified time: 2021-04-06 00:40:42
 
 import os
 import sys
@@ -24,6 +24,7 @@ from util.util import (
     encoder_cookie,
     encoder_url,
     end_time,
+    get_accept,
     get_time_str,
     get_use_agent,
     json_str,
@@ -48,6 +49,7 @@ class Items(object):
     DETAIL_URL = "https://detail.m.tmall.com/item.htm?id=%d"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
     MTOP_URL = "https://h5api.m.taobao.com/h5/%s/%d.0/"
+    API_REFER_URL = "https://h5.m.taobao.com/"
     ITEMS_LIST = [
         "`id`",
         "item_id",
@@ -61,6 +63,9 @@ class Items(object):
         "rate_keywords",
         "ask_text",
         "props",
+        "price",
+        "month_sales",
+        "quantity",
         "created_at",
     ]
     SHOPS_LIST = [
@@ -137,17 +142,17 @@ class Items(object):
         return self.TaoShopURL % (user_id, item_id)
 
     def get_tb_getdetail_req(self, item_id: int, cookies: dict = {}):
-        refer_url = self.DETAIL_URL % item_id
+        """ tb getdetail api 2.6.1 @2021.04.05 ✔️Tested"""
         data = {"itemNumId": str(item_id)}
-        jsv = "2.4.8"
+        jsv = "2.6.1"
         api = "mtop.taobao.detail.getdetail"
         j_data_t = {
             "v": 6.0,
-            "ttid": "2017@taobao_h5_6.6.0",
+            "ttid": "2018@taobao_h5_9.9.9",
             "AntiCreep": True,
             "callback": "mtopjsonp1",
         }
-        return self.get_tb_h5_api(api, jsv, refer_url, data, j_data_t, cookies)
+        return self.get_tb_h5_api(api, jsv, "", data, j_data_t, cookies)
 
     def get_tb_getdetail(self, item_id: int):
         if (
@@ -307,9 +312,9 @@ class Items(object):
             data_str = json_str(data)
 
         headers = {
-            "Accept": "application/json",
-            "referer": refer_url,
-            "Agent": get_use_agent("mobile"),
+            "Accept": get_accept(),
+            "referer": self.API_REFER_URL,
+            "Agent": get_use_agent("pc"),
         }
         if step:
             headers["Cookie"] = encoder_cookie(cookies)
@@ -358,11 +363,13 @@ class Items(object):
     def get_item_detail(
         self, item_id: str, is_wait: bool = False, force_update: bool = False
     ):
+        """ item detail (apiStack) @2021.04.05 ✔️Tested"""
         if is_wait:
             time.sleep(np.random.rand() * 5 + 2)
         if (
             item_id in self.items_detail_map
             and self.items_detail_map[item_id]["category_id"]
+            and self.items_detail_map[item_id]["price"] != "0"
             and not force_update
         ):
             return self.items_detail_map[item_id]
@@ -452,6 +459,34 @@ class Items(object):
         item_desc_rate, logistics_serv_rate, seller_serv_rate = [
             ii.get("score", "0").strip() for ii in evaluates
         ]
+        apiStack = req_json["data"].get("apiStack", [{}])[0].get("value", "")
+        try:
+            apiStack = json.loads(apiStack)
+            price = (
+                apiStack["price"]["price"].get("priceText", "0")
+                if "price" not in apiStack or "price" not in apiStack["price"]
+                else "0"
+            )
+            month_sales = (
+                apiStack["item"].get("vagueSellCount", "0")
+                if "item" in apiStack
+                else "0"
+            )
+            quantity = (
+                sum(
+                    [
+                        int(ii["quantity"])
+                        for ii in apiStack["skuCore"]["sku2info"].values()
+                    ]
+                )
+                if "skuCore" in apiStack and "sku2info" in apiStack["skuCore"]
+                else 0
+            )
+            quantity = str(quantity)
+        except:
+            price = "0"
+            month_sales = "0"
+            quantity = "0"
 
         self.items_detail_map[item_id] = {
             "item_id": item_id,
@@ -465,7 +500,11 @@ class Items(object):
             "rate_keywords": rate_keywords,
             "ask_text": ask_text,
             "props": props,
+            "price": price,
+            "month_sales": month_sales,
+            "quantity": quantity,
         }
+
         if shop_id:
             self.shops_detail_map[shop_id] = {
                 "shop_id": shop_id,
@@ -578,6 +617,7 @@ class Items(object):
                 item
                 for item in self.items
                 if not self.items_detail_map.get(item, {}).get("category_id", "")
+                or self.items_detail_map.get(item, {}).get("price", "") == "0"
             ]
             np.random.shuffle(need_items)
             for item in need_items:

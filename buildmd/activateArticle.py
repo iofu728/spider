@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-07 20:20:30
+# @Last Modified time: 2021-04-07 20:59:14
 
 import json
 import os
@@ -495,10 +495,15 @@ class ActivateArticle(TBK):
         self.tpwds_list[yd_id] = tpwds
         return tpwds
 
-    def update_tpwd(self, mode: int = 0, is_renew: bool = True, a_id: str = None):
+    def update_tpwd(self, is_renew: bool = True, yd_id: str = None):
         update_num = 0
+        c = self.items.items_detail_map
         for o_tpwd, m in self.tpwds_map.items():
-            if a_id is not None and m["article_id"] != a_id:
+            if (
+                yd_id is not None
+                and m["article_id"] != yd_id
+                and o_tpwd not in self.tpwds_list.get(yd_id, [])
+            ):
                 continue
             item_id, url, domain, title, tpwd, c_rate, c_type = [
                 m.get(ii, jj)
@@ -512,8 +517,14 @@ class ActivateArticle(TBK):
                     ("c_type", ""),
                 ]
             ]
-            tmp_title = self.items.items_detail_map.get(item_id, {}).get("title", title)
-            title = tmp_title if tmp_title else title
+            item_title, is_expired = [
+                c.get(item_id, {}).get(ii, jj)
+                for ii, jj in [
+                    ("title", ""),
+                    ("is_expired", 0),
+                ]
+            ]
+            title = item_title if item_title else title
 
             if (
                 is_renew
@@ -531,9 +542,13 @@ class ActivateArticle(TBK):
             if item_id == "" or domain == 16:
                 tpwd, c_rate = renew_tpwd, 1 if renew_type == 0 else 2
             else:
-                (url, tpwd, domain, c_rate, c_type,) = self.generate_tpwd(
-                    title, int(item_id), renew_tpwd, renew_type, m, mode
-                )
+                (
+                    url,
+                    tpwd,
+                    domain,
+                    c_rate,
+                    c_type,
+                ) = self.generate_tpwd(title, int(item_id), renew_tpwd, renew_type, m)
             for k, v in [
                 ("url", url),
                 ("tpwd", tpwd),
@@ -542,7 +557,7 @@ class ActivateArticle(TBK):
                 ("commission_type", c_type),
             ]:
                 self.new_tpwds_map[k] = v
-            update_num += int(domain < 15 or (renew_type and not mode))
+            update_num += int(domain < 15)
         echo(2, "Update {} Tpwd Info Success!!".format(update_num))
 
     def generate_tpwd(
@@ -552,7 +567,6 @@ class ActivateArticle(TBK):
         renew_tpwd: str,
         renew_type: int,
         m: dict,
-        mode: int,
     ):
         goods = self.get_dg_material(title, item_id)
         if not goods:

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-07 18:08:24
+# @Last Modified time: 2021-04-07 20:41:58
 
 import os
 import sys
@@ -67,6 +67,7 @@ class Items(object):
         "price",
         "month_sales",
         "quantity",
+        "is_expired",
         "created_at",
     ]
     SHOPS_LIST = [
@@ -384,9 +385,14 @@ class Items(object):
         )
         if (
             item_id in self.items_detail_map
-            and self.items_detail_map[item_id]["category_id"]
-            and self.items_detail_map[item_id]["price"] != "0"
-            and not expired_flag
+            and (
+                (
+                    self.items_detail_map[item_id]["category_id"]
+                    and self.items_detail_map[item_id]["price"] != "0"
+                    and not expired_flag
+                )
+                or self.items_detail_map[item_id]["is_expired"]
+            )
             and not force_update
         ):
             return self.items_detail_map[item_id]
@@ -408,6 +414,9 @@ class Items(object):
             req_json = {}
         if "data" not in req_json:
             return {}
+        is_expired = int(
+            "expired" in req_json["data"].get("trade", {}).get("redirectUrl", "")
+        )
         title, category_id, comment_count, favcount = [
             req_json["data"]["item"].get(ii, jj) if "item" in req_json["data"] else jj
             for ii, jj in [
@@ -523,6 +532,7 @@ class Items(object):
             "price": price,
             "month_sales": month_sales,
             "quantity": quantity,
+            "is_expired": is_expired,
             "updated_at": self.items_detail_map[item_id]["updated_at"]
             if item_id in self.items_detail_map and not expired_flag
             else self.config["time_str"],

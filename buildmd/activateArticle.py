@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-07 17:32:41
+# @Last Modified time: 2021-04-07 20:20:30
 
 import json
 import os
@@ -512,7 +512,8 @@ class ActivateArticle(TBK):
                     ("c_type", ""),
                 ]
             ]
-            title = self.items.items_detail_map.get(item_id, {}).get("title", title)
+            tmp_title = self.items.items_detail_map.get(item_id, {}).get("title", title)
+            title = tmp_title if tmp_title else title
 
             if (
                 is_renew
@@ -921,7 +922,8 @@ class ActivateArticle(TBK):
                     ("c_type", ""),
                 ]
             ]
-            title = self.items.items_detail_map.get(item_id, {}).get("title", title)
+            tmp_title = self.items.items_detail_map.get(item_id, {}).get("title", title)
+            title = tmp_title if tmp_title else title
 
             if domain >= 15:
                 if domain == 15:

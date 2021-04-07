@@ -15,6 +15,7 @@ CREATE TABLE if not exists `items` (
   `price` varchar(10) NOT NULL DEFAULT '0' COMMENT 'item price',
   `month_sales` varchar(10) NOT NULL DEFAULT '0' COMMENT 'month sales number',
   `quantity` varchar(10) NOT NULL DEFAULT '0' COMMENT 'item saleable number',
+  `is_expired` int(10) unsigned NOT NULL DEFAULT 0 COMMENT 'is expired',
   `is_deleted` int(10) unsigned NOT NULL DEFAULT 0 COMMENT 'is deleted',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'create time',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'update time',

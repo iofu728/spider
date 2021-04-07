@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-04 23:39:06
+# @Last Modified time: 2021-04-07 15:22:41
 
 import json
 import os
@@ -38,6 +38,7 @@ from util.util import (
     get_content_type,
     get_time_str,
     get_use_agent,
+    generate_sql,
     headers,
     mkdir,
     read_file,
@@ -172,30 +173,35 @@ class ActivateArticle(TBK):
     DECODER_TPWD_URL_V2 = "https://taodaxiang.com/taopass/parse/get"
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
-    ARTICLE_LIST = [
+    TPWD_LIST = [
         "`id`",
-        "article_id",
-        "tpwd_id",
-        "item_id",
         "tpwd",
-        "domain",
+        "article_id",
         "content",
         "url",
+        "item_id",
+        "domain",
         "commission_rate",
         "commission_type",
+        "is_updated",
         "expire_at",
         "created_at",
     ]
-    S_LIST_SQL = "SELECT `id`, article_id, title, q, created_at from article;"
-    I_LIST_SQL = "INSERT INTO article (article_id, title, q) VALUES %s;"
-    R_LIST_SQL = "REPLACE INTO article (`id`, article_id, title, q, is_deleted, created_at) VALUES %s;"
-    S_ARTICLE_SQL = "SELECT {} from article_tpwd%s;".format(", ".join(ARTICLE_LIST))
-    I_ARTICLE_SQL = "INSERT INTO article_tpwd ({}) VALUES %s;".format(
-        ", ".join(ARTICLE_LIST[1:-1])
-    )
-    R_ARTICLE_SQL = "REPLACE INTO article_tpwd ({}, is_deleted) VALUES %s;".format(
-        ", ".join(ARTICLE_LIST)
-    )
+    LIST_LIST = [
+        "`id`",
+        "article_id",
+        "title",
+        "q",
+        "established_at",
+        "modified_at",
+        "created_at",
+    ]
+    S_LIST_SQL = generate_sql("select", "article", LIST_LIST + ["updated_at"]) % ""
+    I_LIST_SQL = generate_sql("insert", "article", LIST_LIST)
+    R_LIST_SQL = generate_sql("replace", "article", LIST_LIST)
+    S_TPWD_SQL = generate_sql("select", "article_tpwd", TPWD_LIST)
+    I_TPWD_SQL = generate_sql("insert", "article_tpwd", TPWD_LIST)
+    R_TPWD_SQL = generate_sql("replace", "article_tpwd", TPWD_LIST)
     END_TEXT = "</text><inline-styles/><styles/></para></body></note>"
     TPWD_REG = "\p{Sc}(\w{8,12}?)\p{Sc}"
     TPWD_REG2 = "(\p{Sc}\w{8,12}\p{Sc})"
@@ -216,17 +222,17 @@ class ActivateArticle(TBK):
     URL_DOMAIN = {
         0: "s.click.taobao.com",
         1: "item.taobao.com",
-        2: "detail.tmall.com",
+        2: "detail.m.tmall.com",
         5: "uland.taobao.com",
         10: "taoquan.taobao.com",
         11: "a.m.taobao.com",
+        12: "market.m.taobao.com",
         13: "id=",
         15: "empty",
         16: "failure",
     }
     NEED_KEY_V1 = ["content", "url", "validDate", "picUrl"]
-    NEED_KEY = ["content", "url", "expire", "picUrl"]
-    TABLE_LISTS = ["twpd.sql", "article.sql"]
+    TABLE_LISTS = ["tpwd.sql", "article.sql"]
     ONE_HOURS = 3600
     ONE_DAY = 24
     ZERO_STAMP = "0天0小时0分0秒"
@@ -247,66 +253,131 @@ class ActivateArticle(TBK):
                 "proxy_req": proxy_req,
             }
         )
-        self.Db = self.items.db
+        self.Db = self.items.Db
         for table in self.TABLE_LISTS:
             self.Db.create_table(os.path.join(sql_dir, table))
-        self.tpwd_map = {}
-        self.tpwd_db_map = {}
-        self.tpwds = {}
-        self.tpwd_list = {}
-        self.share2article = {}
-        self.article_list = {}
-        self.list_recent = {}
-        self.idx = []
-        self.empty_content = ""
-        self.tpwd_exec = ThreadPoolExecutor(max_workers=1)
-        self.spends = []
-        self.lock = threading.Lock()
-        self.get_share_list()
+        self.tpwds_map = {}
+        self.lists_map = {}
+        self.tpwds_db_map = {}
+        self.lists_db_map = {}
+        self.new_tpwds_map = {}
+        self.yd_ids = []
+        self.tpwds_list = {}
+        self.ynote_list = {}
+        self.tpwd_exec = ThreadPoolExecutor(max_workers=5)
 
     def load_process(self):
-        self.load_ids()
-        if len(self.idx) < 30:
+        self.load_yd_ids()
+        if len(self.yd_ids) < 30:
             time.sleep(np.random.rand() * 30 + 6)
-            self.load_ids()
-        self.load_article_list()
-        # self.update_tpwd()
+            self.load_yd_ids()
+        self.load_db()
         self.items.get_m_h5_tk()
         self.get_ynote_file()
         self.get_ynote_file(1)
 
-    def load_ids(self):
+    def load_yd_ids(self):
         changeJsonTimeout(5)
         req = self.basic_youdao(self.home_id)
         if req == "":
             echo("0|error", "Get The Home Page Info Error!!! Please retry->->->")
             return
-        self.idx = regex.findall("id=(\w*?)<", req)
-        if len(self.idx) < 30:
+        self.yd_ids = regex.findall("id=(\w*?)<", req)
+        if len(self.yd_ids) < 30:
             echo("0|error", "The Num of id is error!! Please check it.")
         else:
-            echo(1, "Load Article List {} items.".format(len(self.idx)))
+            echo(1, "Load {} Online Articles.".format(len(self.yd_ids)))
 
-    def get_share_info(self, share_id: str):
-        changeJsonTimeout(4)
-        url = self.GET_SHARE_URL % share_id
-        headers = self.get_tb_headers(self.Y_URL)
+    def load_db(self, is_load: bool = True):
+        tpwds = self.items.load_db_table(
+            self.S_TPWD_SQL % "", self.TPWD_LIST, self.tpwds_db_map, "tpwd"
+        ).copy()
+        lists = self.items.load_db_table(
+            self.S_LIST_SQL % "", self.LIST_LIST, self.lists_db_map, "article_id"
+        ).copy()
+
+        if is_load:
+            self.tpwds_map = tpwds
+            self.new_tpwds_map = tpwds.copy()
+            self.lists_map = lists
+        need_update = [1 for ii in self.tpwds_db_map.values() if not ii["is_update"]]
+        echo(
+            1,
+            "Load {} Articles and {} Tpwds from db, {} Tpwds need update.".format(
+                len(self.lists_db_map), len(self.tpwds_db_map), len(need_update)
+            ),
+        )
+
+    def store_db(self):
+        self.load_db(False)
+        self.items.store_one_table(
+            self.R_TPWD_SQL,
+            self.I_TPWD_SQL,
+            self.tpwds_map,
+            self.tpwds_db_map,
+            self.TPWD_LIST,
+            "tpwd",
+        )
+        self.items.store_one_table(
+            self.R_LIST_SQL,
+            self.I_LIST_SQL,
+            self.lists_map,
+            self.lists_db_map,
+            self.LIST_LIST,
+            "list",
+        )
+
+    def get_yd_detail(
+        self, yd_id: str, is_wait: bool = False, force_update: bool = False
+    ):
+        expired_flag = (
+            self.BASIC_TIMEX_STAMP
+            - time_stamp(
+                self.lists_map.get(yd_id, {}).get("updated_at", self.BASIC_TIMEX_STAMP)
+            )
+            >= self.ONE_HOURS * self.ONE_DAY * 10
+        )
+        if (
+            yd_id in self.lists_map
+            and self.lists_map[yd_id]["name"]
+            and not expired_flag
+            and not force_update
+        ):
+            return self.lists_map[yd_id]
+        if is_wait:
+            time.sleep(np.random.rand() * 5 + 2)
+        url = self.GET_SHARE_URL % yd_id
+        headers = self.get_headers(self.Y_URL)
         req = basic_req(url, 1, header=headers)
         if req is None:
-            return
-        info = req["entry"]
-        self.share2article[share_id] = (
-            info["name"].replace(".note", ""),
-            info["id"],
-            info["lastUpdateTime"],
-        )
-        return req
+            return {}
+
+        title, q, established_at, modified_at = [
+            req["entry"].get(ii, jj) if "entry" in req else jj
+            for ii, jj in [
+                ("name", ""),
+                ("id", ""),
+                ("createTime", self.BASIC_TIMEX_STAMP * 1000),
+                ("lastUpdateTime", self.BASIC_TIMEX_STAMP * 1000),
+            ]
+        ]
+        self.lists_map[yd_id] = {
+            "article_id": yd_id,
+            "title": title.replace(".note", ""),
+            "q": q,
+            "established_at": time_str(established_at // 1000),
+            "modified_at": time_str(modified_at // 1000),
+            "updated_at": self.lists_map[yd_id]["updated_at"]
+            if yd_id in self.lists_map and not expired_flag
+            else self.BASIC_TIMEX_STAMP,
+        }
+        return self.lists_map[yd_id]
 
     def basic_youdao(self, idx: str, use_proxy: bool = False):
         url = self.NOTE_URL % idx
         refer_url = self.SHARE_URL % idx
         headers = {
-            "Accept": "*/*",
+            "Accept": get_accept("all"),
             "Referer": refer_url,
             "X-Requested-With": "XMLHttpRequest",
         }
@@ -328,198 +399,116 @@ class ActivateArticle(TBK):
             .replace("</span>", "")
         )
 
-    def load_article_pipeline(self, mode: int = 0):
-        article_exec = ThreadPoolExecutor(max_workers=5)
-        a_list = [article_exec.submit(self.load_article, ii, mode) for ii in self.idx]
-        list(as_completed(a_list))
-        self.load_list2db()
-
-    def load_article(self, article_id: str, mode: int = 0, is_load2db: bool = True):
-        if mode:
-            self.get_share_info(article_id)
-            self.load_list2db()
-            return
-        if article_id not in self.tpwds:
-            article = self.basic_youdao(article_id)
-            self.tpwd_list[article_id] = regex.findall(self.TPWD_REG, article)
-            tpwds = list({ii: 0 for ii in self.tpwd_list[article_id]})
-            if len(tpwds):
-                self.tpwds[article_id] = tpwds
-        else:
-            tpwds = self.tpwds[article_id]
-        need_tpwds = []
-        for tpwd in tpwds:
-            if tpwd in self.tpwd_db_map:
-                t = self.tpwd_db_map[tpwd]
-                need_tpwds.append(tpwd)
-                # if t[-2] >= self.BASIC_TIMEX_STR:
-                #     need_tpwds.append(tpwd)
-            else:
-                need_tpwds.append(tpwd)
-        time = 0
-        au_list = []
-        no_type = [
-            ii
-            for ii, jj in self.tpwd_map.items()
-            if jj["article_id"] == article_id
-            and ("type" not in jj or "item_id" not in jj or jj["item_id"] is None)
-        ]
-        while (
-            [1 for ii in need_tpwds if ii not in self.tpwd_map]
-            or (len(no_type) and not time)
-        ) and time < 5:
-            thread_list = [ii for ii in need_tpwds if not ii in self.tpwd_map]
-            self.spends = []
-            echo(
-                1,
-                article_id,
-                "tpwds len:",
-                len(need_tpwds),
-                "need load",
-                len(thread_list),
-            )
-            thread_list = [
-                self.tpwd_exec.submit(self.decoder_tpwd_once, article_id, ii, 0, True)
-                for ii in thread_list
-            ]
-            list(as_completed(thread_list))
-            echo(2, f"Avager spend {np.mean(self.spends):.2f} s.")
-            no_type = [
-                ii
-                for ii, jj in self.tpwd_map.items()
-                if jj["article_id"] == article_id
-                and ("type" not in jj or "item_id" not in jj or jj["item_id"] is None)
-            ]
-            au_list.extend(
-                [
-                    self.tpwd_exec.submit(self.decoder_tpwd_url, article_id, ii)
-                    for ii in no_type
-                ]
-            )
-            time += 1
-        list(as_completed(au_list))
-        if is_load2db:
-            self.load_article2db(article_id)
-
-    def update_title(self, article_id: str):
-        for ii in self.article_list[article_id].values():
-            self.tpwd_map[ii[3]] = {
-                "content": ii[1],
-                "item_id": ii[0],
-                "article_id": article_id,
-            }
-        no_title = [
-            ii
-            for ii, jj in self.tpwd_map.items()
-            if jj["article_id"] != article_id and "title" not in jj
-        ]
-        time = 0
-        while len(no_title) and time < 5:
-            title_list = [
-                self.tpwd_exec.submit(self.get_item_title, article_id, ii)
-                for ii in no_title
-            ]
-            echo(1, article_id, "need get title:", len(title_list))
-            list(as_completed(title_list))
-            time += 1
-            no_title = [
-                ii
-                for ii, jj in self.tpwd_map.items()
-                if jj["article_id"] != article_id and "title" not in jj
-            ]
-        update_num = len(
-            [
-                1
-                for ii, jj in self.tpwd_map.items()
-                if jj["article_id"] != article_id
-                and "title" in jj
-                and jj["content"] != jj["title"]
-            ]
+    def get_yd_tpwds_detail(
+        self, yd_id: str, is_wait: bool = False, force_update: bool = False
+    ):
+        self.get_article_tpwds(yd_id, is_wait, force_update)
+        self.load_num = [0, 0]
+        for tpwd in set(self.tpwds_list[yd_id]):
+            self.get_tpwd_detail_pro(tpwd, yd_id, is_wait, force_update)
+        self.store_db()
+        echo(
+            2,
+            f"Article {yd_id} Load {self.load_num[0]} Tpwds and {self.load_num[1]} Items Info.",
         )
-        echo(2, "Update", article_id, update_num, "Title Success!!!")
-        self.update_article2db(article_id)
 
-    def load_list2db(self):
-        t_share_map = self.share2article.copy()
-        share_map = self.get_share_list()
-        insert_list, update_list = [], []
-        for ii, jj in t_share_map.items():
-            if ii in share_map:
-                t = share_map[ii]
-                update_list.append((t[0], ii, jj[0], jj[1], 0, t[-1]))
-            else:
-                insert_list.append((ii, jj[0], jj[1]))
-        self.items.update_db(insert_list, self.I_LIST_SQL, "Insert Article List")
-        self.items.update_db(update_list, self.R_LIST_SQL, "Update Article List")
+    def get_tpwd_detail_pro(
+        self,
+        tpwd: str,
+        article_id: str,
+        is_wait: bool = False,
+        force_update: bool = False,
+    ):
+        self.get_tpwd_detail(tpwd, article_id, is_wait, force_update)
+        return self.decoder_tpwd_item(tpwd, force_update)
 
-    def get_share_list(self):
-        share_list = self.Db.select_db(self.S_LIST_SQL)
-        if share_list == False:
-            return
-        share_map = {}
-        for ii, jj in enumerate(share_list):
-            t = jj[-1].strftime("%Y-%m-%d %H:%M:%S")
-            share_map[jj[1]] = (*jj[:-1], t)
-        self.share2article = share_map
-        return share_map
+    def get_tpwd_detail(
+        self,
+        tpwd: str,
+        article_id: str,
+        is_wait: bool = False,
+        force_update: bool = False,
+    ):
+        updated_flag = self.tpwds_map.get(tpwd, {}).get("is_updated", 0)
+        if (
+            tpwd in self.tpwds_map
+            and self.tpwds_map[tpwd]["content"]
+            and updated_flag
+            and not force_update
+        ):
+            return self.tpwds_map[tpwd]
+        self.load_num[0] += 1
+        if is_wait:
+            time.sleep(np.random.rand() * 5 + 2)
+        req = self.decoder_tpwd(tpwd)
+        if req is None or not len(req):
+            return {}
+        NEED_KEY = ["content", "url", "expire", "picUrl"]
+        content, url, expire_at, picUrl = [
+            req["data"].get(ii, jj) if "data" in req else jj
+            for ii, jj in [
+                ("content", ""),
+                ("url", ""),
+                ("expire", self.BASIC_TIMEX_STR),
+                ("picUrl", ""),
+            ]
+        ]
 
-    def load_article2db(self, article_id: str):
-        m = {
-            ii: jj
-            for ii, jj in self.tpwd_map.items()
-            if jj["article_id"] == article_id and jj["url"]
+        self.tpwds_map[tpwd] = {
+            "tpwd": tpwd,
+            "article_id": article_id,
+            "content": content,
+            "url": url.strip(),
+            "item_id": self.tpwds_map.get(tpwd, {}).get("item_id", ""),
+            "domain": self.tpwds_map.get(tpwd, {}).get("item_id", 0),
+            "commission_rate": self.tpwds_map.get(tpwd, {}).get("item_id", 0),
+            "commission_type": self.tpwds_map.get(tpwd, {}).get("item_id", ""),
+            "expire_at": expire_at,
         }
-        if article_id not in self.tpwds:
-            return
-        tpwds = list(set(self.tpwds[article_id]))
-        data = [
-            (
-                article_id,
-                ii,
-                m[jj]["item_id"],
-                jj,
-                m[jj]["type"],
-                m[jj]["title"] if "title" in m[jj] else m[jj]["content"],
-                m[jj]["url"],
-                0,
-                "",
-                m[jj]["validDate"],
-            )
-            for ii, jj in enumerate(tpwds)
-            if jj in m and "item_id" in m[jj] and m[jj]["type"] != 15
-        ]
-        data_map = {ii[3]: ii for ii in data}
-        update_list, insert_list = [], []
-        for ii in data:
-            if ii[3] in self.tpwd_db_map:
-                t = self.tpwd_db_map[ii[3]]
-                if ii[6] or (not ii[6] and not t["url"]):
-                    update_list.append((t[0], *ii, t[-1], 0))
-            else:
-                insert_list.append(ii)
-        for ii, jj in self.tpwd_db_map.items():
-            if jj[1] != article_id:
-                continue
-            if ii not in data_map:
-                update_list.append((*jj, 1))
-        self.items.update_db(
-            insert_list, self.I_ARTICLE_SQL, f"article_id {article_id} Insert"
+        self.tpwds_map[tpwd]["is_updated"] = (
+            1 if content and self.tpwds_map[tpwd]["item_id"] else 0
         )
-        self.items.update_db(
-            update_list, self.R_ARTICLE_SQL, f"article_id {article_id} Update"
-        )
-        if len(insert_list):
-            self.load_ids()
-            self.load_article_list()
+        self.new_tpwds_map[tpwd] = self.tpwds_map[tpwd].copy()
+        self.new_tpwds_map[tpwd]["picUrl"] = picUrl
+        self.decoder_tpwd_item(tpwd)
+
+    def get_article_tpwds(
+        self,
+        yd_id: str,
+        is_wait: bool = False,
+        force_update: bool = False,
+        mode: str = "online",
+    ):
+        if yd_id in self.tpwds_list:
+            return self.tpwds_list[yd_id]
+        if mode == "online":
+            article = self.basic_youdao(yd_id)
+        else:
+            article = "||||".join(read_file(yd_id))
+        if not article:
+            return []
+        tpwds = regex.findall(self.TPWD_REG, article)
+        self.tpwds_list[yd_id] = tpwds
+        return tpwds
 
     def update_tpwd(self, mode: int = 0, is_renew: bool = True, a_id: str = None):
         update_num = 0
-        for o_tpwd, c in self.tpwd_db_map.items():
-            if a_id is not None and c[1] != a_id:
+        for o_tpwd, m in self.new_tpwds_map.items():
+            if a_id is not None and m["article_id"] != a_id:
                 continue
-            num_iid, title, domain, tpwd, url = [c[i] for i in [3, 6, 5, 4, 7]]
-            if num_iid in self.items.items_detail_map:
-                titile = self.items.items_detail_map[num_iid]["title"]
+            item_id, url, domain, title, tpwd, c_rate, c_type = [
+                m.get(ii, jj)
+                for ii, jj in [
+                    ("item_id", ""),
+                    ("url", ""),
+                    ("domain", 20),
+                    ("content", ""),
+                    ("tpwd", ""),
+                    ("c_rate", 0),
+                    ("c_type", ""),
+                ]
+            ]
+            title = self.items.items_detail_map.get(item_id, {}).get("title", title)
 
             if (
                 is_renew
@@ -528,58 +517,56 @@ class ActivateArticle(TBK):
                 and self.URL_DOMAIN[10] not in url
             ):
                 renew_type = 2 if self.URL_DOMAIN[5] in url else 1
-                origin_tpwd = self.convert2tpwd(url, title)
-                if origin_tpwd is None:
-                    origin_tpwd = tpwd
+                renew_tpwd = self.convert2tpwd(url, title)
+                if renew_tpwd is None:
+                    renew_tpwd = o_tpwd
             else:
                 renew_type = 0
-                origin_tpwd = tpwd
-            if num_iid == "" or domain == 16:
-                c = [
-                    *c[:4],
-                    origin_tpwd,
-                    16,
-                    title,
-                    url,
-                    1 if renew_type == 0 else 2,
-                    *c[-3:],
-                ]
+                renew_tpwd = o_tpwd
+            if item_id == "" or domain == 16:
+                tpwd, c_rate = renew_tpwd, 1 if renew_type == 0 else 2
             else:
-                c = self.generate_tpwd(
-                    title, int(num_iid), origin_tpwd, renew_type, c, mode
+                (url, tpwd, domain, c_rate, c_type,) = self.generate_tpwd(
+                    title, int(item_id), renew_tpwd, renew_type, m, mode
                 )
-            self.tpwd_db_map[o_tpwd] = c
-            update_num += int(c[5] < 15 or (renew_type and not mode))
+            for k, v in [
+                ("url", url),
+                ("tpwd", tpwd),
+                ("domain", domain),
+                ("commission_rate", c_rate),
+                ("commission_type", c_type),
+            ]:
+                self.new_tpwds_map[k] = v
+            update_num += int(domain < 15 or (renew_type and not mode))
         echo(2, "Update {} Tpwd Info Success!!".format(update_num))
 
     def generate_tpwd(
         self,
         title: str,
-        num_iid: int,
+        item_id: int,
         renew_tpwd: str,
         renew_type: int,
-        c: dict,
+        m: dict,
         mode: int,
     ):
-        goods = self.get_dg_material(title, num_iid)
-        if goods is None or not len(goods):
+        goods = self.get_dg_material(title, item_id)
+        if not goods:
             echo(
                 0,
                 "goods get",
                 "error" if goods is None else "empty",
                 ":",
                 title,
-                num_iid,
+                item_id,
             )
-            return [
-                *c[:4],
+            return (
+                m["url"],
                 renew_tpwd,
                 17,
-                title,
-                c[7],
                 1 if renew_type == 0 else 2,
-                *c[-3:],
-            ]
+                m["commission_type"],
+            )
+
         goods = goods[0]
         if "ysyl_click_url" in goods and len(goods["ysyl_click_url"]):
             url = goods["ysyl_click_url"]
@@ -593,127 +580,63 @@ class ActivateArticle(TBK):
         tpwd = self.convert2tpwd(url, title)
         if tpwd is None:
             echo(0, "tpwd error:", tpwd)
-            return [
-                *c[:4],
+            return (
+                m["url"],
                 renew_tpwd,
                 18,
-                title,
-                c[7],
                 1 if renew_type == 0 else 2,
-                *c[-3:],
-            ]
+                m["commission_type"],
+            )
         if renew_type == 1:
             commission_rate = 2
+        return url, tpwd, m["domain"], commission_rate, commission_type
 
-        return [
-            *c[:4],
-            tpwd,
-            *c[5:8],
-            commission_rate,
-            commission_type,
-            *c[-2:],
-        ]
-
-    def load_article_list(self):
-        """
-        tpwd: [goods_id, goods_name, domain, tpwd, commission_rate, commission_type, url]
-        """
-        for article_id in self.idx:
-            article_list = self.get_article_db(article_id)
-            self.article_list[article_id] = {
-                ii[4]: [ii[3], ii[6], ii[5], ii[4], ii[8], ii[9], ii[7]]
-                for ii in article_list
-            }
-            for ii in article_list:
-                self.tpwd_db_map[ii[4]] = ii
-        need_update = [
-            1 for ii in self.tpwd_db_map.values() if ii[-2] >= self.BASIC_TIMEX_STR
-        ]
-        echo(
-            1,
-            "Load {} TPWD from db, {} TPWD need update.".format(
-                len(self.tpwd_db_map), len(need_update)
-            ),
-        )
-
-    def get_article_db(self, article_id: str):
-        sql = (
-            self.S_ARTICLE_SQL % (f' WHERE `article_id` = "{article_id}"')
-            if article_id
-            else ""
-        )
-        article_list = list(self.Db.select_db(sql))
-        for ii, jj in enumerate(article_list):
-            t = jj[-1].strftime("%Y-%m-%d %H:%M:%S")
-            y = jj[-2].strftime("%Y-%m-%d %H:%M:%S")
-            article_list[ii] = [*jj[:-2], y, t]
-        return article_list
-
-    def decoder_tpwd_once(
-        self, article_id: str, tpwd: str, mode: int = 0, do_sleep: bool = False
-    ):
-        if tpwd in self.tpwd_map:
-            return
-        flag = begin_time()
-        req = self.decoder_tpwd(tpwd, do_sleep)
-        self.spends.append(end_time(flag, 0))
-        if req is None or not len(req):
-            return
-        if "data" not in req or req["code"]:
-            temp_map = {ii: "" for ii in self.NEED_KEY}
-            temp_map["validDate"] = self.BASIC_TIMEX_STR
-        else:
-            temp_map = {ii: req["data"][ii] for ii in self.NEED_KEY}
-            temp_map["validDate"] = temp_map["expire"]
-        temp_map["url"] = temp_map["url"].strip()
-        temp_map["article_id"] = article_id
-        self.tpwd_map[tpwd] = temp_map
-        if not mode:
-            self.decoder_tpwd_url(article_id, tpwd)
-
-    def decoder_tpwd_url(self, article_id: str, tpwd: str):
-        temp_map = self.tpwd_map[tpwd]
-        tpwd_type, item_id = self.analysis_tpwd_url(temp_map["url"])
-        if item_id is None:
-            return
-        temp_map["type"] = tpwd_type
-        temp_map["item_id"] = item_id
-        if tpwd_type < 20:
-            echo(2, "Domain:", self.URL_DOMAIN[tpwd_type], "item id:", item_id)
-        self.tpwd_map[tpwd] = temp_map
+    def decoder_tpwd_item(self, tpwd: str, force_update: bool = False):
+        if self.tpwds_map.get(tpwd, {}).get("item_id", "") and not force_update:
+            return self.tpwds_map[tpwd]
+        self.load_num[1] += 1
+        m = self.tpwds_map[tpwd]
+        domain, item_id = self.analysis_tpwd_url(m["url"])
+        if not item_id:
+            return self.tpwds_map[tpwd]
+        self.tpwds_map[tpwd] = {
+            **m,
+            "domain": domain,
+            "item_id": item_id,
+            "is_updated": 1 if m["content"] and item_id else 0,
+        }
+        if domain < 20:
+            echo(2, "Domain:", self.URL_DOMAIN[domain], "item id:", item_id)
+        return self.tpwds_map[tpwd]
 
     def analysis_tpwd_url(self, url: str):
-        if self.URL_DOMAIN[5] in url:
-            return 5, self.get_uland_url(url)
+        if not url:
+            idx, item_id = 15, ""
+        elif self.URL_DOMAIN[5] in url:
+            idx, item_id = 5, self.items.get_uland_url(url)
         elif self.URL_DOMAIN[11] in url:
-            return 11, self.get_a_m_url(url)
+            idx, item_id = 11, self.get_a_m_url(url)
         elif self.URL_DOMAIN[0] in url:
-            return 0, self.get_s_click_url(url)
+            idx, item_id = 0, self.get_s_click_url(url)
         elif self.URL_DOMAIN[10] in url:
-            return 10, 0
+            idx, item_id = 10, ""
         elif self.URL_DOMAIN[13] in url:
-            good_id = self.get_item_id(url)
-            if good_id != "":
-                return 1 if self.URL_DOMAIN[1] in url else 13, good_id
-            return 16, 0
-        elif url == "":
-            return 15, 0
+            idx, item_id = 1 if self.URL_DOMAIN[1] in url else 13, self.get_item_id(url)
+            if not item_id:
+                idx = 16
         echo("0|warning", "New Domain:", regex.findall("https://(.*?)/", url), url)
-        return 20, 0
+        return 20, ""
 
     def decoder_tpwd_v1(self, tpwd: str):
         """ decoder the tpwd from taokouling from taokouling.com something failure in March 2021"""
         url = self.DECODER_TPWD_URL % (self.api_key, tpwd)
         req = basic_req(url, 1)
-        # print(req.keys())
         if req is None or isinstance(req, str) or "ret" not in list(req.keys()):
             return {}
         return req
 
-    def decoder_tpwd(self, tpwd: str, do_sleep: bool = False):
+    def decoder_tpwd(self, tpwd: str):
         """ decoder the tpwd from taokouling from https://taodaxiang.com/taopass"""
-        if do_sleep:
-            time.sleep(np.random.rand() * 10 + 2)
         url = self.DECODER_TPWD_URL_V2
         data = {"content": f"￥{tpwd}￥"}
         req = proxy_req(url, 11, data=data)
@@ -723,7 +646,7 @@ class ActivateArticle(TBK):
 
     def get_s_click_url(self, s_click_url: str):
         """ decoder s.click real jump url @validation time: 2019.10.23"""
-        time.sleep(np.random.randint(0, 10))
+        # time.sleep(np.random.randint(0, 10))
         item_url = self.get_s_click_location(s_click_url)
         if item_url is None:
             echo(3, "s_click_url location Error..")
@@ -750,7 +673,7 @@ class ActivateArticle(TBK):
         redirect_url = urllib.parse.unquote(qso["tu"])
         return self.get_s_click_detail(redirect_url, tu_url)
 
-    def get_tb_headers(self, url: str = "", refer_url: str = "") -> dict:
+    def get_headers(self, url: str = "", refer_url: str = "") -> dict:
         headers = {"Accept": get_accept("html"), "User-Agent": get_use_agent()}
         if url != "":
             headers["Host"] = url.split("/")[2]
@@ -766,7 +689,7 @@ class ActivateArticle(TBK):
         allow_redirects: bool = True,
         is_direct: bool = False,
     ):
-        headers = self.get_tb_headers(refer_url=referer)
+        headers = self.get_headers(refer_url=referer)
         req_func = basic_req if is_direct else proxy_req
         req = req_func(
             s_click_url, 2, header=headers, config={"allow_redirects": allow_redirects}
@@ -807,7 +730,7 @@ class ActivateArticle(TBK):
         return req_rj.headers["Location"]
 
     def get_s_click_detail(self, redirect_url: str, tu_url: str):
-        headers = self.get_tb_headers(refer_url=tu_url)
+        headers = self.get_headers(refer_url=tu_url)
         req = proxy_req(redirect_url, 2, header=headers)
         if req is None or "id=" not in req.url:
             if can_retry(redirect_url):
@@ -823,74 +746,15 @@ class ActivateArticle(TBK):
             return ""
         return int(item["id"])
 
-    def get_item_title_once(self, item_id: int) -> str:
-        item = self.get_tb_getdetail(item_id)
-        if item is None:
-            return ""
-        return item["title"]
-
-    def get_item_title(self, article_id: str, tpwd: str):
-        ## TODO: REMOVE
-        temp_map = self.tpwd_map[tpwd]
-        if (
-            "item_id" not in temp_map
-            or temp_map["item_id"] == ""
-            or temp_map["item_id"] == "0"
-        ):
-            return
-        item_id = int(temp_map["item_id"])
-        title = self.get_item_title_once(item_id)
-        if title != "":
-            self.tpwd_map[tpwd]["title"] = title
-
-    def get_item_title_once_v1(self, item_id: int) -> str:
-        req = self.get_item_basic(item_id)
-        if req is None:
-            return ""
-        req_text = req.text
-        req_title = regex.findall('data-title="(.*?)">', req_text)
-        if len(req_title):
-            return req_title[0]
-        req_title = regex.findall('<meta name="keywords" content="(.*?)"', req_text)
-        if len(req_title):
-            return req_title[0]
-        return ""
-
-    def get_item_basic(self, item_id: int, url: str = ""):
-        url = self.ITEM_URL % item_id if url == "" else url
-        headers = {"Accept": get_accept("html")}
-        req = proxy_req(url, 2, header=headers, config={"allow_redirects": False})
-        if req is None:
-            if can_retry(url):
-                return self.get_item_basic(item_id, url)
-            return
-        if req.status_code != 200:
-            return self.get_item_basic(item_id, req.headers["Location"])
-        return req
-
-    def get_uland_url(self, uland_url: str):
-        if (
-            not "uland" in self.iitems.cookies
-            # or not self.M in self.iitems.cookies['uland']
-            or time_stamp() - self.m_time > self.ONE_HOURS / 2
-        ):
-            self.items.get_m_h5_tk()
-        s_req = self.items.get_uland_url_req(uland_url, self.iitems.cookies["uland"])
-        if s_req is None:
-            return ""
-        req_text = s_req.text
-        re_json = json.loads(req_text[req_text.find("{") : -1])
-        return re_json["data"]["resultList"][0]["itemId"]
-
     def get_a_m_url(self, a_m_url: str):
         req = self.get_a_m_basic(a_m_url)
         if req is None:
-            return
+            return ""
         item_url = req.headers["location"]
         return self.get_item_id(item_url)
 
     def get_a_m_basic(self, a_m_url: str):
-        headers = self.get_tb_headers(a_m_url)
+        headers = self.get_headers(a_m_url)
         req = proxy_req(a_m_url, 2, header=headers, config={"allow_redirects": False})
         if req is None or "location" not in req.headers:
             if can_retry(a_m_url):
@@ -904,9 +768,9 @@ class ActivateArticle(TBK):
         req = basic_req(url, 11, data=data, header=self.get_ynote_web_header(1))
         if req is None or type(req) != list:
             return None
-        list_recent = {ii["fileEntry"]["id"]: ii["fileEntry"] for ii in req}
-        self.list_recent = {**self.list_recent, **list_recent}
-        echo(1, "Load ynote file {} items.".format(len(self.list_recent)))
+        ynote_list = {ii["fileEntry"]["id"]: ii["fileEntry"] for ii in req}
+        self.ynote_list = {**self.ynote_list, **ynote_list}
+        echo(1, "Load ynote file {} items.".format(len(self.ynote_list)))
         return req
 
     def get_ynote_web_header(self, mode: int = 0):
@@ -946,8 +810,8 @@ class ActivateArticle(TBK):
                 return
         return req
 
-    def replace_tpwd4article_pipeline(self, article_id: str):
-        xml = self.get_xml(article_id)
+    def replace_tpwd4article_pipeline(self, yd_id: str):
+        xml = self.get_xml(yd_id)
         if xml is None:
             echo("0|warning", "get xml error")
             return
@@ -960,29 +824,28 @@ class ActivateArticle(TBK):
         )
         for ii in tpwds:
             xml = xml.replace(ii, f"3{ii}/")
-        flag = self.update_article(article_id, xml)
+        flag = self.update_article(yd_id, xml)
         if flag:
-            echo(1, f"Update {article_id} Success!! replace {len(tpwds)} tpwds")
+            echo(1, f"Update {yd_id} Success!! replace {len(tpwds)} tpwds")
 
-    def update_article_pipeline(self, article_id: str):
-        xml = self.get_xml(article_id)
+    def update_article_pipeline(self, yd_id: str):
+        xml = self.get_xml(yd_id)
         if xml is None:
             echo("0|warning", "get xml error")
             return
-        xml, r_log, r_num = self.replace_tpwd(article_id, xml)
+        xml, r_log, r_num = self.replace_tpwd(yd_id, xml)
         if not r_num:
             echo("0|warning", "r_num == 0")
             return
-        flag = self.update_article(article_id, xml)
+        flag = self.update_article(yd_id, xml)
         if flag:
             need_num = len(regex.findall("\(已失效\)", xml))
-            self.email_update_result(article_id, r_log, r_num, need_num)
-            # self.update_valid(article_id)
-            self.update_article2db(article_id, True)
-            self.share_article(article_id)
+            self.email_update_result(yd_id, r_log, r_num, need_num)
+            self.update_yd2db(yd_id, True)
+            self.share_yd_article(yd_id)
 
-    def fix_failure(self, article_id: str, store: bool = False):
-        xml = self.get_xml(article_id)
+    def fix_failure(self, yd_id: str, store: bool = False):
+        xml = self.get_xml(yd_id)
         if xml is None:
             echo("0|warning", "get xml error")
             return
@@ -996,131 +859,99 @@ class ActivateArticle(TBK):
                 num += 1
                 xml = xml.replace(jj, jj[:-1] + "/" + jj[-1:])
         if num or store:
-            flag = self.update_article(article_id, xml)
-            echo("1", flag, "Success fix {} tpwds in {}.".format(num, article_id))
+            flag = self.update_article(yd_id, xml)
+            echo("1", flag, f"Success fix {num} tpwds in {yd_id}.")
         else:
-            echo("2", "No need fix in {}.".format(article_id))
+            echo("2", f"No need fix in {yd_id}.")
 
-    def email_update_result(
-        self, article_id: str, r_log: list, r_num: int, need_num: int
-    ):
-        p = self.share2article[article_id][-2].split("/")[-1]
-        article_info = self.list_recent[p]
-        name = article_info["name"].replace(".note", "")
+    def email_update_result(self, yd_id: str, r_log: list, r_num: int, need_num: int):
+        title = self.lists_map.get(yd_id, {}).get("title", "")
         subject = "更新({}){}/{}剩{}条[{}]".format(
             time_str(time_format=self.T_FORMAT),
             r_num,
             len(r_log),
             need_num,
-            article_info["name"].replace(".note", ""),
+            title,
         )
         content = "\n".join(
             [
-                "Title: {}".format(article_info["name"]),
-                "Time: {}".format(time_str()),
-                "Update Num: {}/{}条, 还有{}条需要手动更新".format(r_num, len(r_log), need_num),
+                f"Title: {title}",
+                f"Time: {time_str()}",
+                f"Update Num: {r_num}/{len(r_log)}条, 还有{need_num}条需要手动更新",
                 "",
                 *r_log,
             ]
         )
         send_email(content, subject, assign_rec=self.assign_rec)
 
-    def update_valid(self, article_id: str):
-        wait_list = [
-            ii for ii in self.article_list[article_id].keys() if ii not in self.tpwd_map
-        ]
-        update_time = 0
-        while len(wait_list) and update_time < 5:
-            echo(2, "Begin Update No.{} times Tpwd validDate".format(update_time + 1))
-            update_v = [
-                self.tpwd_exec.submit(self.decoder_tpwd_once, article_id, ii, 1)
-                for ii in wait_list
-            ]
-            list(as_completed(update_v))
-            wait_list = [
-                ii
-                for ii in self.article_list[article_id].keys()
-                if ii not in self.tpwd_map
-            ]
-            update_time += 1
+    def update_yd2db(self, yd_id: str, is_tpwd_update: bool = False):
+        for tpwd in set(self.tpwds_list[yd_id]):
+            self.tpwds_map[tpwd] = self.new_tpwds_map[tpwd]
+        self.store_db()
 
-    def update_article2db(self, article_id: str, is_tpwd_update: bool = False):
-        data = []
-        for o_tpwd in self.tpwds[article_id]:
-            """
-            `id`, article_id, tpwd_id, item_id, tpwd, domain, content, url, commission_rate, commission_type, expire_at, created_at, is_deleted
-            """
-            if o_tpwd[1:-1] not in self.tpwd_db_map:
-                continue
-            n = self.tpwd_db_map[o_tpwd[1:-1]]
-            data.append(
-                (
-                    *n[:-2],
-                    time_str(
-                        self.BASIC_TIMEX_STAMP + self.ONE_DAY * self.ONE_HOURS * 5
-                    ),
-                    n[-1],
-                    0,
-                )
-            )
-        self.items.update_db(
-            data, self.R_ARTICLE_SQL, "Update Article {} TPWD".format(article_id)
-        )
-
-    def replace_tpwd(self, article_id: str, xml: str):
+    def replace_tpwd(self, yd_id: str, xml: str):
         tpwds = regex.findall(self.TPWD_REG2, xml)
-        self.tpwds[article_id] = list(set(tpwds))
-        m = self.tpwd_db_map
+        self.tpwds_list[yd_id] = tpwds
+        m = self.new_tpwds_map
         r_log, r_num = [], 0
         EXIST = "PASSWORD_NOT_EXIST::口令不存在"
         DECODER_EXC = "DECODER_EXCEPTION::商品已下架"
         NO_GOODS = "GOODS_NOT_FOUND::未参加淘客"
         TPWD_ERROR = "TPWD_ERROR::淘口令生成异常"
-        for ii, jj in enumerate(tpwds):
-            pure_jj = jj[1:-1]
-            no_t = "No.{} tpwd: {}, ".format(ii + 1, jj)
-            if pure_jj not in m:
-                r_log.append("{}{}".format(no_t, EXIST))
+        for idx, o_tpwd_pro in enumerate(tpwds):
+            o_tpwd = o_tpwd_pro[1:-1]
+            idx_log = f"No.{idx + 1} tpwd: {o_tpwd_pro}, "
+            if o_tpwd not in m:
+                r_log.append(f"{idx_log}{EXIST}")
                 continue
-                # tpwd = 'NOTNOTEXIST'
-            title, domain, tpwd, commission_rate, commission_type = [
-                m[pure_jj][i] for i in [6, 5, 4, 8, 9]
+            item_id, domain, title, tpwd, c_rate, c_type = [
+                m.get(ii, jj)
+                for ii, jj in [
+                    ("item_id", ""),
+                    ("domain", 20),
+                    ("content", ""),
+                    ("tpwd", ""),
+                    ("c_rate", 0),
+                    ("c_type", ""),
+                ]
             ]
+            title = self.items.items_detail_map.get(item_id, {}).get("title", title)
+
             if domain >= 15:
                 if domain == 15:
-                    applied = "{},{}".format(EXIST, title)
+                    applied = f"{EXIST},{title}"
                 elif domain == 16:
-                    applied = "{},{}".format(DECODER_EXC, title)
+                    applied = f"{DECODER_EXC},{title}"
                 elif domain == 17:
-                    applied = "{},{}".format(NO_GOODS, title)
+                    applied = f"{NO_GOODS},{title}"
                 elif domain == 18:
-                    applied = "{},{}".format(TPWD_ERROR, title)
+                    applied = f"{TPWD_ERROR},{title}"
             else:
                 applied = title
             f = False
-            if "{}/(已失效)".format(jj) in xml:
+            if f"{o_tpwd_pro}/(已失效)" in xml:
                 f = True
-                jj = "{}/(已失效)".format(jj)
-            xml = xml.replace(jj, "￥{}￥{}".format(tpwd, "/" if f else ""))
-            if tpwd == pure_jj:
-                commission_rate = 1
-            if commission_rate == 2:
+                o_tpwd_pro = f"{o_tpwd_pro}/(已失效)"
+            xml = xml.replace(o_tpwd_pro, "￥{}￥{}".format(tpwd, "/" if f else ""))
+            if tpwd == o_tpwd:
+                c_rate = 1
+            if c_rate == 2:
                 COMMISSION = "->￥{}￥ SUCCESS, 保持原链接, {}".format(tpwd, applied)
-            elif commission_rate == 1:
+            elif c_rate == 1:
                 xml = xml.replace("￥{}￥/".format(tpwd), "￥{}￥/(已失效)".format(tpwd))
                 COMMISSION = "未能更新淘口令, {}".format(applied)
             else:
                 COMMISSION = "->￥{}￥ SUCCESS, 佣金: {}, 类型: {}, {}".format(
-                    tpwd, commission_rate, commission_type, applied
+                    tpwd, c_rate, c_type, applied
                 )
-            r_log.append("{}{}".format(no_t, COMMISSION))
-            r_num += int(commission_rate != 1)
+            r_log.append(f"{idx_log}{COMMISSION}")
+            r_num += int(c_rate != 1)
         return xml, r_log, r_num
 
-    def get_xml(self, article_id: str):
+    def get_xml(self, yd_id: str):
         url = self.SYNC_URL % ("download", self.cstk)
         data = {
-            "fileId": self.share2article[article_id][-2].split("/")[-1],
+            "fileId": self.lists_map.get(yd_id, {}).get("q", "").split("/")[-1],
             "version": -1,
             "convert": True,
             "editorType": 1,
@@ -1131,21 +962,21 @@ class ActivateArticle(TBK):
             return
         return req.text
 
-    def update_article(self, article_id: str, article_body: str):
-        p = self.share2article[article_id][-2].split("/")[-1]
-        article_info = self.list_recent[p]
+    def update_article(self, yd_id: str, content: str):
+        q = self.lists_map.get(yd_id, {}).get("q", "").split("/")[-1]
+        ynote = self.ynote_list[q]
+        data_basic = {
+            ii: ynote[ii] for ii in ["parentId", "domain", "orgEditorType", "tags"]
+        }
         data = {
-            "fileId": p,
-            "parentId": article_info["parentId"],
-            "domain": article_info["domain"],
+            **data_basic,
+            "fileId": q,
             "rootVersion": -1,
             "sessionId": "",
             "modifyTime": int(time_stamp()),
-            "bodyString": article_body,
-            "transactionId": p,
+            "bodyString": content,
+            "transactionId": q,
             "transactionTime": int(time_stamp()),
-            "orgEditorType": article_info["orgEditorType"],
-            "tags": article_info["tags"],
             "cstk": self.cstk,
         }
         url = self.SYNC_URL % ("push", self.cstk)
@@ -1159,41 +990,34 @@ class ActivateArticle(TBK):
         ]:
             echo(
                 "0|error",
-                "Update atricle_id {} Error".format(article_id),
+                f"Update atricle {yd_id} Error",
                 req.json() if req is not None else "",
             )
             return False
-        echo("1|warning", "Update atricle_id {} Success!!!".format(article_id))
+        echo("1|warning", f"Update atricle {yd_id} Success!!!")
         return True
 
-    def share_article(self, article_id: str):
-        p = self.share2article[article_id][-2].split("/")[-1]
-        url = self.MYSHARE_URL % (p, self.cstk)
-        req = proxy_req(url, 1, header=self.get_ynote_web_header(1))
-        if req is None or list(req.keys()) != ["entry", "meta"]:
-            if can_retry(url):
-                return self.share_article(article_id)
+    def share_yd_article(self, yd_id: str):
+        q = self.lists_map.get(yd_id, {}).get("q", "").split("/")[-1]
+        if not q:
             return False
-        echo("2", "Share article {} Success!!!".format(article_id))
+        url = self.MYSHARE_URL % (q, self.cstk)
+        req = basic_req(url, 1, header=self.get_ynote_web_header(1))
+        if req is None or list(req.keys()) != ["entry", "meta"]:
+            return False
+        echo("2", "Share article {} Success!!!".format(yd_id))
         return True
 
-    def load_article_local(self, file_path: str):
-        if file_path not in self.tpwds:
-            tt = "||||".join(read_file(file_path))
-            tpwds = regex.findall(self.TPWD_REG, tt)
-            self.tpwds[file_path] = tpwds
-        else:
-            tpwds = self.tpwds[file_path]
-        time = 0
-        while [1 for ii in tpwds if ii not in self.tpwd_map] and time < 5:
-            thread_list = [ii for ii in tpwds if not ii in self.tpwd_map]
-            echo(1, file_path, "tpwds len:", len(tpwds), "need load", len(thread_list))
-            thread_list = [
-                self.tpwd_exec.submit(self.decoder_tpwd_once, file_path, ii, 1)
-                for ii in thread_list
-            ]
-            list(as_completed(thread_list))
-            time += 1
+    def load_article_local(self, yd_path: str):
+        self.change_tpwd(yd_path)
+        self.get_article_tpwds(yd_path, mode="local")
+        self.load_num = [0, 0]
+        for tpwd in set(self.tpwds_list[yd_path]):
+            self.get_tpwd_detail_pro(tpwd, yd_path)
+        echo(
+            2,
+            f"Article {yd_path} Load {self.load_num[0]} Tpwds and {self.load_num[1]} Items Info.",
+        )
 
     def load_picture(self, url: str, idx: int):
         td = basic_req(url, 2)
@@ -1201,93 +1025,64 @@ class ActivateArticle(TBK):
         with open(picture_path, "wb") as f:
             f.write(td.content)
 
-    def load_picture_pipeline(self, file_path: str):
+    def load_picture_pipeline(self, yd_path: str):
         mkdir("picture")
-        tpk_list = self.tpwds[file_path]
-        picture_url = [
-            (self.tpwd_map[tpk]["picUrl"], idx)
-            for idx, tpk in enumerate(tpk_list)
-            if tpk in self.tpwd_map
+        tpwds = self.tpwds_list[yd_path]
+        urls = [
+            (self.new_tpwds_map[tpwd]["picUrl"], idx)
+            for idx, tpwd in enumerate(tpwds)
+            if tpwd in self.new_tpwds_map
+            and not os.path.exists("picture/{}.jpg".format(idx))
         ]
-        picture_url = [
-            (ii, idx)
-            for ii, idx in picture_url
-            if not os.path.exists("picture/{}.jpg".format(idx))
-        ]
-        echo(1, "Load {} picture Begin".format(len(picture_url)))
-        pp = [
-            self.tpwd_exec.submit(self.load_picture, ii, jj) for ii, jj in picture_url
-        ]
+        echo(1, "Load {} picture Begin".format(len(urls)))
+        pp = [self.tpwd_exec.submit(self.load_picture, ii, jj) for ii, jj in urls]
         return pp
 
     def check_overdue(self):
-        def check_overdue_once(data: list) -> bool:
-            dif_time = time_stamp(data[-2]) - time_stamp()
+        def check_overdue_req(tpwd_data: map) -> bool:
+            dif_time = time_stamp(tpwd_data["expire_at"]) - time_stamp()
             return dif_time > 0 and dif_time <= self.ONE_HOURS * self.ONE_DAY
 
-        overdue_article = [
-            (jj[1], ii) for ii, jj in self.tpwd_db_map.items() if check_overdue_once(jj)
+        overdue_tpwds = [
+            tpwd
+            for tpwd, tpwd_data in self.tpwds_db_map.items()
+            if check_overdue_req(tpwd_data)
         ]
-        overdue_id = set([article_id for article_id, _ in overdue_article])
-        overdue_list = [
-            (
-                article_id,
-                len([1 for a_id, tpwd in overdue_article if article_id == a_id]),
-            )
-            for article_id in overdue_id
-        ]
-        if not len(overdue_list):
+        yd_ids_map = Counter(
+            [self.tpwds_db_map[tpwd]["article_id"] for tpwd in overdue_tpwds]
+        )
+        if not yd_ids_map:
             return
-        title = "链接需要更新#{}#篇".format(len(overdue_list))
-        content = title + "\n \n"
-        for article_id, num in overdue_list:
-            content += "{}, 需要更新{}个链接，{}\n".format(
-                self.share2article[article_id][2], num, self.NOTE_URL % article_id
-            )
+        title = "链接需要更新#{}#篇".format(len(yd_ids_map))
+        content = f"{title}\n \n"
+        for yd_id, num in sorted(yd_ids_map.items(), lambda x: -(x[1])):
+            title = self.lists_map.get(yd_id, {}).get("title", "")
+            content += f"{title}, 需要更新{num}个链接，{self.SHARE_URL % yd_id}\n"
         content += "\n\nPlease update within 6 hours, Thx!"
         echo("2|debug", title, content)
         send_email(content, title)
 
     def load_share_total(self):
-        self.check_overdue()
-        for article_id in self.idx:
-            self.get_share_info(article_id)
-        self.load_list2db()
+        for yd_ids in self.yd_ids:
+            self.get_yd_detail(yd_ids)
+        self.store_db()
         self.__init__()
         self.load_process()
 
-    def load_article_new(self):
-        article_exec = ThreadPoolExecutor(max_workers=3)
-        np.random.shuffle(self.idx)
-        N = len(self.idx)
-        for i in range(int(N // 3)):
-            self.load_article(self.idx[i])
-            # a_list = [
-            #     article_exec.submit(self.load_article, ii)
-            #     for ii in self.idx[i * 3 : i * 3 + 3]
-            # ]
-            # list(as_completed(a_list))
-            time.sleep(np.random.rand() * 20 * 3 + 10)
+    def load_yds(self):
+        yd_ids = self.yd_ids.copy()
+        np.random.shuffle(yd_ids)
+        for yd_id in range(yd_ids):
+            self.get_yd_tpwds_detail(yd_id, is_wait=True)
         self.check_overdue()
-        # self.send_repeat_email()
 
     def load_click(self, num=1000000):
-        """ schedule click """
         for index in range(num):
-            threading_list = []
             flag = begin_time()
             if index % 6 != 1:
-                threading_list.append(
-                    threading.Thread(target=self.load_article_new, args=())
-                )
+                self.load_yds()
             if index % 6 == 1:
-                threading_list.append(
-                    threading.Thread(target=self.load_share_total, args=())
-                )
-            for work in threading_list:
-                work.start()
-            for work in threading_list:
-                work.join()
+                self.load_share_total()
             spend_time = end_time(flag, 0)
             echo(
                 3,
@@ -1305,63 +1100,6 @@ class ActivateArticle(TBK):
         old, _, _ = load_bigger(TPWDLIST_PATH)
         return int(old != self.tpwd_list)
 
-    def send_repeat_email(self, do_it: bool = False):
-        def get_repeat(items: list):
-            repeat_time = {k: v for k, v in Counter(items).items() if v >= 2}
-            repeat_order = sorted(repeat_time.items(), key=lambda i: -i[1])
-            return ",".join(["￥{}￥出现{}次".format(k, v) for k, v in repeat_order])
-
-        do_update = self.does_update(do_it)
-        echo(1, "Do_update:", do_update)
-        if not do_update:
-            return
-        repeats = []
-        for article_id, tpwd in self.tpwd_list.items():
-            repeat = get_repeat(tpwd)
-            if repeat == "":
-                continue
-            if article_id in self.share2article:
-                p = self.share2article[article_id][-2].split("/")[-1]
-                if p in self.list_recent:
-                    article_info = self.list_recent[p]
-                else:
-                    echo(0, "P error.", p, article_id)
-                    article_info = {"name": ""}
-            else:
-                article_info = {"name": ""}
-            repeats.append(
-                "{}({})共{}条: {}".format(
-                    article_info["name"]
-                    .replace(".note", "")
-                    .split("/")[0]
-                    .split(" ")[0],
-                    article_id,
-                    repeat.count(",") + 1,
-                    repeat,
-                )
-            )
-        subject = "重复({}){}/{}共{}条".format(
-            time_str(time_format=self.T_FORMAT),
-            len(repeats),
-            len(self.tpwd_list),
-            "".join(repeats).count(",") + len(repeats),
-        )
-        content = "\n".join(
-            [
-                "重复情况",
-                "Time: {}".format(time_str()),
-                "Repeat Num: {}/{}篇, 共{}条.".format(
-                    len(repeats),
-                    len(self.tpwd_list),
-                    "".join(repeats).count(",") + len(repeats),
-                ),
-                "--------------------------------" "",
-                *repeats,
-            ]
-        )
-        dump_bigger([self.tpwd_list, content, subject], TPWDLIST_PATH)
-        send_email(content, subject)
-
     def change_tpwd(self, article_path):
         origin = read_file(article_path)
         origin = [
@@ -1375,33 +1113,6 @@ class ActivateArticle(TBK):
                 origin[ii] = text
         with open(article_path, "w") as f:
             f.write("\n".join(origin))
-
-    def update_items(self):
-        tpwd_list = []
-        items = {}
-        for tpwd, m in self.tpwd_db_map.items():
-            if m[3] and (not m[6] or "打开" in m[6]):
-                tpwd_list.append(tpwd)
-                items[item_id] = ""
-                continue
-            if "?id=" in m[7] or "&id=" in m[7]:
-                item_id = decoder_url(m[7])
-            if "id" not in item_id:
-                continue
-            item_id = item_id["id"]
-            if item_id != m[3] or not m[6]:
-                tpwd_list.append(tpwd)
-                items[item_id] = ""
-        for _ in range(5):
-            need_items = [ii for ii, jj in items.items() if not jj]
-            echo(1, f"Need load {len(need_items)} Titles.")
-            for ii in need_items:
-                item = self.get_tb_getdetail(int(ii))
-                if item is not None:
-                    items[ii] = item["title"]
-        need_items = [ii for ii, jj in items.items() if not jj]
-        echo(1, f"Need load {len(need_items)} Titles.")
-        return items, tpwd_list
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-06 00:40:42
+# @Last Modified time: 2021-04-06 23:50:58
 
 import os
 import sys
@@ -24,6 +24,7 @@ from util.util import (
     encoder_cookie,
     encoder_url,
     end_time,
+    generate_sql,
     get_accept,
     get_time_str,
     get_use_agent,
@@ -85,20 +86,12 @@ class Items(object):
         "created_at",
     ]
     S_TPWDS_SQL = "SELECT item_id from article_tpwd;"
-    S_ITEMS_SQL = "SELECT {} from items%s;".format(", ".join(ITEMS_LIST))
-    I_ITEMS_SQL = "INSERT INTO items ({}) VALUES %s;".format(
-        ", ".join(ITEMS_LIST[1:-1])
-    )
-    R_ITEMS_SQL = "REPLACE INTO items ({}, is_deleted) VALUES %s;".format(
-        ", ".join(ITEMS_LIST)
-    )
-    S_SHOPS_SQL = "SELECT {} from shops%s;".format(", ".join(SHOPS_LIST))
-    I_SHOPS_SQL = "INSERT INTO shops ({}) VALUES %s;".format(
-        ", ".join(SHOPS_LIST[1:-1])
-    )
-    R_SHOPS_SQL = "REPLACE INTO shops ({}, is_deleted) VALUES %s;".format(
-        ", ".join(SHOPS_LIST)
-    )
+    S_ITEMS_SQL = generate_sql("select", "items", ITEMS_LIST + ["updated_at"])
+    I_ITEMS_SQL = generate_sql("insert", "items", ITEMS_LIST)
+    R_ITEMS_SQL = generate_sql("replace", "items", ITEMS_LIST)
+    S_SHOPS_SQL = generate_sql("select", "shops", SHOPS_LIST)
+    I_SHOPS_SQL = generate_sql("insert", "shops", SHOPS_LIST)
+    R_SHOPS_SQL = generate_sql("replace", "shops", SHOPS_LIST)
     TABLE_LISTS = ["items.sql", "shops.sql"]
     ONE_HOURS = 3600
     ONE_DAY = 24
@@ -115,6 +108,7 @@ class Items(object):
         self.items_detail_map = {}
         self.shops_detail_db_map = {}
         self.items_detail_db_map = {}
+        self.load_num = 0
         self.items = set()
         self.cookies = {}
         self.load_configure()
@@ -223,13 +217,28 @@ class Items(object):
             r'{"pageCode":"mallDetail","ua":"%s","params":"{\"url\":\"%s\",\"referrer\":\"\",\"oneId\":null,\"isTBInstalled\":\"null\",\"fid\":\"%s\"}"}'
             % (get_use_agent("mobile"), refer_url, finger_id)
         )
-        print(data)
         api = "mtop.taobao.baichuan.smb.get"
         jsv = "2.4.8"
 
         return self.get_tb_h5_api(
             api, jsv, refer_url, data, cookies=cookies, mode=1, data_str=data_str
         )
+
+    def get_uland_url(self, uland_url: str):
+        if (
+            not "uland" in self.cookies
+            or time_stamp() - self.m_time > self.ONE_HOURS / 2
+        ):
+            self.get_m_h5_tk()
+        s_req = self.get_uland_url_req(uland_url, self.cookies["uland"])
+        if s_req is None:
+            return ""
+        req_text = s_req.text
+        try:
+            re_json = json.loads(req_text[req_text.find("{") : -1])
+            return re_json["data"]["resultList"][0]["itemId"]
+        except:
+            return ""
 
     def get_uland_url_req(self, uland_url: str, cookies: dict = {}):
         """ tb h5 api @2020.01.18 ✔️Tested"""
@@ -312,7 +321,7 @@ class Items(object):
             data_str = json_str(data)
 
         headers = {
-            "Accept": get_accept(),
+            "Accept": get_accept("all"),
             "referer": self.API_REFER_URL,
             "Agent": get_use_agent("pc"),
         }
@@ -364,20 +373,31 @@ class Items(object):
         self, item_id: str, is_wait: bool = False, force_update: bool = False
     ):
         """ item detail (apiStack) @2021.04.05 ✔️Tested"""
-        if is_wait:
-            time.sleep(np.random.rand() * 5 + 2)
+        expired_flag = (
+            self.config["time_stamp"]
+            - time_stamp(
+                self.items_detail_map.get(item_id, {}).get(
+                    "updated_at", self.config["time_stamp"]
+                )
+            )
+            >= self.ONE_HOURS * self.ONE_DAY * 10
+        )
         if (
             item_id in self.items_detail_map
             and self.items_detail_map[item_id]["category_id"]
             and self.items_detail_map[item_id]["price"] != "0"
+            and not expired_flag
             and not force_update
         ):
             return self.items_detail_map[item_id]
+        if is_wait:
+            time.sleep(np.random.rand() * 5 + 2)
         if (
             not "uland" in self.cookies
             or time_stamp() - self.m_time > self.ONE_HOURS / 2
         ):
             self.get_m_h5_tk()
+        self.load_num += 1
         req = self.get_tb_getdetail_req(int(item_id), self.cookies["uland"])
         if req is None:
             return {}
@@ -387,7 +407,7 @@ class Items(object):
         except:
             req_json = {}
         if "data" not in req_json:
-            return None
+            return {}
         title, category_id, comment_count, favcount = [
             req_json["data"]["item"].get(ii, jj) if "item" in req_json["data"] else jj
             for ii, jj in [
@@ -464,7 +484,7 @@ class Items(object):
             apiStack = json.loads(apiStack)
             price = (
                 apiStack["price"]["price"].get("priceText", "0")
-                if "price" not in apiStack or "price" not in apiStack["price"]
+                if "price" in apiStack and "price" in apiStack["price"]
                 else "0"
             )
             month_sales = (
@@ -503,6 +523,9 @@ class Items(object):
             "price": price,
             "month_sales": month_sales,
             "quantity": quantity,
+            "updated_at": self.items_detail_map[item_id]["updated_at"]
+            if item_id in self.items_detail_map and not expired_flag
+            else self.config["time_str"],
         }
 
         if shop_id:
@@ -522,17 +545,17 @@ class Items(object):
             }
         return self.items_detail_map[item_id]
 
-    def load_db(self, is_load: bool = True):
-        def load_one_table(sql: str, LIST: list, db_map: dict, key: str):
-            lines = self.Db.select_db(sql)
-            for line in lines:
-                line = {
-                    ii: jj.strftime("%Y-%m-%d %H:%M:%S") if ii.endswith("_at") else jj
-                    for ii, jj in zip(LIST, line)
-                }
-                db_map[line[key]] = line
-            return db_map
+    def load_db_table(self, sql: str, LIST: list, db_map: dict, key: str):
+        lines = self.Db.select_db(sql)
+        for line in lines:
+            line = {
+                ii: jj.strftime("%Y-%m-%d %H:%M:%S") if ii.endswith("_at") else jj
+                for ii, jj in zip(LIST, line)
+            }
+            db_map[line[key]] = line
+        return db_map
 
+    def load_db(self, is_load: bool = True):
         self.items = set(
             [
                 ii[0]
@@ -540,10 +563,10 @@ class Items(object):
                 if ii[0] and ii[0].isdigit()
             ]
         )
-        items = load_one_table(
+        items = self.load_db_table(
             self.S_ITEMS_SQL % "", self.ITEMS_LIST, self.items_detail_db_map, "item_id"
         ).copy()
-        shops = load_one_table(
+        shops = self.load_db_table(
             self.S_SHOPS_SQL % "", self.SHOPS_LIST, self.shops_detail_db_map, "shop_id"
         ).copy()
         if is_load:
@@ -564,35 +587,36 @@ class Items(object):
         else:
             echo(0, "{} failed".format(types))
 
-    def store_db(self):
-        def store_one_table(
-            update_sql: str,
-            insert_sql: str,
-            detail_map: dict,
-            db_map: dict,
-            LIST: list,
-            types: str,
-        ):
-            update_list, insert_list = [], []
-            for key, value in detail_map.items():
-                if key in db_map:
-                    value_db = db_map[key]
-                    if value_db != value:
-                        update_list.append(
-                            (
-                                value_db[LIST[0]],
-                                *[value[ii] for ii in LIST[1:-1]],
-                                value_db[LIST[-1]],
-                                0,
-                            )
+    def store_one_table(
+        self,
+        update_sql: str,
+        insert_sql: str,
+        detail_map: dict,
+        db_map: dict,
+        LIST: list,
+        types: str,
+    ):
+        update_list, insert_list = [], []
+        for key, value in detail_map.items():
+            if key in db_map:
+                value_db = db_map[key]
+                if value_db != value:
+                    update_list.append(
+                        (
+                            value_db[LIST[0]],
+                            *[value[ii] for ii in LIST[1:-1]],
+                            value_db[LIST[-1]],
+                            0,
                         )
-                else:
-                    insert_list.append(tuple([value[ii] for ii in LIST[1:-1]]))
-            self.update_db(update_list, update_sql, f"Update {types.upper()}")
-            self.update_db(insert_list, insert_sql, f"Insert {types.upper()}")
+                    )
+            else:
+                insert_list.append(tuple([value[ii] for ii in LIST[1:-1]]))
+        self.update_db(update_list, update_sql, f"Update {types.upper()}")
+        self.update_db(insert_list, insert_sql, f"Insert {types.upper()}")
 
+    def store_db(self):
         self.load_db(False)
-        store_one_table(
+        self.store_one_table(
             self.R_ITEMS_SQL,
             self.I_ITEMS_SQL,
             self.items_detail_map,
@@ -600,7 +624,7 @@ class Items(object):
             self.ITEMS_LIST,
             "items",
         )
-        store_one_table(
+        self.store_one_table(
             self.R_SHOPS_SQL,
             self.I_SHOPS_SQL,
             self.shops_detail_map,
@@ -613,12 +637,8 @@ class Items(object):
         """ schedule click """
         for idx in range(num):
             flag = begin_time()
-            need_items = [
-                item
-                for item in self.items
-                if not self.items_detail_map.get(item, {}).get("category_id", "")
-                or self.items_detail_map.get(item, {}).get("price", "") == "0"
-            ]
+            self.load_num = 0
+            need_items = list(self.items)
             np.random.shuffle(need_items)
             for item in need_items:
                 self.get_item_detail(item, True)
@@ -626,7 +646,7 @@ class Items(object):
             spend_time = end_time(flag, 0)
             echo(
                 3,
-                f"No. {idx + 1} load {len(need_items)} items spend {get_time_str(spend_time, False)}",
+                f"No. {idx + 1} load {self.load_num} items spend {get_time_str(spend_time, False)}",
             )
             time.sleep(max(self.ONE_HOURS * 2 - spend_time, 0))
 

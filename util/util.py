@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-09 00:13:14
+# @Last Modified time: 2021-04-07 15:27:12
 
 from __future__ import (
     absolute_import,
@@ -558,6 +558,18 @@ def load_configure():
     send_lists = [ii.split(":") for ii in send_list]
     SCKEY = cfg.get("ServerChan", "SCKEY")
     SIGN = EMAIL_SIGN % time_str(time_format="%B %d")
+
+
+def generate_sql(types: str, table_name: str, LIST: list):
+    if types == "select":
+        return "SELECT {} from {}%s;".format(", ".join(LIST), table_name)
+    if types == "insert":
+        return "INSERT INTO {} ({}) VALUES %s;".format(
+            table_name, ", ".join(LIST[1:-1])
+        )
+    return "REPLACE INTO {} ({}, is_deleted) VALUES %s;".format(
+        table_name, ", ".join(LIST)
+    )
 
 
 headers = {

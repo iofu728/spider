@@ -10,7 +10,7 @@ CREATE TABLE if not exists `article_tpwd` (
   `commission_rate` int(10) unsigned NOT NULL DEFAULT 0 COMMENT 'commission rate',
   `commission_type` varchar(30) NOT NULL DEFAULT '' COMMENT 'commission type',
   `expire_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'expire time',
-  `is_update` int(10) unsigned NOT NULL DEFAULT 0 COMMENT 'is updated',
+  `is_updated` int(10) unsigned NOT NULL DEFAULT 0 COMMENT 'is updated',
   `is_deleted` int(10) unsigned NOT NULL DEFAULT 0 COMMENT 'is deleted',
   `other1` varchar(300) NOT NULL DEFAULT '' COMMENT 'other1',
   `other2` varchar(300) NOT NULL DEFAULT '' COMMENT 'other2',

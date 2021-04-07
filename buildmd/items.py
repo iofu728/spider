@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-06 23:50:58
+# @Last Modified time: 2021-04-07 15:38:16
 
 import os
 import sys
@@ -377,7 +377,7 @@ class Items(object):
             self.config["time_stamp"]
             - time_stamp(
                 self.items_detail_map.get(item_id, {}).get(
-                    "updated_at", self.config["time_stamp"]
+                    "updated_at", self.config["time_str"]
                 )
             )
             >= self.ONE_HOURS * self.ONE_DAY * 10
@@ -564,7 +564,10 @@ class Items(object):
             ]
         )
         items = self.load_db_table(
-            self.S_ITEMS_SQL % "", self.ITEMS_LIST, self.items_detail_db_map, "item_id"
+            self.S_ITEMS_SQL % "",
+            self.ITEMS_LIST + ["updated_at"],
+            self.items_detail_db_map,
+            "item_id",
         ).copy()
         shops = self.load_db_table(
             self.S_SHOPS_SQL % "", self.SHOPS_LIST, self.shops_detail_db_map, "shop_id"

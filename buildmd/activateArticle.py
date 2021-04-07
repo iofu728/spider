@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-07 15:22:41
+# @Last Modified time: 2021-04-07 16:28:43
 
 import json
 import os
@@ -264,6 +264,7 @@ class ActivateArticle(TBK):
         self.yd_ids = []
         self.tpwds_list = {}
         self.ynote_list = {}
+        self.load_num = [0, 0]
         self.tpwd_exec = ThreadPoolExecutor(max_workers=5)
 
     def load_process(self):
@@ -293,14 +294,17 @@ class ActivateArticle(TBK):
             self.S_TPWD_SQL % "", self.TPWD_LIST, self.tpwds_db_map, "tpwd"
         ).copy()
         lists = self.items.load_db_table(
-            self.S_LIST_SQL % "", self.LIST_LIST, self.lists_db_map, "article_id"
+            self.S_LIST_SQL,
+            self.LIST_LIST + ["updated_at"],
+            self.lists_db_map,
+            "article_id",
         ).copy()
 
         if is_load:
             self.tpwds_map = tpwds
             self.new_tpwds_map = tpwds.copy()
             self.lists_map = lists
-        need_update = [1 for ii in self.tpwds_db_map.values() if not ii["is_update"]]
+        need_update = [1 for ii in self.tpwds_db_map.values() if not ii["is_updated"]]
         echo(
             1,
             "Load {} Articles and {} Tpwds from db, {} Tpwds need update.".format(
@@ -333,13 +337,12 @@ class ActivateArticle(TBK):
         expired_flag = (
             self.BASIC_TIMEX_STAMP
             - time_stamp(
-                self.lists_map.get(yd_id, {}).get("updated_at", self.BASIC_TIMEX_STAMP)
+                self.lists_map.get(yd_id, {}).get("updated_at", self.BASIC_TIMEX_STR)
             )
             >= self.ONE_HOURS * self.ONE_DAY * 10
         )
         if (
-            yd_id in self.lists_map
-            and self.lists_map[yd_id]["name"]
+            self.lists_map.get(yd_id, {}).get("title", "")
             and not expired_flag
             and not force_update
         ):

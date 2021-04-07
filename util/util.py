@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-07 15:27:12
+# @Last Modified time: 2021-04-08 00:13:39
 
 from __future__ import (
     absolute_import,
@@ -411,11 +411,15 @@ def log(types: str, *log_args: list):
 def decoder_url(url: str, do_decoder: bool = False) -> dict:
     if "?" not in url:
         return {}
-    decoder_dict = {
-        ii.split("=", 1)[0]: ii.split("=", 1)[1]
-        for ii in url.split("?", 1)[1].split("&")
-        if ii != ""
-    }
+    try:
+        decoder_dict = {
+            ii.split("=", 1)[0]: ii.split("=", 1)[1]
+            for ii in url.split("?", 1)[1].split("&")
+            if ii != ""
+        }
+    except:
+        ehco(2, "decoder url error.", "url:", url)
+        return {}
     if do_decoder:
         decoder_dict = {
             key: urllib.parse.unquote(value) for key, value in decoder_dict.items()

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-07 20:41:58
+# @Last Modified time: 2021-04-08 00:12:34
 
 import os
 import sys
@@ -17,6 +17,7 @@ sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
 from util.util import (
+    basic_req,
     begin_time,
     can_retry,
     decoder_url,
@@ -105,8 +106,10 @@ class Items(object):
         self.Db = Db("tbk")
         for table in self.TABLE_LISTS:
             self.Db.create_table(os.path.join(sql_dir, table))
+        self.is_local = config.get("is_local", False)
         self.shops_detail_map = {}
         self.items_detail_map = {}
+        self.shops_seller_map = {}
         self.shops_detail_db_map = {}
         self.items_detail_db_map = {}
         self.load_num = 0
@@ -350,11 +353,11 @@ class Items(object):
         if mode == 0:
             j_data["data"] = data_str
         mtop_url = encoder_url(j_data, self.MTOP_URL % (api, int(j_data["v"])))
+        req_func = basic_req if self.is_local else proxy_req
         if mode == 0:
-            req = proxy_req(mtop_url, 2, header=headers)
+            req = req_func(mtop_url, 2, header=headers)
         else:
-            req = proxy_req(mtop_url, 12, data=data, header=headers)
-        # echo(4, 'request once.')
+            req = req_func(mtop_url, 12, data=data, header=headers)
         if req is None:
             if can_retry(self.MTOP_URL % (api, int(j_data["v"]))):
                 return self.get_tb_h5_api(
@@ -570,7 +573,10 @@ class Items(object):
             [
                 ii[0]
                 for ii in self.Db.select_db(self.S_TPWDS_SQL)
-                if ii[0] and ii[0].isdigit()
+                + self.Db.select_db(
+                    self.S_TPWDS_SQL.replace("article_tpwd", "tpwds_local")
+                )
+                if ii[0] and ii[0].isdigit() and not ii[0].startswith("shop")
             ]
         )
         items = self.load_db_table(
@@ -585,9 +591,10 @@ class Items(object):
         if is_load:
             self.items_detail_map = items
             self.shops_detail_map = shops
+            self.shops_seller_map = {c["user_id"]: c for c in shops.values()}
         echo(
             1,
-            f"Load {len(self.items)} TPWDS {len(self.items_detail_map)} ITEMS and {len(self.shops_detail_map)} SHOPS from db.",
+            f"Load {len(self.items)} TPWDS_ITEMS {len(self.items_detail_map)} ITEMS and {len(self.shops_detail_map)} SHOPS from db.",
         )
 
     def update_db(self, data: list, basic_sql: str, types: str):

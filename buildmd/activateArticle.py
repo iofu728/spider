@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-07 20:59:14
+# @Last Modified time: 2021-04-08 00:59:51
 
 import json
 import os
@@ -242,8 +242,13 @@ class ActivateArticle(TBK):
         - ONE_DAY * ONE_HOURS
     )
 
-    def __init__(self):
+    def __init__(self, is_local: bool = False):
         super(ActivateArticle, self).__init__()
+        if is_local:
+            self.S_TPWD_SQL = self.S_TPWD_SQL.replace("article_tpwd", "tpwds_local")
+            self.I_TPWD_SQL = self.I_TPWD_SQL.replace("article_tpwd", "tpwds_local")
+            self.R_TPWD_SQL = self.R_TPWD_SQL.replace("article_tpwd", "tpwds_local")
+        self.is_local = is_local
         self.BASIC_TIMEX_STR = time_str()
         self.BASIC_TIMEX_STAMP = time_stamp()
         self.items = Items(
@@ -251,6 +256,7 @@ class ActivateArticle(TBK):
                 "time_str": self.BASIC_TIMEX_STR,
                 "time_stamp": self.BASIC_TIMEX_STAMP,
                 "proxy_req": proxy_req,
+                "is_local": is_local,
             }
         )
         self.Db = self.items.Db
@@ -495,7 +501,7 @@ class ActivateArticle(TBK):
         self.tpwds_list[yd_id] = tpwds
         return tpwds
 
-    def update_tpwd(self, is_renew: bool = True, yd_id: str = None):
+    def update_tpwds(self, is_renew: bool = True, yd_id: str = None):
         update_num = 0
         c = self.items.items_detail_map
         for o_tpwd, m in self.tpwds_map.items():
@@ -611,6 +617,8 @@ class ActivateArticle(TBK):
         return url, tpwd, m["domain"], commission_rate, commission_type
 
     def decoder_tpwd_item(self, tpwd: str, force_update: bool = False):
+        if tpwd not in self.tpwds_map:
+            return {}
         if self.tpwds_map.get(tpwd, {}).get("item_id", "") and not force_update:
             return self.tpwds_map[tpwd]
         self.load_num[1] += 1
@@ -646,7 +654,7 @@ class ActivateArticle(TBK):
         else:
             echo("0|warning", "New Domain:", regex.findall("https://(.*?)/", url), url)
             idx, item_id = 20, ""
-        return idx, item_id
+        return idx, str(item_id)
 
     def decoder_tpwd_v1(self, tpwd: str):
         """ decoder the tpwd from taokouling from taokouling.com something failure in March 2021"""
@@ -660,7 +668,8 @@ class ActivateArticle(TBK):
         """ decoder the tpwd from taokouling from https://taodaxiang.com/taopass"""
         url = self.DECODER_TPWD_URL_V2
         data = {"content": f"￥{tpwd}￥"}
-        req = proxy_req(url, 11, data=data)
+        req_func = basic_req if self.is_local else proxy_req
+        req = req_func(url, 11, data=data)
         if req is None or not isinstance(req, dict) or "code" not in list(req.keys()):
             return {}
         return req
@@ -711,7 +720,7 @@ class ActivateArticle(TBK):
         is_direct: bool = False,
     ):
         headers = self.get_headers(refer_url=referer)
-        req_func = basic_req if is_direct else proxy_req
+        req_func = basic_req if is_direct or self.is_local else proxy_req
         req = req_func(
             s_click_url, 2, header=headers, config={"allow_redirects": allow_redirects}
         )
@@ -752,7 +761,8 @@ class ActivateArticle(TBK):
 
     def get_s_click_detail(self, redirect_url: str, tu_url: str):
         headers = self.get_headers(refer_url=tu_url)
-        req = proxy_req(redirect_url, 2, header=headers)
+        req_func = basic_req if self.is_local else proxy_req
+        req = req_func(redirect_url, 2, header=headers)
         if req is None or "id=" not in req.url:
             if can_retry(redirect_url):
                 return self.get_s_click_detail(redirect_url, tu_url)
@@ -763,6 +773,8 @@ class ActivateArticle(TBK):
     def get_item_id(self, item_url: str) -> int:
         item = decoder_url(item_url)
         if not "id" in item or not item["id"].isdigit():
+            if "user_number_id" in item:
+                return "shop{}".format(item["user_number_id"])
             echo(0, "id not found:", item_url)
             return ""
         return int(item["id"])
@@ -1035,7 +1047,7 @@ class ActivateArticle(TBK):
         self.get_article_tpwds(yd_path, mode="local")
         self.load_num = [0, 0]
         for tpwd in set(self.tpwds_list[yd_path]):
-            self.get_tpwd_detail_pro(tpwd, yd_path)
+            self.get_tpwd_detail_pro(tpwd, yd_path, is_wait=True)
         echo(
             2,
             f"Article {yd_path} Load {self.load_num[0]} Tpwds and {self.load_num[1]} Items Info.",
@@ -1094,7 +1106,7 @@ class ActivateArticle(TBK):
     def load_yds(self):
         yd_ids = self.yd_ids.copy()
         np.random.shuffle(yd_ids)
-        for yd_id in range(yd_ids):
+        for yd_id in yd_ids:
             self.get_yd_tpwds_detail(yd_id, is_wait=True)
         self.check_overdue()
 
@@ -1122,8 +1134,51 @@ class ActivateArticle(TBK):
         old, _, _ = load_bigger(TPWDLIST_PATH)
         return int(old != self.tpwd_list)
 
-    def change_tpwd(self, article_path):
-        origin = read_file(article_path)
+    def generate_local_yd_info(self, yd_path: str):
+        o_text = "\n".join(read_file(yd_path))
+        for tpwd in self.tpwds_list[yd_path]:
+            item_id = self.tpwds_map.get(tpwd, {}).get("item_id", "")
+            if not item_id or item_id not in self.items.items_detail_map:
+                continue
+
+            price, shop_id, rate_keywords = [
+                self.items.items_detail_map[item_id].get(ii, jj)
+                for ii, jj in [
+                    ("price", ""),
+                    ("shop_id", ""),
+                    ("rate_keywords", ""),
+                ]
+            ]
+            shop_name = self.items.shops_detail_map.get(shop_id, {}).get(
+                "shop_name", ""
+            )
+            origin_str = f"\n3￥{tpwd}￥/"
+            replace_str = origin_str
+            if shop_name:
+                replace_str = f"\n店铺 {shop_name}" + replace_str
+            if price:
+                replace_str = f" {price}" + replace_str
+            if rate_keywords:
+                keywords_list = sorted(
+                    [ii.split(":") for ii in rate_keywords.split(",")],
+                    key=lambda i: -int(i[1]),
+                )
+                advantages = [ii for ii in keywords_list if ii[-1] == "1"]
+                disadvantages = [ii for ii in keywords_list if ii[-1] == "-1"]
+                if advantages:
+                    replace_str += "\n优点: {}".format(
+                        ", ".join([f"{ii}({jj}人)" for ii, jj, _ in advantages])
+                    )
+                if disadvantages:
+                    replace_str += "\n缺点: {}".format(
+                        ", ".join([f"{ii}({jj}人)" for ii, jj, _ in disadvantages])
+                    )
+            o_text = o_text.replace(origin_str, replace_str)
+        with open(yd_path, "w") as f:
+            f.write(o_text)
+
+    def change_tpwd(self, yd_path):
+        origin = read_file(yd_path)
         origin = [
             "".join(["￥" if jj in UNICODE_EMOJI else jj for jj in ii]) for ii in origin
         ]
@@ -1133,7 +1188,7 @@ class ActivateArticle(TBK):
             if tpwds:
                 text = f"3￥{tpwds[0][1]}￥/"
                 origin[ii] = text
-        with open(article_path, "w") as f:
+        with open(yd_path, "w") as f:
             f.write("\n".join(origin))
 
 

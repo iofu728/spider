@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-07 15:38:16
+# @Last Modified time: 2021-04-07 18:08:24
 
 import os
 import sys
@@ -599,11 +599,14 @@ class Items(object):
         LIST: list,
         types: str,
     ):
+        def get_update_info(d_map: dict, LIST: list):
+            return {ii: jj for ii, jj in d_map.items() if ii not in [LIST[0], LIST[-1]]}
+
         update_list, insert_list = [], []
         for key, value in detail_map.items():
             if key in db_map:
                 value_db = db_map[key]
-                if value_db != value:
+                if get_update_info(value_db, LIST) != get_update_info(value, LIST):
                     update_list.append(
                         (
                             value_db[LIST[0]],

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-07 16:28:43
+# @Last Modified time: 2021-04-07 17:32:41
 
 import json
 import os
@@ -418,17 +418,17 @@ class ActivateArticle(TBK):
     def get_tpwd_detail_pro(
         self,
         tpwd: str,
-        article_id: str,
+        yd_id: str,
         is_wait: bool = False,
         force_update: bool = False,
     ):
-        self.get_tpwd_detail(tpwd, article_id, is_wait, force_update)
+        self.get_tpwd_detail(tpwd, yd_id, is_wait, force_update)
         return self.decoder_tpwd_item(tpwd, force_update)
 
     def get_tpwd_detail(
         self,
         tpwd: str,
-        article_id: str,
+        yd_id: str,
         is_wait: bool = False,
         force_update: bool = False,
     ):
@@ -459,13 +459,13 @@ class ActivateArticle(TBK):
 
         self.tpwds_map[tpwd] = {
             "tpwd": tpwd,
-            "article_id": article_id,
+            "article_id": yd_id,
             "content": content,
             "url": url.strip(),
             "item_id": self.tpwds_map.get(tpwd, {}).get("item_id", ""),
-            "domain": self.tpwds_map.get(tpwd, {}).get("item_id", 0),
-            "commission_rate": self.tpwds_map.get(tpwd, {}).get("item_id", 0),
-            "commission_type": self.tpwds_map.get(tpwd, {}).get("item_id", ""),
+            "domain": self.tpwds_map.get(tpwd, {}).get("domain", 0),
+            "commission_rate": self.tpwds_map.get(tpwd, {}).get("commission_rate", 0),
+            "commission_type": self.tpwds_map.get(tpwd, {}).get("commission_type", ""),
             "expire_at": expire_at,
         }
         self.tpwds_map[tpwd]["is_updated"] = (
@@ -474,6 +474,7 @@ class ActivateArticle(TBK):
         self.new_tpwds_map[tpwd] = self.tpwds_map[tpwd].copy()
         self.new_tpwds_map[tpwd]["picUrl"] = picUrl
         self.decoder_tpwd_item(tpwd)
+        return self.tpwds_map[tpwd]
 
     def get_article_tpwds(
         self,
@@ -496,7 +497,7 @@ class ActivateArticle(TBK):
 
     def update_tpwd(self, mode: int = 0, is_renew: bool = True, a_id: str = None):
         update_num = 0
-        for o_tpwd, m in self.new_tpwds_map.items():
+        for o_tpwd, m in self.tpwds_map.items():
             if a_id is not None and m["article_id"] != a_id:
                 continue
             item_id, url, domain, title, tpwd, c_rate, c_type = [
@@ -627,8 +628,10 @@ class ActivateArticle(TBK):
             idx, item_id = 1 if self.URL_DOMAIN[1] in url else 13, self.get_item_id(url)
             if not item_id:
                 idx = 16
-        echo("0|warning", "New Domain:", regex.findall("https://(.*?)/", url), url)
-        return 20, ""
+        else:
+            echo("0|warning", "New Domain:", regex.findall("https://(.*?)/", url), url)
+            idx, item_id = 20, ""
+        return idx, item_id
 
     def decoder_tpwd_v1(self, tpwd: str):
         """ decoder the tpwd from taokouling from taokouling.com something failure in March 2021"""

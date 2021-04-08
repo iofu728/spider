@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-08 11:46:15
+# @Last Modified time: 2021-04-08 13:46:00
 
 import json
 import os
@@ -450,11 +450,10 @@ class ActivateArticle(TBK):
         if is_wait:
             time.sleep(np.random.rand() * 5 + 2)
         req = self.decoder_tpwd(tpwd)
-        if req is None or not len(req):
+        if req is None or not len(req) or req.get("code", "") not in [0, 3]:
             return {}
         if req.get("code", "") == 3:
             is_updated = 1
-
         NEED_KEY = ["content", "url", "expire", "picUrl"]
         content, url, expire_at, picUrl = [
             req["data"].get(ii, o_info.get(ii, jj))
@@ -673,7 +672,7 @@ class ActivateArticle(TBK):
         """ decoder the tpwd from taokouling from https://taodaxiang.com/taopass"""
         url = self.DECODER_TPWD_URL_V2
         data = {"content": f"￥{tpwd}￥"}
-        req_func = basic_req if self.is_local else proxy_req
+        req_func = basic_req
         req = req_func(url, 11, data=data)
         if req is None or not isinstance(req, dict) or "code" not in list(req.keys()):
             return {}
@@ -1118,9 +1117,9 @@ class ActivateArticle(TBK):
     def load_click(self, num=1000000):
         for index in range(num):
             flag = begin_time()
-            if index % 6 != 1:
+            if index % 6 != 5:
                 self.load_yds()
-            if index % 6 == 1:
+            if index % 6 == 5:
                 self.load_share_total()
             spend_time = end_time(flag, 0)
             echo(

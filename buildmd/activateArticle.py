@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-08 00:59:51
+# @Last Modified time: 2021-04-08 11:46:15
 
 import json
 import os
@@ -413,7 +413,7 @@ class ActivateArticle(TBK):
     ):
         self.get_article_tpwds(yd_id, is_wait, force_update)
         self.load_num = [0, 0]
-        for tpwd in set(self.tpwds_list[yd_id]):
+        for tpwd in set(self.tpwds_list.get(yd_id, [])):
             self.get_tpwd_detail_pro(tpwd, yd_id, is_wait, force_update)
         self.store_db()
         echo(
@@ -438,11 +438,11 @@ class ActivateArticle(TBK):
         is_wait: bool = False,
         force_update: bool = False,
     ):
-        updated_flag = self.tpwds_map.get(tpwd, {}).get("is_updated", 0)
+        o_info = self.tpwds_map.get(tpwd, {})
+        is_updated = o_info.get("is_updated", 0)
         if (
             tpwd in self.tpwds_map
-            and self.tpwds_map[tpwd]["content"]
-            and updated_flag
+            and (self.tpwds_map[tpwd]["content"] or is_updated)
             and not force_update
         ):
             return self.tpwds_map[tpwd]
@@ -452,9 +452,14 @@ class ActivateArticle(TBK):
         req = self.decoder_tpwd(tpwd)
         if req is None or not len(req):
             return {}
+        if req.get("code", "") == 3:
+            is_updated = 1
+
         NEED_KEY = ["content", "url", "expire", "picUrl"]
         content, url, expire_at, picUrl = [
-            req["data"].get(ii, jj) if "data" in req else jj
+            req["data"].get(ii, o_info.get(ii, jj))
+            if "data" in req
+            else o_info.get(ii, jj)
             for ii, jj in [
                 ("content", ""),
                 ("url", ""),
@@ -468,14 +473,14 @@ class ActivateArticle(TBK):
             "article_id": yd_id,
             "content": content,
             "url": url.strip(),
-            "item_id": self.tpwds_map.get(tpwd, {}).get("item_id", ""),
-            "domain": self.tpwds_map.get(tpwd, {}).get("domain", 0),
-            "commission_rate": self.tpwds_map.get(tpwd, {}).get("commission_rate", 0),
-            "commission_type": self.tpwds_map.get(tpwd, {}).get("commission_type", ""),
+            "item_id": o_info.get("item_id", ""),
+            "domain": o_info.get("domain", 0),
+            "commission_rate": o_info.get("commission_rate", 0),
+            "commission_type": o_info.get("commission_type", ""),
             "expire_at": expire_at,
         }
         self.tpwds_map[tpwd]["is_updated"] = (
-            1 if content and self.tpwds_map[tpwd]["item_id"] else 0
+            1 if (content and o_info.get("item_id", "")) or is_updated else 0
         )
         self.new_tpwds_map[tpwd] = self.tpwds_map[tpwd].copy()
         self.new_tpwds_map[tpwd]["picUrl"] = picUrl
@@ -630,7 +635,7 @@ class ActivateArticle(TBK):
             **m,
             "domain": domain,
             "item_id": item_id,
-            "is_updated": 1 if m["content"] and item_id else 0,
+            "is_updated": 1 if (m["content"] and item_id) or m["is_updated"] else 0,
         }
         if domain < 20:
             echo(2, "Domain:", self.URL_DOMAIN[domain], "item id:", item_id)

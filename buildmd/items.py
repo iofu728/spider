@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-08 00:12:34
+# @Last Modified time: 2021-04-09 02:13:57
 
 import os
 import sys
@@ -400,7 +400,7 @@ class Items(object):
         ):
             return self.items_detail_map[item_id]
         if is_wait:
-            time.sleep(np.random.rand() * 5 + 2)
+            time.sleep(np.random.rand() * 8 + 2)
         if (
             not "uland" in self.cookies
             or time_stamp() - self.m_time > self.ONE_HOURS / 2
@@ -576,7 +576,10 @@ class Items(object):
                 + self.Db.select_db(
                     self.S_TPWDS_SQL.replace("article_tpwd", "tpwds_local")
                 )
-                if ii[0] and ii[0].isdigit() and not ii[0].startswith("shop")
+                if ii[0]
+                and ii[0].isdigit()
+                and not ii[0].startswith("shop")
+                and ii[0] != "0"
             ]
         )
         items = self.load_db_table(

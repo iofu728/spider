@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-08 13:46:00
+# @Last Modified time: 2021-04-09 01:20:39
 
 import json
 import os
@@ -621,7 +621,7 @@ class ActivateArticle(TBK):
         return url, tpwd, m["domain"], commission_rate, commission_type
 
     def decoder_tpwd_item(self, tpwd: str, force_update: bool = False):
-        if tpwd not in self.tpwds_map:
+        if tpwd not in self.tpwds_map or not self.tpwds_map[tpwd].get("url", ""):
             return {}
         if self.tpwds_map.get(tpwd, {}).get("item_id", "") and not force_update:
             return self.tpwds_map[tpwd]
@@ -1171,11 +1171,11 @@ class ActivateArticle(TBK):
                 disadvantages = [ii for ii in keywords_list if ii[-1] == "-1"]
                 if advantages:
                     replace_str += "\n优点: {}".format(
-                        ", ".join([f"{ii}({jj}人)" for ii, jj, _ in advantages])
+                        ", ".join([f"{ii}" for ii, jj, _ in advantages])
                     )
                 if disadvantages:
                     replace_str += "\n缺点: {}".format(
-                        ", ".join([f"{ii}({jj}人)" for ii, jj, _ in disadvantages])
+                        ", ".join([f"{ii}" for ii, jj, _ in disadvantages])
                     )
             o_text = o_text.replace(origin_str, replace_str)
         with open(yd_path, "w") as f:

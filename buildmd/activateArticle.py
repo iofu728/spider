@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-09 02:24:43
+# @Last Modified time: 2021-04-09 22:22:03
 
 import json
 import os
@@ -224,6 +224,8 @@ class ActivateArticle(TBK):
         1: "item.taobao.com",
         2: "detail.m.tmall.com",
         5: "uland.taobao.com",
+        6: "ai.taobao.com",
+        7: "temai.taobao.com",
         10: "taoquan.taobao.com",
         11: "a.m.taobao.com",
         12: "market.m.taobao.com",
@@ -502,6 +504,7 @@ class ActivateArticle(TBK):
         return tpwds
 
     def update_tpwds(self, is_renew: bool = True, yd_id: str = None):
+        """ c_rate: 0: origin, 1: renew, >2: dg matrical """
         update_num = 0
         c = self.items.items_detail_map
         for o_tpwd, m in self.tpwds_map.items():
@@ -519,8 +522,8 @@ class ActivateArticle(TBK):
                     ("domain", 20),
                     ("content", ""),
                     ("tpwd", ""),
-                    ("c_rate", 0),
-                    ("c_type", ""),
+                    ("commission_rate", 0),
+                    ("commission_type", ""),
                 ]
             ]
             item_title, is_expired = [
@@ -531,47 +534,29 @@ class ActivateArticle(TBK):
                 ]
             ]
             title = item_title if item_title else title
+            domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
+            m = m.copy()
+            if is_expired == 1:
+                m["commission_rate"] = 0
+            else:
+                renew_tpwd = None
+                if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
+                    renew_tpwd = self.convert2tpwd(url, title)
+                    if renew_tpwd is not None:
+                        m["commission_rate"] = 1
+                        m["tpwd"] = renew_tpwd
+                if renew_tpwd is None and item_id.isdigit():
+                    self.get_item_tpwd(title, item_id, m)
+                if m["tpwd"] == o_tpwd:
+                    m["commission_rate"] = 0
 
-            if (
-                is_renew
-                and self.URL_DOMAIN[1] not in url
-                and self.URL_DOMAIN[2] not in url
-                and self.URL_DOMAIN[10] not in url
-            ):
-                renew_type = 2 if self.URL_DOMAIN[5] in url else 1
-                renew_tpwd = self.convert2tpwd(url, title)
-                if renew_tpwd is None:
-                    renew_tpwd = o_tpwd
-            else:
-                renew_type = 0
-                renew_tpwd = o_tpwd
-            if item_id == "" or domain == 16:
-                tpwd, c_rate = renew_tpwd, 1 if renew_type == 0 else 2
-            else:
-                (
-                    url,
-                    tpwd,
-                    domain,
-                    c_rate,
-                    c_type,
-                ) = self.generate_tpwd(title, int(item_id), renew_tpwd, renew_type, m)
-            for k, v in [
-                ("url", url),
-                ("tpwd", tpwd),
-                ("domain", domain),
-                ("commission_rate", c_rate),
-                ("commission_type", c_type),
-            ]:
-                self.new_tpwds_map[k] = v
-            update_num += int(domain < 15)
+            update_num += int(m["commission_rate"] > 0)
         echo(2, "Update {} Tpwd Info Success!!".format(update_num))
 
-    def generate_tpwd(
+    def get_item_tpwd(
         self,
         title: str,
         item_id: int,
-        renew_tpwd: str,
-        renew_type: int,
         m: dict,
     ):
         goods = self.get_dg_material(title, item_id)
@@ -584,13 +569,7 @@ class ActivateArticle(TBK):
                 title,
                 item_id,
             )
-            return (
-                m["url"],
-                renew_tpwd,
-                17,
-                1 if renew_type == 0 else 2,
-                m["commission_type"],
-            )
+            return
 
         goods = goods[0]
         if "ysyl_click_url" in goods and len(goods["ysyl_click_url"]):
@@ -605,16 +584,11 @@ class ActivateArticle(TBK):
         tpwd = self.convert2tpwd(url, title)
         if tpwd is None:
             echo(0, "tpwd error:", tpwd)
-            return (
-                m["url"],
-                renew_tpwd,
-                18,
-                1 if renew_type == 0 else 2,
-                m["commission_type"],
-            )
-        if renew_type == 1:
-            commission_rate = 2
-        return url, tpwd, m["domain"], commission_rate, commission_type
+            return
+        m["commission_rate"] = commission_rate
+        m["commission_type"] = commission_type
+        m["url"] = url
+        m["tpwd"] = tpwd
 
     def decoder_tpwd_item(self, tpwd: str, force_update: bool = False):
         if tpwd not in self.tpwds_map or not self.tpwds_map[tpwd].get("url", ""):

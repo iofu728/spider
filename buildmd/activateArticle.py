@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-09 22:22:03
+# @Last Modified time: 2021-04-09 23:43:29
 
 import json
 import os
@@ -12,7 +12,7 @@ import time
 import urllib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from configparser import ConfigParser
-from collections import Counter
+from collections import Counter, defaultdict
 from emoji import UNICODE_EMOJI
 
 import numpy as np
@@ -507,25 +507,13 @@ class ActivateArticle(TBK):
         """ c_rate: 0: origin, 1: renew, >2: dg matrical """
         update_num = 0
         c = self.items.items_detail_map
+        item2tpwds = defaultdict(set)
         for o_tpwd, m in self.tpwds_map.items():
-            if (
-                yd_id is not None
-                and m["article_id"] != yd_id
-                and o_tpwd not in self.tpwds_list.get(yd_id, [])
-            ):
-                continue
-            item_id, url, domain, title, tpwd, c_rate, c_type = [
-                m.get(ii, jj)
-                for ii, jj in [
-                    ("item_id", ""),
-                    ("url", ""),
-                    ("domain", 20),
-                    ("content", ""),
-                    ("tpwd", ""),
-                    ("commission_rate", 0),
-                    ("commission_type", ""),
-                ]
-            ]
+            item_id = m.get("item_id", "")
+            if item_id not in ["", "0"] and not item_id.startswith("shop"):
+                item2tpwds[item_id].add(o_tpwd)
+        item2new = {}
+        for item_id, tpwds in item2tpwds.items():
             item_title, is_expired = [
                 c.get(item_id, {}).get(ii, jj)
                 for ii, jj in [
@@ -533,25 +521,45 @@ class ActivateArticle(TBK):
                     ("is_expired", 0),
                 ]
             ]
-            title = item_title if item_title else title
-            domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
-            m = m.copy()
             if is_expired == 1:
-                m["commission_rate"] = 0
-            else:
-                renew_tpwd = None
+                continue
+
+            renew_tpwd, m, o_tpwd = None, None, None
+            for o_tpwd in tpwds:
+                m = self.tpwds_map.get(o_tpwd, {}).copy()
+                url = m.get("url", "")
+                title = m.get("title", "")
+                title = item_title if item_title else title
+                domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
                 if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
                     renew_tpwd = self.convert2tpwd(url, title)
                     if renew_tpwd is not None:
                         m["commission_rate"] = 1
                         m["tpwd"] = renew_tpwd
-                if renew_tpwd is None and item_id.isdigit():
-                    self.get_item_tpwd(title, item_id, m)
-                if m["tpwd"] == o_tpwd:
-                    m["commission_rate"] = 0
+                        break
+            if renew_tpwd is None:
+                self.get_item_tpwd(item_title, item_id, m)
+            if m["tpwd"] != o_tpwd:
+                item2new[item_id] = m
+        for o_tpwd, m in self.tpwds_map.items():
+            m = m.copy()
+            item_id = m.get("item_id", "")
+            if item_id not in item2new:
+                m["commission_rate"] = 0
+                self.new_tpwds_map[o_tpwd] = m
+                continue
+            new_m = item2new[item_id]
+            for key in ["url", "tpwd", "commission_rate", "commission_type"]:
+                m[key] = new_m[key]
+            self.new_tpwds_map[o_tpwd] = m
+        update_num = len([1 for v in self.new_tpwds_map if v["commission_rate"] >= 0])
 
-            update_num += int(m["commission_rate"] > 0)
-        echo(2, "Update {} Tpwd Info Success!!".format(update_num))
+        echo(
+            2,
+            "Update {}/{} Items and {} Tpwds Info Success!!".format(
+                len(item2new), len(item2tpwds), update_num
+            ),
+        )
 
     def get_item_tpwd(
         self,

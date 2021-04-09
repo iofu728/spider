@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-09 23:43:29
+# @Last Modified time: 2021-04-10 03:20:32
 
 import json
 import os
@@ -62,11 +62,13 @@ mkdir(DATA_DIR)
 class TBK(object):
     """ tbk info class """
 
+    SC_URL = "http://gateway.kouss.com/tbpub/%s"
     CSTK_KEY = "YNOTE_CSTK"
 
     def __init__(self):
         super(TBK, self).__init__()
         self.tb_items = {}
+        self.sc_data = {}
         self.load_configure()
         # self.load_tbk_info()
 
@@ -78,17 +80,23 @@ class TBK(object):
         self.user_id = cfg.getint("TBK", "user_id")
         self.site_id = cfg.getint("TBK", "site_id")
         self.adzone_id = cfg.getint("TBK", "adzone_id")
-        self.home_id = cfg.get("YNOTE", "home_id")
         self.test_item_id = cfg.getint("TBK", "test_item_id")
         self.test_finger_id = cfg.getint("TBK", "test_finger_id")
         self.uland_url = cfg.get("TBK", "uland_url")
+        self.api_key = cfg.get("TBK", "apikey")
+        self.sc_session = cfg.get("TBK", "sc_session")
+        self.home_id = cfg.get("YNOTE", "home_id")
         self.unlogin_id = cfg.get("YNOTE", "unlogin_id")
         self.cookie = cfg.get("YNOTE", "cookie")[1:-1]
-        self.api_key = cfg.get("TBK", "apikey")
         self.assign_rec = cfg.get("YNOTE", "assign_email").split(",")
         cookie_de = decoder_cookie(self.cookie)
         self.cstk = cookie_de[self.CSTK_KEY] if self.CSTK_KEY in cookie_de else ""
         top.setDefaultAppInfo(self.appkey, self.secret)
+        self.sc_data = {
+            "adzone_id": self.adzone_id,
+            "site_id": self.site_id,
+            "session": self.sc_session,
+        }
 
     def load_tbk_info(self):
         favorites = self.get_uatm_favor()
@@ -134,9 +142,11 @@ class TBK(object):
             goods = goods["tbk_dg_material_optional_response"]["result_list"][
                 "map_data"
             ]
-            return [ii for ii in goods if ii["num_iid"] == num_iid]
+            match = [ii for ii in goods if ii["num_iid"] == num_iid]
+            return match[0] if match else {}
         except Exception as e:
             echo(0, "get dg material failed.", title, num_iid, e)
+            return {}
 
     def convert2tpwd(self, url: str, title: str):
         req = top.api.TbkTpwdCreateRequest()
@@ -151,6 +161,30 @@ class TBK(object):
             return ""
         except Exception as e:
             echo(0, "Generate tpwd failed", url, title, e)
+
+    def generate_shop_tpwds(self, shop_ids_map: dict):
+        time.sleep(2)
+        url = self.SC_URL % "shopConvert"
+        data = {
+            **self.sc_data,
+            "user_ids": ",".join(list(shop_ids_map.keys())),
+            "fields": "user_id,click_url",
+        }
+        req = basic_req(url, 11, data=data)
+        n_tbk_shop = req.get("results", {}).get("n_tbk_shop", [])
+        return {
+            str(ii["user_id"]): self.convert2tpwd(
+                ii["click_url"], shop_ids_map[str(ii["user_id"])]
+            )
+            for ii in n_tbk_shop
+        }
+
+    def generate_private_tpwd(self, item_id: str):
+        time.sleep(2)
+        url = self.SC_URL % "privilegeGet"
+        data = {**self.sc_data, "item_id": item_id}
+        req = basic_req(url, 11, data=data)
+        return req.get("result", {}).get("data", {})
 
 
 class ActivateArticle(TBK):
@@ -503,10 +537,35 @@ class ActivateArticle(TBK):
         self.tpwds_list[yd_id] = tpwds
         return tpwds
 
+    def update_shops(self):
+        flag = begin_time()
+        shops = [ii for ii in self.items.shops_detail_map.values() if ii["user_id"]]
+        N, updated_num = len(shops), 0
+        for ii in range((N - 1) // 30 + 1):
+            shop_ids_map = {
+                ii["user_id"]: ii["shop_name"] for ii in shops[ii * 30 : (ii + 1) * 30]
+            }
+            user2shop = {
+                ii["user_id"]: ii["shop_id"] for ii in shops[ii * 30 : (ii + 1) * 30]
+            }
+            shop_tpwds = self.generate_shop_tpwds(shop_ids_map)
+            for user_id, tpwd in shop_tpwds:
+                shop_id = user2shop[user_id]
+                self.items.shops_detail_map[shop_id]["tpwd"] = tpwd
+            updated_num += len(shop_tpwds)
+        spend_time = end_time(flag, 0)
+        echo(
+            2,
+            "Update {}/{} Shops Success spend {}!!".format(
+                updated_num, N, get_time_str(spend_time, False)
+            ),
+        )
+
     def update_tpwds(self, is_renew: bool = True, yd_id: str = None):
-        """ c_rate: 0: origin, 1: renew, >2: dg matrical """
-        update_num = 0
+        """ c_rate: 0: origin, 1: renew, 2: shop tpwd, >3: dg matrical """
+        self.load_num, shop_num = [0, 0], 0
         c = self.items.items_detail_map
+        s = self.items.shops_detail_map
         item2tpwds = defaultdict(set)
         for o_tpwd, m in self.tpwds_map.items():
             item_id = m.get("item_id", "")
@@ -514,21 +573,17 @@ class ActivateArticle(TBK):
                 item2tpwds[item_id].add(o_tpwd)
         item2new = {}
         for item_id, tpwds in item2tpwds.items():
-            item_title, is_expired = [
+            item_title, is_expired, shop_id = [
                 c.get(item_id, {}).get(ii, jj)
-                for ii, jj in [
-                    ("title", ""),
-                    ("is_expired", 0),
-                ]
+                for ii, jj in [("title", ""), ("is_expired", 0), ("shop_id", "")]
             ]
             if is_expired == 1:
                 continue
-
             renew_tpwd, m, o_tpwd = None, None, None
             for o_tpwd in tpwds:
                 m = self.tpwds_map.get(o_tpwd, {}).copy()
                 url = m.get("url", "")
-                title = m.get("title", "")
+                title = m.get("content", "")
                 title = item_title if item_title else title
                 domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
                 if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
@@ -538,7 +593,13 @@ class ActivateArticle(TBK):
                         m["tpwd"] = renew_tpwd
                         break
             if renew_tpwd is None:
-                self.get_item_tpwd(item_title, item_id, m)
+                self.get_item_tpwd(title, item_id, m)
+            shop_tpwd = s.get(shop_id, {}).get("tpwd", "")
+            if m["tpwd"] == o_tpwd and shop_tpwd:
+                m["tpwd"] = shop_tpwd
+                m["commission_rate"] = 2
+                shop_num += 1
+
             if m["tpwd"] != o_tpwd:
                 item2new[item_id] = m
         for o_tpwd, m in self.tpwds_map.items():
@@ -552,12 +613,24 @@ class ActivateArticle(TBK):
             for key in ["url", "tpwd", "commission_rate", "commission_type"]:
                 m[key] = new_m[key]
             self.new_tpwds_map[o_tpwd] = m
-        update_num = len([1 for v in self.new_tpwds_map if v["commission_rate"] >= 0])
+        update_num = len(
+            [1 for v in self.new_tpwds_map.values() if v["commission_rate"] > 0]
+        )
+        normal_items_num = len(
+            [1 for v in self.items.items_detail_map.values() if v["is_expired"] == 0]
+        )
+        renew = len(item2new) - shop_num - sum(self.load_num)
 
         echo(
             2,
-            "Update {}/{} Items and {} Tpwds Info Success!!".format(
-                len(item2new), len(item2tpwds), update_num
+            "Update {}/{} Items and {} Tpwds Info Success!!\nAmong, {} renew, {} dg, {} private, {} shop.".format(
+                len(item2new),
+                normal_items_num,
+                update_num,
+                renew,
+                self.load_num[0],
+                self.load_num[1],
+                shop_num,
             ),
         )
 
@@ -567,36 +640,43 @@ class ActivateArticle(TBK):
         item_id: int,
         m: dict,
     ):
-        goods = self.get_dg_material(title, item_id)
-        if not goods:
+        goods = self.get_dg_material(title, int(item_id))
+        private = self.generate_private_tpwd(item_id)
+
+        if not goods and not private:
             echo(
                 0,
-                "goods get",
-                "error" if goods is None else "empty",
-                ":",
-                title,
-                item_id,
+                f"goods get empty: {title} {item_id}",
             )
             return
-
-        goods = goods[0]
-        if "ysyl_click_url" in goods and len(goods["ysyl_click_url"]):
-            url = goods["ysyl_click_url"]
-        elif "coupon_share_url" in goods and len(goods["coupon_share_url"]):
-            url = goods["coupon_share_url"]
+        private_rate = float(private.get("max_commission_rate", "0")) * 1000
+        goods_rate = float(goods.get("commission_rate", "0"))
+        if goods_rate >= private_rate:
+            self.load_num[0] += 1
+            url = goods.get("ysyl_click_url", "")
+            if not url:
+                url = goods.get("coupon_share_url", "")
+            if not url:
+                url = goods.get("url", "")
+            url = "https:" + url
+            c_rate = int(goods_rate)
+            c_type = goods.get("commission_type", "")
         else:
-            url = goods["url"]
-        url = "https:{}".format(url)
-        commission_rate = int(goods["commission_rate"])
-        commission_type = goods["commission_type"]
+            self.load_num[1] += 1
+            url = private.get("coupon_click_url", private.get("item_url", ""))
+            c_rate = int(private_rate)
+            c_type = "private"
         tpwd = self.convert2tpwd(url, title)
         if tpwd is None:
             echo(0, "tpwd error:", tpwd)
             return
-        m["commission_rate"] = commission_rate
-        m["commission_type"] = commission_type
-        m["url"] = url
-        m["tpwd"] = tpwd
+        m = {
+            **m,
+            "commission_rate": c_rate,
+            "commission_type": c_type,
+            "url": url,
+            "tpwd": tpwd,
+        }
 
     def decoder_tpwd_item(self, tpwd: str, force_update: bool = False):
         if tpwd not in self.tpwds_map or not self.tpwds_map[tpwd].get("url", ""):
@@ -759,7 +839,7 @@ class ActivateArticle(TBK):
                 return "shop{}".format(item["user_number_id"])
             echo(0, "id not found:", item_url)
             return ""
-        return int(item["id"])
+        return item["id"]
 
     def get_a_m_url(self, a_m_url: str):
         req = self.get_a_m_basic(a_m_url)
@@ -901,7 +981,9 @@ class ActivateArticle(TBK):
 
     def update_yd2db(self, yd_id: str, is_tpwd_update: bool = False):
         for tpwd in set(self.tpwds_list[yd_id]):
-            self.tpwds_map[tpwd] = self.new_tpwds_map[tpwd]
+            new_m = self.new_tpwds_map[tpwd]
+            new_m["is_updayed"] = 0
+            self.tpwds_map[new_m["tpwd"]] = new_m
         self.store_db()
 
     def replace_tpwd(self, yd_id: str, xml: str):

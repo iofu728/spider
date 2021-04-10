@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 03:20:32
+# @Last Modified time: 2021-04-10 12:11:37
 
 import json
 import os
@@ -161,6 +161,7 @@ class TBK(object):
             return ""
         except Exception as e:
             echo(0, "Generate tpwd failed", url, title, e)
+            return ""
 
     def generate_shop_tpwds(self, shop_ids_map: dict):
         time.sleep(2)
@@ -549,7 +550,7 @@ class ActivateArticle(TBK):
                 ii["user_id"]: ii["shop_id"] for ii in shops[ii * 30 : (ii + 1) * 30]
             }
             shop_tpwds = self.generate_shop_tpwds(shop_ids_map)
-            for user_id, tpwd in shop_tpwds:
+            for user_id, tpwd in shop_tpwds.items():
                 shop_id = user2shop[user_id]
                 self.items.shops_detail_map[shop_id]["tpwd"] = tpwd
             updated_num += len(shop_tpwds)
@@ -566,13 +567,28 @@ class ActivateArticle(TBK):
         self.load_num, shop_num = [0, 0], 0
         c = self.items.items_detail_map
         s = self.items.shops_detail_map
+
+        # counter tpwds -> item_id
         item2tpwds = defaultdict(set)
         for o_tpwd, m in self.tpwds_map.items():
             item_id = m.get("item_id", "")
-            if item_id not in ["", "0"] and not item_id.startswith("shop"):
+            if item_id not in ["", "0"]:
                 item2tpwds[item_id].add(o_tpwd)
+
+        # generate new tpwd for each item_id
         item2new = {}
         for item_id, tpwds in item2tpwds.items():
+            if item_id.startswith("shop"):
+                shop_id = item_id[4:]
+                shop_tpwd = s.get(shop_id, {}).get("tpwd", "")
+                if shop_tpwd:
+                    o_tpwd = list(tpwds)[0]
+                    m = self.tpwds_map.get(o_tpwd, {}).copy()
+                    m["tpwd"] = shop_tpwd
+                    m["commission_rate"] = 2
+                    item2new[item_id] = m
+                continue
+
             item_title, is_expired, shop_id = [
                 c.get(item_id, {}).get(ii, jj)
                 for ii, jj in [("title", ""), ("is_expired", 0), ("shop_id", "")]
@@ -588,7 +604,7 @@ class ActivateArticle(TBK):
                 domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
                 if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
                     renew_tpwd = self.convert2tpwd(url, title)
-                    if renew_tpwd is not None:
+                    if renew_tpwd:
                         m["commission_rate"] = 1
                         m["tpwd"] = renew_tpwd
                         break
@@ -602,6 +618,8 @@ class ActivateArticle(TBK):
 
             if m["tpwd"] != o_tpwd:
                 item2new[item_id] = m
+
+        # generate new tpwd for each tpwd
         for o_tpwd, m in self.tpwds_map.items():
             m = m.copy()
             item_id = m.get("item_id", "")
@@ -613,6 +631,7 @@ class ActivateArticle(TBK):
             for key in ["url", "tpwd", "commission_rate", "commission_type"]:
                 m[key] = new_m[key]
             self.new_tpwds_map[o_tpwd] = m
+
         update_num = len(
             [1 for v in self.new_tpwds_map.values() if v["commission_rate"] > 0]
         )
@@ -649,7 +668,7 @@ class ActivateArticle(TBK):
                 f"goods get empty: {title} {item_id}",
             )
             return
-        private_rate = float(private.get("max_commission_rate", "0")) * 1000
+        private_rate = float(private.get("max_commission_rate", "0")) * 100
         goods_rate = float(goods.get("commission_rate", "0"))
         if goods_rate >= private_rate:
             self.load_num[0] += 1
@@ -667,7 +686,7 @@ class ActivateArticle(TBK):
             c_rate = int(private_rate)
             c_type = "private"
         tpwd = self.convert2tpwd(url, title)
-        if tpwd is None:
+        if not tpwd:
             echo(0, "tpwd error:", tpwd)
             return
         m = {

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-11 00:13:11
+# @Last Modified time: 2021-04-11 02:34:58
 
 import json
 import os
@@ -200,6 +200,13 @@ class TBK(object):
         }
         data = {"text": f"￥{tpwd}￥"}
         req = basic_req(url, 11, data=data, header=header)
+        return req
+
+    def decoder_sclick_url(self, s_click_url: str):
+        time.sleep(2)
+        url = self.SC_URL % "itemClickExtract"
+        data = {**self.sc_data, "click_url": s_click_url}
+        req = basic_req(url, 11, data=data)
         return req
 
 
@@ -821,6 +828,12 @@ class ActivateArticle(TBK):
         return req
 
     def get_s_click_url(self, s_click_url: str):
+        item_id_map = self.decoder_sclick_url(s_click_url)
+        if item_id_map is not None and item_id_map.get("item_id", ""):
+            return item_id_map.get("item_id", "")
+        return self.get_s_click_v2(s_click_url)
+
+    def get_s_click_url_v2(self, s_click_url: str):
         """ decoder s.click real jump url @validation time: 2019.10.23"""
         # time.sleep(np.random.randint(0, 10))
         item_url = self.get_s_click_location(s_click_url)
@@ -1117,7 +1130,7 @@ class ActivateArticle(TBK):
             xml = xml.replace(o_tpwd_pro, f"￥{tpwd}￥")
 
             if c_rate == 0:
-                if is_expired:
+                if is_expired or not item_id:
                     status_log = ITEM_EXPIRED
                 else:
                     status_log = DNP_TBK

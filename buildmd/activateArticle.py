@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 12:16:07
+# @Last Modified time: 2021-04-10 15:28:30
 
 import json
 import os
@@ -948,14 +948,14 @@ class ActivateArticle(TBK):
         if xml is None:
             echo("0|warning", "get xml error")
             return
-        xml, r_log, r_num = self.replace_tpwd(yd_id, xml)
+        xml, r_log, r_num, counter = self.replace_tpwd(yd_id, xml)
         if not r_num:
             echo("0|warning", "r_num == 0")
             return
         flag = self.update_article(yd_id, xml)
         if flag:
             need_num = len(regex.findall("\(已失效\)", xml))
-            self.email_update_result(yd_id, r_log, r_num, need_num)
+            self.email_update_result(yd_id, r_log, r_num, counter, need_num)
             self.update_yd2db(yd_id, True)
             self.share_yd_article(yd_id)
 
@@ -979,7 +979,9 @@ class ActivateArticle(TBK):
         else:
             echo("2", f"No need fix in {yd_id}.")
 
-    def email_update_result(self, yd_id: str, r_log: list, r_num: int, need_num: int):
+    def email_update_result(
+        self, yd_id: str, r_log: list, r_num: int, counter: dict, need_num: int
+    ):
         title = self.lists_map.get(yd_id, {}).get("title", "")
         subject = "更新({}){}/{}剩{}条[{}]".format(
             time_str(time_format=self.T_FORMAT),
@@ -988,11 +990,14 @@ class ActivateArticle(TBK):
             need_num,
             title,
         )
+        statistical_log = "\n".join([f"{i}:{j}" for i, j in sorted(counter.items(), key=lambda i: -i[1])])
         content = "\n".join(
             [
                 f"Title: {title}",
                 f"Time: {time_str()}",
                 f"Update Num: {r_num}/{len(r_log)}条, 还有{need_num}条需要手动更新",
+                "------UPDTAED DETAILS--------",
+                statistical_log,
                 "",
                 *r_log,
             ]
@@ -1002,7 +1007,7 @@ class ActivateArticle(TBK):
     def update_yd2db(self, yd_id: str, is_tpwd_update: bool = False):
         for tpwd in set(self.tpwds_list[yd_id]):
             new_m = self.new_tpwds_map[tpwd]
-            new_m["is_updayed"] = 0
+            new_m["is_updated"] = 0
             self.tpwds_map[new_m["tpwd"]] = new_m
         self.store_db()
 
@@ -1010,61 +1015,60 @@ class ActivateArticle(TBK):
         tpwds = regex.findall(self.TPWD_REG2, xml)
         self.tpwds_list[yd_id] = tpwds
         m = self.new_tpwds_map
+        counter = defaultdict(int)
         r_log, r_num = [], 0
-        EXIST = "PASSWORD_NOT_EXIST::口令不存在"
-        DECODER_EXC = "DECODER_EXCEPTION::商品已下架"
-        NO_GOODS = "GOODS_NOT_FOUND::未参加淘客"
-        TPWD_ERROR = "TPWD_ERROR::淘口令生成异常"
+        EXIST = "TPWD_NOT_EXIST::口令不存在"
+        ITEM_EXPIRED = "ITEM_EXPIRED::商品已下架"
+        DNP_TBK = "DN_PARTICIPATE_TBK::商家未参加淘客"
+        RENEW_TPWD = "RENEW_TPWD::已根据URL更新淘口令"
+        GEN_SHOP_TPWD = "GENERATE_SHOP_TPWD::该商品未参加淘客，已透出店铺淘口令"
+        GEN_ITEM_TPWD = "GENERATE_ITEM_TPWD::已根据商品更新淘口令"
         for idx, o_tpwd_pro in enumerate(tpwds):
             o_tpwd = o_tpwd_pro[1:-1]
             idx_log = f"No.{idx + 1} tpwd: {o_tpwd_pro}, "
             if o_tpwd not in m:
                 r_log.append(f"{idx_log}{EXIST}")
                 continue
-            item_id, domain, title, tpwd, c_rate, c_type = [
+            item_id, title, tpwd, c_rate, c_type = [
                 m.get(ii, jj)
                 for ii, jj in [
                     ("item_id", ""),
-                    ("domain", 20),
                     ("content", ""),
                     ("tpwd", ""),
-                    ("c_rate", 0),
-                    ("c_type", ""),
+                    ("commission_rate", 0),
+                    ("commission_type", ""),
                 ]
             ]
             tmp_title = self.items.items_detail_map.get(item_id, {}).get("title", title)
+            is_expired = self.items.items_detail_map.get(item_id, {}).get(
+                "is_expired", 0
+            )
             title = tmp_title if tmp_title else title
 
-            if domain >= 15:
-                if domain == 15:
-                    applied = f"{EXIST},{title}"
-                elif domain == 16:
-                    applied = f"{DECODER_EXC},{title}"
-                elif domain == 17:
-                    applied = f"{NO_GOODS},{title}"
-                elif domain == 18:
-                    applied = f"{TPWD_ERROR},{title}"
-            else:
-                applied = title
-            f = False
             if f"{o_tpwd_pro}/(已失效)" in xml:
-                f = True
-                o_tpwd_pro = f"{o_tpwd_pro}/(已失效)"
-            xml = xml.replace(o_tpwd_pro, "￥{}￥{}".format(tpwd, "/" if f else ""))
-            if tpwd == o_tpwd:
-                c_rate = 1
-            if c_rate == 2:
-                COMMISSION = "->￥{}￥ SUCCESS, 保持原链接, {}".format(tpwd, applied)
+                xml = xml.replace(f"{o_tpwd_pro}/(已失效)", f"{o_tpwd_pro}/")
+            xml = xml.replace(o_tpwd_pro, f"￥{tpwd}￥")
+
+            if c_rate == 0:
+                if is_expired:
+                    status_log = ITEM_EXPIRED
+                else:
+                    status_log = DNP_TBK
+                xml = xml.replace(f"￥{tpwd}￥/", f"￥{tpwd}￥/(已失效)")
+                COMMISSION = f"未能更新淘口令, {status_log}, {title}"
             elif c_rate == 1:
-                xml = xml.replace("￥{}￥/".format(tpwd), "￥{}￥/(已失效)".format(tpwd))
-                COMMISSION = "未能更新淘口令, {}".format(applied)
+                status_log = RENEW_TPWD
+                COMMISSION = f"->￥{tpwd}￥ SUCCESS, 保持原链接, {status_log}, {title}"
+            elif c_rate == 2:
+                status_log = GEN_SHOP_TPWD
+                COMMISSION = f"->￥{tpwd}￥ SUCCESS, 透出店铺链接, {GEN_SHOP_TPWD}, {title}"
             else:
-                COMMISSION = "->￥{}￥ SUCCESS, 佣金: {}, 类型: {}, {}".format(
-                    tpwd, c_rate, c_type, applied
-                )
+                status_log = GEN_ITEM_TPWD
+                COMMISSION = f"->￥{tpwd}￥ SUCCESS, {status_log}, 佣金: {c_rate}, 类型: {c_type}, {title}"
             r_log.append(f"{idx_log}{COMMISSION}")
-            r_num += int(c_rate != 1)
-        return xml, r_log, r_num
+            r_num += int(c_rate != 0)
+            counter[status_log] += 1
+        return xml, r_log, r_num, counter
 
     def get_xml(self, yd_id: str):
         url = self.SYNC_URL % ("download", self.cstk)

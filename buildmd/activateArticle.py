@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 21:39:27
+# @Last Modified time: 2021-04-10 23:48:01
 
 import json
 import os
@@ -74,7 +74,7 @@ class TBK(object):
         # self.load_tbk_info()
 
     def load_configure(self):
-        cfg = ConfigParser()
+        cfg = ConfigParser(interpolation=None)
         cfg.read(assign_path, "utf-8")
         self.appkey = cfg.get("TBK", "appkey")
         self.secret = cfg.get("TBK", "secret")
@@ -190,7 +190,7 @@ class TBK(object):
         return req.get("result", {}).get("data", {})
 
     def decoder_generated_tpwd(self, tpwd: str):
-        time.sleep(2)
+        time.sleep(1)
         url = self.TKL_DECODER_URL
         header = {
             "Accept": get_accept("json"),
@@ -199,7 +199,7 @@ class TBK(object):
             "Cookie": self.tkl_cookie,
         }
         data = {"text": f"￥{tpwd}￥"}
-        req = basic_req(url, 11, data=data)
+        req = basic_req(url, 11, data=data, header=header)
         return req
 
 
@@ -514,6 +514,7 @@ class ActivateArticle(TBK):
                 ("picUrl", ""),
             ]
         ]
+        url_can_renew = self.renew_tpwd(tpwd, True)
 
         self.tpwds_map[tpwd] = {
             "tpwd": tpwd,
@@ -524,6 +525,7 @@ class ActivateArticle(TBK):
             "domain": o_info.get("domain", 0),
             "commission_rate": o_info.get("commission_rate", 0),
             "commission_type": o_info.get("commission_type", ""),
+            "url_can_renew": int(url_can_renew is not None),
             "expire_at": expire_at,
         }
         self.tpwds_map[tpwd]["is_updated"] = (
@@ -577,11 +579,21 @@ class ActivateArticle(TBK):
             ),
         )
 
-    def renew_tpwd(self, tpwd: str):
+    def check_tpwds_url_renew(self):
+        for tpwd in self.tpwds_db_map:
+            renew_tpwd = self.renew_tpwd(tpwd, True)
+            if renew_tpwd:
+                self.tpwds_map[tpwd]["url_can_renew"] = 1
+        self.store_db()
+
+    def renew_tpwd(self, tpwd: str, force_update: bool = False):
         m = self.tpwds_map.get(tpwd, {})
+        if m.get("url_can_renew", 0) == 0 and not force_update:
+            return
         url = m.get("url", "")
         title = m.get("content", "")
         domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
+        renew_tpwd = None
         if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
             renew_tpwd = self.convert2tpwd(url, title)
             if renew_tpwd is not None:
@@ -658,7 +670,7 @@ class ActivateArticle(TBK):
                     m["tpwd"] = renew_tpwd
                     break
             if renew_tpwd is None:
-                self.get_item_tpwd(title, item_id, m)
+                m = self.get_item_tpwd(title, item_id, m)
             shop_tpwd = s.get(shop_id, {}).get("tpwd", "")
             if m["tpwd"] == o_tpwd and shop_tpwd:
                 m["tpwd"] = shop_tpwd
@@ -716,7 +728,7 @@ class ActivateArticle(TBK):
                 0,
                 f"goods get empty: {title} {item_id}",
             )
-            return
+            return m
         private_rate = float(private.get("max_commission_rate", "0")) * 100
         goods_rate = float(goods.get("commission_rate", "0"))
         if goods_rate >= private_rate:
@@ -737,7 +749,7 @@ class ActivateArticle(TBK):
         tpwd = self.convert2tpwd(url, title)
         if not tpwd:
             echo(0, "tpwd error:", tpwd)
-            return
+            return m
         m = {
             **m,
             "commission_rate": c_rate,
@@ -745,6 +757,7 @@ class ActivateArticle(TBK):
             "url": url,
             "tpwd": tpwd,
         }
+        return m
 
     def decoder_tpwd_item(self, tpwd: str, force_update: bool = False):
         if tpwd not in self.tpwds_map or not self.tpwds_map[tpwd].get("url", ""):
@@ -1119,7 +1132,7 @@ class ActivateArticle(TBK):
             if c_rate != 0:
                 r_num += 1
                 check_data = self.decoder_generated_tpwd(tpwd)
-                url = data.get("data", {}).get("url", "")
+                url = check_data.get("data", {}).get("url", "")
                 if url:
                     COMMISSION += ", 客服端可正常弹出"
                 else:

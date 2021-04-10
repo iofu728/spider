@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 16:25:22
+# @Last Modified time: 2021-04-10 17:10:34
 
 import json
 import os
@@ -600,8 +600,6 @@ class ActivateArticle(TBK):
                         if shop_tpwds:
                             shop_tpwd = shop_tpwds[user_id]
                     if shop_tpwd:
-                        o_tpwd = list(tpwds)[0]
-                        m = self.tpwds_map.get(o_tpwd, {}).copy()
                         m["tpwd"] = shop_tpwd
                         shop_num += 1
                         m["commission_rate"] = 2
@@ -614,6 +612,15 @@ class ActivateArticle(TBK):
                 for ii, jj in [("title", ""), ("is_expired", 0), ("shop_id", "")]
             ]
             if is_expired == 1:
+                if shop_id:
+                    shop_tpwd = s.get(shop_id, {}).get("tpwd", "")
+                    if shop_tpwd:
+                        o_tpwd = list(tpwds)[0]
+                        m = self.tpwds_map.get(o_tpwd, {}).copy()
+                        m["tpwd"] = shop_tpwd
+                        m["commission_rate"] = 2
+                        shop_num += 1
+                        item2new[item_id] = m
                 continue
             renew_tpwd, m, o_tpwd = None, None, None
             for o_tpwd in tpwds:
@@ -1026,7 +1033,8 @@ class ActivateArticle(TBK):
         send_email(content, subject, assign_rec=self.assign_rec)
 
     def update_yd2db(self, yd_id: str, is_tpwd_update: bool = False):
-        for tpwd in set(self.tpwds_list[yd_id]):
+        for tpwd_pro in set(self.tpwds_list[yd_id]):
+            tpwd = tpwd_pro[1:-1]
             new_m = self.new_tpwds_map[tpwd]
             new_m["is_updated"] = 0
             self.tpwds_map[new_m["tpwd"]] = new_m
@@ -1051,7 +1059,7 @@ class ActivateArticle(TBK):
                 r_log.append(f"{idx_log}{EXIST}")
                 continue
             item_id, title, tpwd, c_rate, c_type = [
-                m.get(ii, jj)
+                m[o_tpwd].get(ii, jj)
                 for ii, jj in [
                     ("item_id", ""),
                     ("content", ""),

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-08 00:13:39
+# @Last Modified time: 2021-04-10 17:20:26
 
 from __future__ import (
     absolute_import,
@@ -230,8 +230,8 @@ def send_email(context: str, subject: str, add_rec=None, assign_rec=None) -> boo
     send_server_chan(context, subject)
     email_rec = [ii for ii, jj in rec_lists if jj == "0"]
     email_cc = [ii for ii, jj in rec_lists if jj == "1"]
-    if assign_rec is not None:
-        email_rec = assign_rec
+    if assign_rec:
+        email_rec = email_rec + assign_rec
     send_email_once(email_rec, email_cc, context, subject)
     if not add_rec is None:
         send_email_once(add_rec, [], context, subject)
@@ -418,7 +418,7 @@ def decoder_url(url: str, do_decoder: bool = False) -> dict:
             if ii != ""
         }
     except:
-        ehco(2, "decoder url error.", "url:", url)
+        echo(2, "decoder url error.", "url:", url)
         return {}
     if do_decoder:
         decoder_dict = {

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 17:10:34
+# @Last Modified time: 2021-04-10 21:39:27
 
 import json
 import os
@@ -62,6 +62,7 @@ mkdir(DATA_DIR)
 class TBK(object):
     """ tbk info class """
 
+    TKL_DECODER_URL = "https://www.taokouling.com/index/taobao_tkljm"
     SC_URL = "http://gateway.kouss.com/tbpub/%s"
     CSTK_KEY = "YNOTE_CSTK"
 
@@ -85,6 +86,7 @@ class TBK(object):
         self.uland_url = cfg.get("TBK", "uland_url")
         self.api_key = cfg.get("TBK", "apikey")
         self.sc_session = cfg.get("TBK", "sc_session")
+        self.tkl_cookie = cfg.get("TBK", "tkl_cookie")
         self.home_id = cfg.get("YNOTE", "home_id")
         self.unlogin_id = cfg.get("YNOTE", "unlogin_id")
         self.cookie = cfg.get("YNOTE", "cookie")[1:-1]
@@ -186,6 +188,19 @@ class TBK(object):
         data = {**self.sc_data, "item_id": item_id}
         req = basic_req(url, 11, data=data)
         return req.get("result", {}).get("data", {})
+
+    def decoder_generated_tpwd(self, tpwd: str):
+        time.sleep(2)
+        url = self.TKL_DECODER_URL
+        header = {
+            "Accept": get_accept("json"),
+            "Referer": url,
+            "X-Requested-With": "XMLHttpRequest",
+            "Cookie": self.tkl_cookie,
+        }
+        data = {"text": f"￥{tpwd}￥"}
+        req = basic_req(url, 11, data=data)
+        return req
 
 
 class ActivateArticle(TBK):
@@ -562,6 +577,20 @@ class ActivateArticle(TBK):
             ),
         )
 
+    def renew_tpwd(self, tpwd: str):
+        m = self.tpwds_map.get(tpwd, {})
+        url = m.get("url", "")
+        title = m.get("content", "")
+        domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
+        if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
+            renew_tpwd = self.convert2tpwd(url, title)
+            if renew_tpwd is not None:
+                data = self.decoder_generated_tpwd(renew_tpwd)
+                url = data.get("data", {}).get("url", "")
+                if not url:
+                    renew_tpwd = None
+        return renew_tpwd
+
     def update_tpwds(self, is_renew: bool = True, yd_id: str = None):
         """ c_rate: 0: origin, 1: renew, 2: shop tpwd, >3: dg matrical """
         self.load_num, shop_num = [0, 0], 0
@@ -581,18 +610,15 @@ class ActivateArticle(TBK):
         for item_id, tpwds in item2tpwds.items():
             if item_id.startswith("shop"):
                 user_id = item_id[4:]
-                renew_tpwd, m, o_tpwd = None, None, None
+                renew_tpwd, m, o_tpwd, title = None, None, None, ""
                 for o_tpwd in tpwds:
+                    renew_tpwd = self.renew_tpwd(o_tpwd)
                     m = self.tpwds_map.get(o_tpwd, {}).copy()
-                    url = m.get("url", "")
-                    title = m.get("content", "")
-                    domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
-                    if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
-                        renew_tpwd = self.convert2tpwd(url, title)
-                        if renew_tpwd:
-                            m["commission_rate"] = 1
-                            m["tpwd"] = renew_tpwd
-                            break
+                    title = m.get("title", "") if not title else title
+                    if renew_tpwd:
+                        m["commission_rate"] = 1
+                        m["tpwd"] = renew_tpwd
+                        break
                 if renew_tpwd is None:
                     shop_tpwd = su.get(user_id, {}).get("tpwd", "")
                     if not shop_tpwd:
@@ -622,19 +648,15 @@ class ActivateArticle(TBK):
                         shop_num += 1
                         item2new[item_id] = m
                 continue
-            renew_tpwd, m, o_tpwd = None, None, None
+            renew_tpwd, m, o_tpwd, title = None, None, None, item_title
             for o_tpwd in tpwds:
                 m = self.tpwds_map.get(o_tpwd, {}).copy()
-                url = m.get("url", "")
-                title = m.get("content", "")
-                title = item_title if item_title else title
-                domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
-                if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
-                    renew_tpwd = self.convert2tpwd(url, title)
-                    if renew_tpwd:
-                        m["commission_rate"] = 1
-                        m["tpwd"] = renew_tpwd
-                        break
+                title = m.get("title", "") if not title else title
+                renew_tpwd = self.renew_tpwd(o_tpwd)
+                if renew_tpwd:
+                    m["commission_rate"] = 1
+                    m["tpwd"] = renew_tpwd
+                    break
             if renew_tpwd is None:
                 self.get_item_tpwd(title, item_id, m)
             shop_tpwd = s.get(shop_id, {}).get("tpwd", "")
@@ -1094,8 +1116,15 @@ class ActivateArticle(TBK):
             else:
                 status_log = GEN_ITEM_TPWD
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, {status_log}, 佣金: {c_rate}, 类型: {c_type}, {title}"
+            if c_rate != 0:
+                r_num += 1
+                check_data = self.decoder_generated_tpwd(tpwd)
+                url = data.get("data", {}).get("url", "")
+                if url:
+                    COMMISSION += ", 客服端可正常弹出"
+                else:
+                    COMMISSION += ", 客服端不可弹出"
             r_log.append(f"{idx_log}{COMMISSION}")
-            r_num += int(c_rate != 0)
             counter[status_log] += 1
         return xml, r_log, r_num, counter
 

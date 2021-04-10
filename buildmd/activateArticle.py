@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 15:28:30
+# @Last Modified time: 2021-04-10 16:25:22
 
 import json
 import os
@@ -567,6 +567,7 @@ class ActivateArticle(TBK):
         self.load_num, shop_num = [0, 0], 0
         c = self.items.items_detail_map
         s = self.items.shops_detail_map
+        su = {v["user_id"]: v for v in s.values()}
 
         # counter tpwds -> item_id
         item2tpwds = defaultdict(set)
@@ -579,14 +580,32 @@ class ActivateArticle(TBK):
         item2new = {}
         for item_id, tpwds in item2tpwds.items():
             if item_id.startswith("shop"):
-                shop_id = item_id[4:]
-                shop_tpwd = s.get(shop_id, {}).get("tpwd", "")
-                if shop_tpwd:
-                    o_tpwd = list(tpwds)[0]
+                user_id = item_id[4:]
+                renew_tpwd, m, o_tpwd = None, None, None
+                for o_tpwd in tpwds:
                     m = self.tpwds_map.get(o_tpwd, {}).copy()
-                    m["tpwd"] = shop_tpwd
-                    m["commission_rate"] = 2
-                    shop_num += 1
+                    url = m.get("url", "")
+                    title = m.get("content", "")
+                    domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
+                    if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
+                        renew_tpwd = self.convert2tpwd(url, title)
+                        if renew_tpwd:
+                            m["commission_rate"] = 1
+                            m["tpwd"] = renew_tpwd
+                            break
+                if renew_tpwd is None:
+                    shop_tpwd = su.get(user_id, {}).get("tpwd", "")
+                    if not shop_tpwd:
+                        shop_tpwds = self.generate_shop_tpwds({user_id: title})
+                        if shop_tpwds:
+                            shop_tpwd = shop_tpwds[user_id]
+                    if shop_tpwd:
+                        o_tpwd = list(tpwds)[0]
+                        m = self.tpwds_map.get(o_tpwd, {}).copy()
+                        m["tpwd"] = shop_tpwd
+                        shop_num += 1
+                        m["commission_rate"] = 2
+                if m["tpwd"] != o_tpwd:
                     item2new[item_id] = m
                 continue
 
@@ -990,7 +1009,9 @@ class ActivateArticle(TBK):
             need_num,
             title,
         )
-        statistical_log = "\n".join([f"{i}:{j}" for i, j in sorted(counter.items(), key=lambda i: -i[1])])
+        statistical_log = "\n".join(
+            [f"{i}:{j}" for i, j in sorted(counter.items(), key=lambda i: -i[1])]
+        )
         content = "\n".join(
             [
                 f"Title: {title}",

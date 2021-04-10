@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-09 02:13:57
+# @Last Modified time: 2021-04-10 15:30:53
 
 import os
 import sys
@@ -675,6 +675,7 @@ class Items(object):
                 f"No. {idx + 1} load {self.load_num} items spend {get_time_str(spend_time, False)}",
             )
             time.sleep(max(self.ONE_HOURS * 2 - spend_time, 0))
+            self.load_db()
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 23:48:01
+# @Last Modified time: 2021-04-11 00:13:11
 
 import json
 import os
@@ -234,6 +234,7 @@ class ActivateArticle(TBK):
         "commission_rate",
         "commission_type",
         "is_updated",
+        "url_can_renew",
         "expire_at",
         "created_at",
     ]
@@ -598,6 +599,8 @@ class ActivateArticle(TBK):
             renew_tpwd = self.convert2tpwd(url, title)
             if renew_tpwd is not None:
                 data = self.decoder_generated_tpwd(renew_tpwd)
+                if data is None:
+                    return
                 url = data.get("data", {}).get("url", "")
                 if not url:
                     renew_tpwd = None

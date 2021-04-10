@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 12:11:37
+# @Last Modified time: 2021-04-10 12:16:07
 
 import json
 import os
@@ -541,13 +541,13 @@ class ActivateArticle(TBK):
     def update_shops(self):
         flag = begin_time()
         shops = [ii for ii in self.items.shops_detail_map.values() if ii["user_id"]]
-        N, updated_num = len(shops), 0
-        for ii in range((N - 1) // 30 + 1):
+        N, updated_num, bc = len(shops), 0, 20
+        for ii in range((N - 1) // bc + 1):
             shop_ids_map = {
-                ii["user_id"]: ii["shop_name"] for ii in shops[ii * 30 : (ii + 1) * 30]
+                ii["user_id"]: ii["shop_name"] for ii in shops[ii * bc : (ii + 1) * bc]
             }
             user2shop = {
-                ii["user_id"]: ii["shop_id"] for ii in shops[ii * 30 : (ii + 1) * 30]
+                ii["user_id"]: ii["shop_id"] for ii in shops[ii * bc : (ii + 1) * bc]
             }
             shop_tpwds = self.generate_shop_tpwds(shop_ids_map)
             for user_id, tpwd in shop_tpwds.items():
@@ -586,6 +586,7 @@ class ActivateArticle(TBK):
                     m = self.tpwds_map.get(o_tpwd, {}).copy()
                     m["tpwd"] = shop_tpwd
                     m["commission_rate"] = 2
+                    shop_num += 1
                     item2new[item_id] = m
                 continue
 

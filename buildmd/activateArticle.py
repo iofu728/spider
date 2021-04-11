@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-11 14:11:37
+# @Last Modified time: 2021-04-11 14:25:37
 
 import json
 import os
@@ -426,16 +426,16 @@ class ActivateArticle(TBK):
             for ii, jj in [
                 ("name", ""),
                 ("id", ""),
-                ("createTime", self.BASIC_TIMEX_STAMP * 1000),
-                ("lastUpdateTime", self.BASIC_TIMEX_STAMP * 1000),
+                ("createTime", self.BASIC_TIMEX_STAMP),
+                ("lastUpdateTime", self.BASIC_TIMEX_STAMP),
             ]
         ]
         self.lists_map[yd_id] = {
             "article_id": yd_id,
             "title": title.replace(".note", ""),
             "q": q,
-            "established_at": time_str(established_at // 1000),
-            "modified_at": time_str(modified_at // 1000),
+            "established_at": time_str(established_at),
+            "modified_at": time_str(modified_at),
             "updated_at": self.lists_map[yd_id]["updated_at"]
             if yd_id in self.lists_map and not expired_flag
             else self.BASIC_TIMEX_STAMP,

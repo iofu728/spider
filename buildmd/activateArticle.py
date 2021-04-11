@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-11 23:52:36
+# @Last Modified time: 2021-04-12 00:15:16
 
 import json
 import os
@@ -1118,7 +1118,7 @@ class ActivateArticle(TBK):
         tpwds = regex.findall(self.TPWD_REG2, xml)
         self.tpwds_list[yd_id] = tpwds
         m = self.new_tpwds_map
-        counter = defaultdict(int)
+        counter, popup = defaultdict(int), defaultdict(int)
         r_log, r_num = [], 0
         EXIST = "TPWD_NOT_EXIST::口令不存在"
         ITEM_EXPIRED = "ITEM_EXPIRED::商品已下架"
@@ -1176,15 +1176,23 @@ class ActivateArticle(TBK):
                     or not isinstance(check_data, dict)
                     or not isinstance(check_data.get("data", {}), dict)
                 ):
-                    url = check_data.get("data", {}).get("url", "")
-                else:
                     url = ""
+                else:
+                    url = check_data.get("data", {}).get("url", "")
                 if url:
                     COMMISSION += ", 客服端可正常弹出"
+                    popup["正常弹出"] += 1
                 else:
                     COMMISSION += ", 客服端不可弹出"
+                    popup["不可弹出"] += 1
             r_log.append(f"{idx_log}{COMMISSION}")
             counter[status_log] += 1
+        echo(
+            2,
+            "更新链接 可弹出: {}, 不可弹出: {}, 失效: {}".format(
+                popup["正常弹出"], popup["不可弹出"], len(r_log) - r_num
+            ),
+        )
         return xml, r_log, r_num, counter
 
     def get_xml(self, yd_id: str):

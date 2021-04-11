@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-11 02:34:58
+# @Last Modified time: 2021-04-11 13:51:58
 
 import json
 import os
@@ -599,14 +599,19 @@ class ActivateArticle(TBK):
         if m.get("url_can_renew", 0) == 0 and not force_update:
             return
         url = m.get("url", "")
-        title = m.get("content", "")
+        title = m.get("content", "商品")
+        title = "商品" if not title else title
         domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
         renew_tpwd = None
         if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
             renew_tpwd = self.convert2tpwd(url, title)
             if renew_tpwd is not None:
                 data = self.decoder_generated_tpwd(renew_tpwd)
-                if data is None:
+                if (
+                    data is None
+                    or not isinstance(data, dict)
+                    or not isinstance(data.get("data", {}), dict)
+                ):
                     return
                 url = data.get("data", {}).get("url", "")
                 if not url:
@@ -1148,7 +1153,14 @@ class ActivateArticle(TBK):
             if c_rate != 0:
                 r_num += 1
                 check_data = self.decoder_generated_tpwd(tpwd)
-                url = check_data.get("data", {}).get("url", "")
+                if (
+                    check_data is None
+                    or not isinstance(check_data, dict)
+                    or not isinstance(check_data.get("data", {}), dict)
+                ):
+                    url = check_data.get("data", {}).get("url", "")
+                else:
+                    url = ""
                 if url:
                     COMMISSION += ", 客服端可正常弹出"
                 else:
@@ -1264,7 +1276,7 @@ class ActivateArticle(TBK):
             return
         title = "链接需要更新#{}#篇".format(len(yd_ids_map))
         content = f"{title}\n \n"
-        for yd_id, num in sorted(yd_ids_map.items(), lambda x: -(x[1])):
+        for yd_id, num in sorted(yd_ids_map.items(), key=lambda x: -(x[1])):
             title = self.lists_map.get(yd_id, {}).get("title", "")
             content += f"{title}, 需要更新{num}个链接，{self.SHARE_URL % yd_id}\n"
         content += "\n\nPlease update within 6 hours, Thx!"

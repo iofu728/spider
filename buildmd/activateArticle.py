@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-11 14:25:37
+# @Last Modified time: 2021-04-11 14:27:53
 
 import json
 import os
@@ -1289,8 +1289,8 @@ class ActivateArticle(TBK):
         send_email(content, title)
 
     def load_share_total(self):
-        for yd_ids in self.yd_ids:
-            self.get_yd_detail(yd_ids)
+        for yd_id in self.yd_ids:
+            self.get_yd_detail(yd_id, True)
         self.store_db()
         self.__init__()
         self.load_process()

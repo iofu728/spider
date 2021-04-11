@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-11 23:31:25
+# @Last Modified time: 2021-04-11 23:52:36
 
 import json
 import os
@@ -633,6 +633,9 @@ class ActivateArticle(TBK):
 
     def update_tpwds(self, is_renew: bool = True, yd_id: str = None):
         """ c_rate: 0: origin, 1: renew, 2: shop tpwd, >3: dg matrical """
+        can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] == 1])
+        echo(2, f"{can_num} tpwds's url can renew.")
+        flag = begin_time()
         self.load_num, shop_num = [0, 0], 0
         c = self.items.items_detail_map
         s = self.items.shops_detail_map
@@ -728,13 +731,15 @@ class ActivateArticle(TBK):
             [1 for v in self.items.items_detail_map.values() if v["is_expired"] == 0]
         )
         renew = len(item2new) - shop_num - sum(self.load_num)
+        spend_time = end_time(flag, 0)
 
         echo(
             2,
-            "Update {}/{} Items and {} Tpwds Info Success!!\nAmong, {} renew, {} dg, {} private, {} shop.".format(
+            "Update {}/{} Items and {} Tpwds Info Success spend {}!!\n Among, {} renew, {} dg, {} private, {} shop.".format(
                 len(item2new),
                 normal_items_num,
                 update_num,
+                get_time_str(spend_time, False),
                 renew,
                 self.load_num[0],
                 self.load_num[1],

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-11 13:51:58
+# @Last Modified time: 2021-04-11 14:11:37
 
 import json
 import os
@@ -1277,8 +1277,13 @@ class ActivateArticle(TBK):
         title = "链接需要更新#{}#篇".format(len(yd_ids_map))
         content = f"{title}\n \n"
         for yd_id, num in sorted(yd_ids_map.items(), key=lambda x: -(x[1])):
-            title = self.lists_map.get(yd_id, {}).get("title", "")
-            content += f"{title}, 需要更新{num}个链接，{self.SHARE_URL % yd_id}\n"
+            t = self.lists_map.get(yd_id, {}).get("title", "")
+            modified_at = self.lists_map.get(yd_id, {}).get(
+                "modified_at", self.BASIC_TIMEX_STR
+            )
+            content += (
+                f"{t}, 需要更新{num}个链接，上次更新时间:{modified_at}, {self.SHARE_URL % yd_id}\n"
+            )
         content += "\n\nPlease update within 6 hours, Thx!"
         echo("2|debug", title, content)
         send_email(content, title)

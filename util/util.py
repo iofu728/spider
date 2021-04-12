@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 19:53:04
+# @Last Modified time: 2021-04-12 22:59:32
 
 from __future__ import (
     absolute_import,
@@ -587,7 +587,7 @@ log_path = "service.log"
 LAST_CONFIG = -1
 rec_lists, send_lists, SCKEY, SIGN = [], [], "", ""
 configure_path = "util/util.ini"
-BASIC_SCURL = "https://sc.ftqq.com/%s.send"
+BASIC_SCURL = "https://sctapi.ftqq.com/%s.send"
 mkdir(data_dir)
 agent_lists = [
     " ".join(index.split()[1:])[1:-1] for index in read_file("{}agent".format(data_dir))

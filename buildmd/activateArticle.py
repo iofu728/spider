@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-13 13:36:34
+# @Last Modified time: 2021-04-13 14:01:21
 
 import json
 import os
@@ -653,7 +653,9 @@ class ActivateArticle(TBK):
                     renew_tpwd = None
         return renew_tpwd
 
-    def update_tpwds(self, is_renew: bool = True, yd_id: str = None):
+    def update_tpwds(
+        self, is_renew: bool = True, yd_id: str = None, use_direct: bool = False
+    ):
         """ c_rate: 0: origin, 1: renew, 2: shop tpwd, 3: direct convert, >4: dg matrical """
         can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] == 1])
         echo(2, f"{can_num} tpwds's url can renew.")
@@ -710,6 +712,8 @@ class ActivateArticle(TBK):
                         m = self.tpwds_map.get(o_tpwd, {}).copy()
                         m["tpwd"] = shop_tpwd
                         m["commission_rate"] = 2
+                        user_id = s.get(shop_id, {}).get("user_id", "")
+                        m["item_id"] = f"shop{user_id}"
                         shop_num += 1
                         item2new[item_id] = m
                 continue
@@ -731,7 +735,7 @@ class ActivateArticle(TBK):
                 user_id = s.get(shop_id, {}).get("user_id", "")
                 m["item_id"] = f"shop{user_id}"
                 shop_num += 1
-            if m["tpwd"] == o_tpwd:
+            if m["tpwd"] == o_tpwd and use_direct:
                 m["tpwd"] = self.generate_tpwd_from_tpwd(o_tpwd, title)
                 if m["tpwd"] != o_tpwd:
                     m["commission_rate"] = 3

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-12 14:09:36
+# @Last Modified time: 2021-04-13 12:23:24
 
 import json
 import os
@@ -70,6 +70,7 @@ class TBK(object):
         super(TBK, self).__init__()
         self.tb_items = {}
         self.sc_data = {}
+        self.direct_convert_num = 0
         self.load_configure()
         # self.load_tbk_info()
 
@@ -208,6 +209,21 @@ class TBK(object):
         data = {**self.sc_data, "click_url": s_click_url}
         req = basic_req(url, 11, data=data)
         return req
+
+    def generate_tpwd_from_tpwd(self, o_tpwd: str, title: str):
+        time.sleep(2)
+        url = self.SC_URL % "tpwdConvertSc"
+        data = {**self.sc_data, "password_content": f"￥{o_tpwd}￥"}
+        req = basic_req(url, 11, data=data)
+        if not isinstance(req, dict) or not isinstance(req.get("data", {}), dict):
+            return o_tpwd
+        url = req.get("data", {}).get("click_url", "")
+        if url:
+            renew_tpwd = self.convert2tpwd(url, title)
+            if renew_tpwd is not None:
+                self.direct_convert_num += 1
+                return renew_tpwd
+        return o_tpwd
 
 
 class ActivateArticle(TBK):
@@ -636,7 +652,7 @@ class ActivateArticle(TBK):
         can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] == 1])
         echo(2, f"{can_num} tpwds's url can renew.")
         flag = begin_time()
-        self.load_num, shop_num = [0, 0], 0
+        self.load_num, shop_num, self.direct_convert_num = [0, 0], 0, 0
         c = self.items.items_detail_map
         s = self.items.shops_detail_map
         su = {v["user_id"]: v for v in s.values()}
@@ -707,7 +723,10 @@ class ActivateArticle(TBK):
                 m["tpwd"] = shop_tpwd
                 m["commission_rate"] = 2
                 shop_num += 1
-
+            if m["tpwd"] == o_tpwd:
+                m["tpwd"] = self.generate_tpwd_from_tpwd(o_tpwd, title)
+                if m["tpwd"] != o_tpwd:
+                    m["commission_rate"] = 3
             if m["tpwd"] != o_tpwd:
                 item2new[item_id] = m
 
@@ -735,7 +754,7 @@ class ActivateArticle(TBK):
 
         echo(
             2,
-            "Update {}/{} Items and {} Tpwds Info Success spend {}!!\n Among, {} renew, {} dg, {} private, {} shop.".format(
+            "Update {}/{} Items and {} Tpwds Info Success spend {}!!\n Among, {} renew, {} dg, {} private, {} shop, {} direct.".format(
                 len(item2new),
                 normal_items_num,
                 update_num,
@@ -743,6 +762,7 @@ class ActivateArticle(TBK):
                 renew,
                 self.load_num[0],
                 self.load_num[1],
+                self.direct_convert_num
                 shop_num,
             ),
         )

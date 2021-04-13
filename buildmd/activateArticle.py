@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-13 12:23:24
+# @Last Modified time: 2021-04-13 13:36:34
 
 import json
 import os
@@ -223,6 +223,12 @@ class TBK(object):
             if renew_tpwd is not None:
                 self.direct_convert_num += 1
                 return renew_tpwd
+        seller_id = req.get("data", {}).get("seller_id", "")
+        if seller_id:
+            renew_tpwds = self.generate_shop_tpwds({seller_id: title})
+            if seller_id in renew_tpwds:
+                self.direct_convert_num += 1
+                return renew_tpwds[seller_id]
         return o_tpwd
 
 
@@ -648,7 +654,7 @@ class ActivateArticle(TBK):
         return renew_tpwd
 
     def update_tpwds(self, is_renew: bool = True, yd_id: str = None):
-        """ c_rate: 0: origin, 1: renew, 2: shop tpwd, >3: dg matrical """
+        """ c_rate: 0: origin, 1: renew, 2: shop tpwd, 3: direct convert, >4: dg matrical """
         can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] == 1])
         echo(2, f"{can_num} tpwds's url can renew.")
         flag = begin_time()
@@ -722,6 +728,8 @@ class ActivateArticle(TBK):
             if m["tpwd"] == o_tpwd and shop_tpwd:
                 m["tpwd"] = shop_tpwd
                 m["commission_rate"] = 2
+                user_id = s.get(shop_id, {}).get("user_id", "")
+                m["item_id"] = f"shop{user_id}"
                 shop_num += 1
             if m["tpwd"] == o_tpwd:
                 m["tpwd"] = self.generate_tpwd_from_tpwd(o_tpwd, title)
@@ -739,7 +747,7 @@ class ActivateArticle(TBK):
                 self.new_tpwds_map[o_tpwd] = m
                 continue
             new_m = item2new[item_id]
-            for key in ["url", "tpwd", "commission_rate", "commission_type"]:
+            for key in ["url", "tpwd", "commission_rate", "commission_type", "item_id"]:
                 m[key] = new_m[key]
             self.new_tpwds_map[o_tpwd] = m
 
@@ -749,7 +757,7 @@ class ActivateArticle(TBK):
         normal_items_num = len(
             [1 for v in self.items.items_detail_map.values() if v["is_expired"] == 0]
         )
-        renew = len(item2new) - shop_num - sum(self.load_num)
+        renew = len(item2new) - shop_num - sum(self.load_num) - self.direct_convert_num
         spend_time = end_time(flag, 0)
 
         echo(
@@ -762,8 +770,8 @@ class ActivateArticle(TBK):
                 renew,
                 self.load_num[0],
                 self.load_num[1],
-                self.direct_convert_num
                 shop_num,
+                self.direct_convert_num,
             ),
         )
 

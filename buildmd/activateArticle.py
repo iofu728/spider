@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-13 14:01:21
+# @Last Modified time: 2021-04-13 15:12:00
 
 import json
 import os
@@ -1088,6 +1088,7 @@ class ActivateArticle(TBK):
         if flag:
             need_num = len(regex.findall("\(已失效\)", xml))
             self.email_update_result(yd_id, r_log, r_num, counter, need_num)
+            self.get_yd_detail(yd_id, True, True)
             self.update_yd2db(yd_id, True)
             self.share_yd_article(yd_id)
 

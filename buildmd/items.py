@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-10 15:30:53
+# @Last Modified time: 2021-04-21 16:23:16
 
 import os
 import sys
@@ -519,7 +519,8 @@ class Items(object):
             price = "0"
             month_sales = "0"
             quantity = "0"
-
+        if not title and not is_expired:
+            return self.items_detail_map.get(item_id, {})
         self.items_detail_map[item_id] = {
             "item_id": item_id,
             "title": title,
@@ -661,6 +662,7 @@ class Items(object):
 
     def load_click(self, num: int = 1000000):
         """ schedule click """
+        global proxy_req
         for idx in range(num):
             flag = begin_time()
             self.load_num = 0
@@ -676,6 +678,13 @@ class Items(object):
             )
             time.sleep(max(self.ONE_HOURS * 2 - spend_time, 0))
             self.load_db()
+            if idx % 10 == 9:
+                self.config = {
+                    "time_str": time_str(),
+                    "time_stamp": time_stamp(),
+                    "proxy_req": GetFreeProxy().proxy_req,
+                }
+                proxy_req = self.config["proxy_req"]
 
 
 if __name__ == "__main__":

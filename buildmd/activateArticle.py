@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-13 15:12:00
+# @Last Modified time: 2021-04-23 02:03:51
 
 import json
 import os
@@ -713,7 +713,7 @@ class ActivateArticle(TBK):
                         m["tpwd"] = shop_tpwd
                         m["commission_rate"] = 2
                         user_id = s.get(shop_id, {}).get("user_id", "")
-                        m["item_id"] = f"shop{user_id}"
+                        # m["item_id"] = f"shop{user_id}"
                         shop_num += 1
                         item2new[item_id] = m
                 continue
@@ -733,7 +733,7 @@ class ActivateArticle(TBK):
                 m["tpwd"] = shop_tpwd
                 m["commission_rate"] = 2
                 user_id = s.get(shop_id, {}).get("user_id", "")
-                m["item_id"] = f"shop{user_id}"
+                # m["item_id"] = f"shop{user_id}"
                 shop_num += 1
             if m["tpwd"] == o_tpwd and use_direct:
                 m["tpwd"] = self.generate_tpwd_from_tpwd(o_tpwd, title)
@@ -1320,7 +1320,7 @@ class ActivateArticle(TBK):
 
     def check_overdue(self):
         def check_overdue_req(tpwd_data: map) -> bool:
-            dif_time = time_stamp(tpwd_data["expire_at"]) - time_stamp()
+            dif_time = abs(time_stamp(tpwd_data["expire_at"]) - time_stamp())
             return dif_time > 0 and dif_time <= self.ONE_HOURS * self.ONE_DAY
 
         overdue_tpwds = [

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-23 02:03:51
+# @Last Modified time: 2021-04-23 23:45:39
 
 import json
 import os
@@ -610,10 +610,13 @@ class ActivateArticle(TBK):
         )
 
     def check_tpwds_url_renew(self, mode: str = "all"):
+        ''' @mode: one, all, recheck'''
         renew = 0
         flag = begin_time()
         for tpwd in self.tpwds_db_map:
-            if mode != "all" and self.tpwds_map[tpwd].get("url_can_renew", 0) == 1:
+            if mode == "one" and self.tpwds_map[tpwd].get("url_can_renew", 0) == 1:
+                continue
+            if mode == "recheck" and self.tpwds_map[tpwd].get("url_can_renew", 0) == 0:
                 continue
             renew_tpwd = self.renew_tpwd(tpwd, True)
             if renew_tpwd:

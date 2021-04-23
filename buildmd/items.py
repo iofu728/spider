@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-21 16:23:16
+# @Last Modified time: 2021-04-23 23:58:08
 
 import os
 import sys
@@ -152,13 +152,29 @@ class Items(object):
         }
         return self.get_tb_h5_api(api, jsv, "", data, j_data_t, cookies)
 
+    def get_tb_getdetail_req_from_url(self, url: str, item_id: str, cookies: dict = {}):
+        exParams = decoder_url(url)
+        data = {
+            **exParams,
+            "itemNumId": item_id,
+            "itemId": item_id,
+            "exParams": exParams,
+            "detail_v": "8.0.0",
+            "utdid": "1",
+        }
+        jsv = "2.6.1"
+        api = "mtop.taobao.detail.getdetail"
+        j_data_t = {
+            "v": 6.0,
+            "ttid": "2018@taobao_h5_9.9.9",
+            "AntiCreep": True,
+            "callback": "mtopjsonp1",
+        }
+        return self.get_tb_h5_api(api, jsv, "", data, j_data_t, cookies)
+
     def get_tb_getdetail(self, item_id: int):
-        if (
-            not "uland" in self.cookies
-            or time_stamp() - self.m_time > self.ONE_HOURS / 2
-        ):
-            self.get_m_h5_tk()
-        req = self.get_tb_getdetail_req(item_id, self.cookies["uland"])
+        uland = self.get_m_h5_cookie("uland")
+        req = self.get_tb_getdetail_req(item_id, uland)
         if req is not None:
             req_text = req.text
             try:
@@ -167,6 +183,11 @@ class Items(object):
                 re_json = {}
             if "data" in re_json and "item" in re_json["data"]:
                 return re_json["data"]["item"]
+
+    def get_m_h5_cookie(self, key: str):
+        if not key in self.cookies or time_stamp() - self.m_time > self.ONE_HOURS / 2:
+            self.get_m_h5_tk()
+        return self.cookies.get(key, "")
 
     def get_m_h5_tk(self):
         self.m_time = time_stamp()
@@ -188,17 +209,12 @@ class Items(object):
             )
 
     def get_baichuan(self, item_id: int):
-        if (
-            not "baichuan" in self.cookies
-            or not self.M in self.cookies["baichuan"]
-            or time_stamp() - self.m_time > self.ONE_HOURS / 2
-        ):
-            self.get_m_h5_tk()
+        baichuan = self.get_m_h5_cookie("baichuan")
         finger_id = self.get_finger(item_id)
         if finger_id is None:
             return
         echo(4, "finger id:", finger_id)
-        req = self.get_baichuan_req(item_id, finger_id, self.cookies["baichuan"])
+        req = self.get_baichuan_req(item_id, finger_id, baichuan)
         if req is not None:
             return req.json()["data"]
 
@@ -229,12 +245,8 @@ class Items(object):
         )
 
     def get_uland_url(self, uland_url: str):
-        if (
-            not "uland" in self.cookies
-            or time_stamp() - self.m_time > self.ONE_HOURS / 2
-        ):
-            self.get_m_h5_tk()
-        s_req = self.get_uland_url_req(uland_url, self.cookies["uland"])
+        uland = self.get_m_h5_cookie("uland")
+        s_req = self.get_uland_url_req(uland_url, uland)
         if s_req is None:
             return ""
         req_text = s_req.text
@@ -286,13 +298,8 @@ class Items(object):
         return self.get_tb_h5_api(api, jsv, uland_url, tt, j_data, cookies)
 
     def get_finger(self, item_id: int):
-        if (
-            not "finger" in self.cookies
-            or not self.M in self.cookies["finger"]
-            or time_stamp() - self.m_time > self.ONE_HOURS / 2
-        ):
-            self.get_m_h5_tk()
-        s_req = self.get_finger_req(item_id, self.cookies["finger"])
+        finger = self.get_m_h5_cookie("finger")
+        s_req = self.get_finger_req(item_id, finger)
         if s_req is None:
             return
         try:
@@ -392,7 +399,11 @@ class Items(object):
                 (
                     self.items_detail_map[item_id]["category_id"]
                     and self.items_detail_map[item_id]["price"] != "0"
-                    and not expired_flag
+                    and (
+                        not expired_flag
+                        or np.random.rand() > 0.33
+                        or self.load_num > 100
+                    )
                 )
                 or self.items_detail_map[item_id]["is_expired"]
             )
@@ -401,13 +412,9 @@ class Items(object):
             return self.items_detail_map[item_id]
         if is_wait:
             time.sleep(np.random.rand() * 8 + 2)
-        if (
-            not "uland" in self.cookies
-            or time_stamp() - self.m_time > self.ONE_HOURS / 2
-        ):
-            self.get_m_h5_tk()
+        uland = self.get_m_h5_cookie("uland")
         self.load_num += 1
-        req = self.get_tb_getdetail_req(int(item_id), self.cookies["uland"])
+        req = self.get_tb_getdetail_req(int(item_id), uland)
         if req is None:
             return {}
         req_text = req.text

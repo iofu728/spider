@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-23 23:45:39
+# @Last Modified time: 2021-04-24 13:15:10
 
 import json
 import os
@@ -585,10 +585,10 @@ class ActivateArticle(TBK):
         self.tpwds_list[yd_id] = tpwds
         return tpwds
 
-    def update_shops(self):
+    def update_shops(self, bc: int = 1):
         flag = begin_time()
         shops = [ii for ii in self.items.shops_detail_map.values() if ii["user_id"]]
-        N, updated_num, bc = len(shops), 0, 20
+        N, updated_num = len(shops), 0
         for ii in range((N - 1) // bc + 1):
             shop_ids_map = {
                 ii["user_id"]: ii["shop_name"] for ii in shops[ii * bc : (ii + 1) * bc]
@@ -610,7 +610,7 @@ class ActivateArticle(TBK):
         )
 
     def check_tpwds_url_renew(self, mode: str = "all"):
-        ''' @mode: one, all, recheck'''
+        """ @mode: one, all, recheck"""
         renew = 0
         flag = begin_time()
         for tpwd in self.tpwds_db_map:

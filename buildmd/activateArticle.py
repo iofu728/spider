@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-24 16:07:59
+# @Last Modified time: 2021-04-24 16:32:34
 
 import json
 import os
@@ -303,6 +303,7 @@ class ActivateArticle(TBK):
     TPWD_REG = "\p{Sc}(\w{8,12}?)\p{Sc}"
     TPWD_REG2 = "(\p{Sc}\w{8,12}\p{Sc})"
     TPWD_REG3 = "(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》])([a-zA-Z0-9]{8,12}?)(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》])"
+    TPWD_REG4 = "(\p{Sc}\w{8,12}\p{Sc})/\(已失效\)"
     JSON_KEYS = [
         "p",
         "ct",
@@ -1095,19 +1096,19 @@ class ActivateArticle(TBK):
         if flag:
             echo(1, f"Update {yd_id} Success!! replace {len(tpwds)} tpwds")
 
-    def update_article_pipeline(self, yd_id: str):
+    def update_article_pipeline(self, yd_id: str, mode: str = "normal"):
         xml = self.get_xml(yd_id)
         if xml is None:
             echo("0|warning", "get xml error")
             return
-        xml, r_log, r_num, counter = self.replace_tpwd(yd_id, xml)
+        xml, r_log, r_num, counter = self.replace_tpwd(yd_id, xml, mode)
         if not r_num:
             echo("0|warning", "r_num == 0")
             return
         flag = self.update_article(yd_id, xml)
         if flag:
             need_num = len(regex.findall("\(已失效\)", xml))
-            self.email_update_result(yd_id, r_log, r_num, counter, need_num)
+            self.email_update_result(yd_id, r_log, r_num, counter, need_num, mode)
             self.get_yd_detail(yd_id, True, True)
             self.update_yd2db(yd_id, True)
             self.share_yd_article(yd_id)
@@ -1133,10 +1134,11 @@ class ActivateArticle(TBK):
             echo("2", f"No need fix in {yd_id}.")
 
     def email_update_result(
-        self, yd_id: str, r_log: list, r_num: int, counter: dict, need_num: int
+        self, yd_id: str, r_log: list, r_num: int, counter: dict, need_num: int, mode: str
     ):
         title = self.lists_map.get(yd_id, {}).get("title", "")
-        subject = "更新({}){}/{}剩{}条[{}]".format(
+        subject = "{}({}){}/{}剩{}条[{}]".format(
+            "更新" if mode == "normal" else "修复失效",
             time_str(time_format=self.T_FORMAT),
             r_num,
             len(r_log),
@@ -1193,11 +1195,16 @@ class ActivateArticle(TBK):
             update_num += 1
             self.new_tpwds_map[k]["tpwd"] = tpwd
             self.new_tpwds_map[k]["commission_rate"] = 4
-        echo(1, "Update ITEM {} by Normal TPWD of {} tpwds.".format(item_id, update_num))
+        echo(
+            1, "Update ITEM {} by Normal TPWD of {} tpwds.".format(item_id, update_num)
+        )
         return tpwd, 4
 
-    def replace_tpwd(self, yd_id: str, xml: str):
-        tpwds = regex.findall(self.TPWD_REG2, xml)
+    def replace_tpwd(self, yd_id: str, xml: str, mode: str):
+        if mode == "normal":
+            tpwds = regex.findall(self.TPWD_REG2, xml)
+        else:
+            tpwds = regex.findall(self.TPWD_REG4, xml)
         self.tpwds_list[yd_id] = tpwds
         m = self.new_tpwds_map
         counter, popup = defaultdict(int), defaultdict(int)

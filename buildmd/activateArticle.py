@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-24 16:32:34
+# @Last Modified time: 2021-04-24 17:07:33
 
 import json
 import os
@@ -1134,7 +1134,13 @@ class ActivateArticle(TBK):
             echo("2", f"No need fix in {yd_id}.")
 
     def email_update_result(
-        self, yd_id: str, r_log: list, r_num: int, counter: dict, need_num: int, mode: str
+        self,
+        yd_id: str,
+        r_log: list,
+        r_num: int,
+        counter: dict,
+        need_num: int,
+        mode: str,
     ):
         title = self.lists_map.get(yd_id, {}).get("title", "")
         subject = "{}({}){}/{}剩{}条[{}]".format(
@@ -1238,7 +1244,7 @@ class ActivateArticle(TBK):
             )
             title = tmp_title if tmp_title else title
             if c_rate == 0:
-                self.update_normal_tpwd(o_tpwd, item_id, title)
+                tpwd, c_rate = self.update_normal_tpwd(o_tpwd, item_id, title)
 
             if f"{o_tpwd_pro}/(已失效)" in xml:
                 xml = xml.replace(f"{o_tpwd_pro}/(已失效)", f"{o_tpwd_pro}/")

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-24 17:08:58
+# @Last Modified time: 2021-04-24 17:41:14
 
 import json
 import os
@@ -1225,6 +1225,7 @@ class ActivateArticle(TBK):
         RENEW_TPWD = "RENEW_TPWD::已根据URL更新淘口令"
         GEN_SHOP_TPWD = "GENERATE_SHOP_TPWD::该商品未参加淘客，已透出店铺淘口令"
         GEN_ITEM_TPWD = "GENERATE_ITEM_TPWD::已根据商品更新淘口令"
+        GEN_DIR_TPWD = "GENERATE_DIRECT_TPWD::已根据淘口令更新淘口令"
         GEN_NORM_TPWD = "GENERATE_NORMAL_TPWD::已根据商品生成一般分享淘口令"
         for idx, o_tpwd_pro in enumerate(tpwds):
             o_tpwd = o_tpwd_pro[1:-1]
@@ -1267,6 +1268,12 @@ class ActivateArticle(TBK):
             elif c_rate == 2:
                 status_log = GEN_SHOP_TPWD
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, 透出店铺链接, {GEN_SHOP_TPWD}, {title}"
+            elif c_rate == 3:
+                status_log = GEN_DIR_TPWD
+                COMMISSION = f"->￥{tpwd}￥ SUCCESS, 淘口令直接更新, {GEN_DIR_TPWD}, {title}"
+            elif c_rate == 4:
+                status_log = GEN_NORM_TPWD
+                COMMISSION = f"->￥{tpwd}￥ SUCCESS, 一般分享淘口令, {GEN_NORM_TPWD}, {title}"
             else:
                 status_log = GEN_ITEM_TPWD
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, {status_log}, 佣金: {c_rate}, 类型: {c_type}, {title}"

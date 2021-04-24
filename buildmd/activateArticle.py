@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-24 13:15:10
+# @Last Modified time: 2021-04-24 16:07:59
 
 import json
 import os
@@ -64,6 +64,7 @@ class TBK(object):
 
     TKL_DECODER_URL = "https://www.taokouling.com/index/taobao_tkljm"
     SC_URL = "http://gateway.kouss.com/tbpub/%s"
+    APPTIMES_CREATE_URL = "http://tkapi.apptimes.cn/tao-password/create"
     CSTK_KEY = "YNOTE_CSTK"
 
     def __init__(self):
@@ -88,6 +89,8 @@ class TBK(object):
         self.api_key = cfg.get("TBK", "apikey")
         self.sc_session = cfg.get("TBK", "sc_session")
         self.tkl_cookie = cfg.get("TBK", "tkl_cookie")
+        self.apptimes_key = cfg.get("TBK", "apptimes_key")
+        self.apptimes_secret = cfg.get("TBK", "apptimes_secret")
         self.home_id = cfg.get("YNOTE", "home_id")
         self.unlogin_id = cfg.get("YNOTE", "unlogin_id")
         self.cookie = cfg.get("YNOTE", "cookie")[1:-1]
@@ -231,6 +234,19 @@ class TBK(object):
                 return renew_tpwds[seller_id]
         return o_tpwd
 
+    def generate_normal_tpwd(self, url: str, title: str):
+        data = {
+            "appkey": self.apptimes_key,
+            "appsecret": self.apptimes_secret,
+            "url": url,
+            "text": title,
+        }
+        url = self.APPTIMES_CREATE_URL
+        req = basic_req(url, 11, data=data)
+        if not req or req["errcode"] != 0:
+            return ""
+        return req.get("data", {}).get("password", "")[1:-1]
+
 
 class ActivateArticle(TBK):
     """ activate article in youdao Cloud and Convert the tpwds to items"""
@@ -252,6 +268,7 @@ class ActivateArticle(TBK):
     DECODER_TPWD_URL_V2 = "https://taodaxiang.com/taopass/parse/get"
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
+    STORE_URL = "https://store.taobao.com/shop/view_shop.htm?user_number_id=%d"
     TPWD_LIST = [
         "`id`",
         "tpwd",
@@ -659,7 +676,7 @@ class ActivateArticle(TBK):
     def update_tpwds(
         self, is_renew: bool = True, yd_id: str = None, use_direct: bool = False
     ):
-        """ c_rate: 0: origin, 1: renew, 2: shop tpwd, 3: direct convert, >4: dg matrical """
+        """ c_rate: 0: origin, 1: renew, 2: shop tpwd, 3: direct convert, 4: normal tpwd, >5: dg matrical """
         can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] == 1])
         echo(2, f"{can_num} tpwds's url can renew.")
         flag = begin_time()
@@ -1150,6 +1167,35 @@ class ActivateArticle(TBK):
             self.tpwds_map[new_m["tpwd"]] = new_m
         self.store_db()
 
+    def update_normal_tpwd(self, o_tpwd: str, item_id: str, title: str):
+        update_num = 0
+        is_expired = self.items.items_detail_map.get(item_id, {}).get("is_expired", 0)
+        shop_id = self.items.items_detail_map.get(item_id, {}).get("shop_id", "")
+        if (item_id and shop_id) or (item_id.startswith("shop")):
+            if item_id.startswith("shop"):
+                user_id = item_id[4:]
+            else:
+                user_id = self.items.shops_detail_map.get(shop_id, {}).get(
+                    "user_id", ""
+                )
+            if not user_id:
+                return o_tpwd, 0
+            url = self.STORE_URL % int(user_id)
+        if not item_id or not shop_id or is_expired:
+            return o_tpwd, 0
+        url = self.ITEM_URL % int(item_id)
+        tpwd = self.generate_normal_tpwd(url, title)
+        if not tpwd:
+            return o_tpwd, 0
+        for k, v in self.tpwds_map.items():
+            if v.get("item_id", "") != item_id:
+                continue
+            update_num += 1
+            self.new_tpwds_map[k]["tpwd"] = tpwd
+            self.new_tpwds_map[k]["commission_rate"] = 4
+        echo(1, "Update ITEM {} by Normal TPWD of {} tpwds.".format(item_id, update_num))
+        return tpwd, 4
+
     def replace_tpwd(self, yd_id: str, xml: str):
         tpwds = regex.findall(self.TPWD_REG2, xml)
         self.tpwds_list[yd_id] = tpwds
@@ -1162,6 +1208,7 @@ class ActivateArticle(TBK):
         RENEW_TPWD = "RENEW_TPWD::已根据URL更新淘口令"
         GEN_SHOP_TPWD = "GENERATE_SHOP_TPWD::该商品未参加淘客，已透出店铺淘口令"
         GEN_ITEM_TPWD = "GENERATE_ITEM_TPWD::已根据商品更新淘口令"
+        GEN_NORM_TPWD = "GENERATE_NORMAL_TPWD::已根据商品生成一般分享淘口令"
         for idx, o_tpwd_pro in enumerate(tpwds):
             o_tpwd = o_tpwd_pro[1:-1]
             idx_log = f"No.{idx + 1} tpwd: {o_tpwd_pro}, "
@@ -1183,6 +1230,8 @@ class ActivateArticle(TBK):
                 "is_expired", 0
             )
             title = tmp_title if tmp_title else title
+            if c_rate == 0:
+                self.update_normal_tpwd(o_tpwd, item_id, title)
 
             if f"{o_tpwd_pro}/(已失效)" in xml:
                 xml = xml.replace(f"{o_tpwd_pro}/(已失效)", f"{o_tpwd_pro}/")

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-24 17:07:33
+# @Last Modified time: 2021-04-24 17:08:58
 
 import json
 import os
@@ -605,7 +605,11 @@ class ActivateArticle(TBK):
 
     def update_shops(self, bc: int = 1):
         flag = begin_time()
-        shops = [ii for ii in self.items.shops_detail_map.values() if ii["user_id"]]
+        shops = [
+            ii
+            for ii in self.items.shops_detail_map.values()
+            if ii["user_id"] and not ii.get("tpwd", "")
+        ]
         N, updated_num = len(shops), 0
         for ii in range((N - 1) // bc + 1):
             shop_ids_map = {

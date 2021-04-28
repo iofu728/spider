@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-28 21:02:14
+# @Last Modified time: 2021-04-28 21:52:21
 
 import json
 import os
@@ -281,6 +281,7 @@ class ActivateArticle(TBK):
         "commission_type",
         "is_updated",
         "url_can_renew",
+        "renew_prior",
         "expire_at",
         "created_at",
     ]
@@ -575,6 +576,7 @@ class ActivateArticle(TBK):
             "commission_rate": o_info.get("commission_rate", 0),
             "commission_type": o_info.get("commission_type", ""),
             "url_can_renew": int(url_can_renew is not None),
+            "renew_prior": o_info.get("renew_prior", 0),
             "expire_at": expire_at,
         }
         self.tpwds_map[tpwd]["is_updated"] = (
@@ -664,7 +666,7 @@ class ActivateArticle(TBK):
         title = "商品" if not title else title
         domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
         renew_tpwd = None
-        if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7, 8]] or force_update:
+        if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7, 8]]:
             renew_tpwd = self.convert2tpwd(url, title)
             if renew_tpwd is not None:
                 data = self.decoder_generated_tpwd(renew_tpwd)
@@ -701,6 +703,9 @@ class ActivateArticle(TBK):
         # generate new tpwd for each item_id
         item2new = {}
         for item_id, tpwds in item2tpwds.items():
+            tpwds = sorted(
+                tpwds, key=lambda i: -self.tpwds_map.get(i, {}).get("renew_prior", 0)
+            )
             if item_id.startswith("shop"):
                 user_id = item_id[4:]
                 renew_tpwd, m, o_tpwd, title = None, None, None, ""

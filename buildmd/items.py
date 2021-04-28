@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-28 14:53:18
+# @Last Modified time: 2021-04-28 23:44:51
 
 import os
 import sys
@@ -366,12 +366,7 @@ class Items(object):
         else:
             req = req_func(mtop_url, 12, data=data, header=headers)
         if req is None:
-            if can_retry(self.MTOP_URL % (api, int(j_data["v"]))):
-                return self.get_tb_h5_api(
-                    api, jsv, refer_url, data, j_data_t, cookies, mode
-                )
-            else:
-                return
+            return
         return req
 
     def get_tb_h5_token(self, *data: list):

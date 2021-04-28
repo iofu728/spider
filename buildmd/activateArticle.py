@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-24 17:41:14
+# @Last Modified time: 2021-04-28 21:02:14
 
 import json
 import os
@@ -324,6 +324,7 @@ class ActivateArticle(TBK):
         5: "uland.taobao.com",
         6: "ai.taobao.com",
         7: "temai.taobao.com",
+        8: "h5.m.taobao.com",
         10: "taoquan.taobao.com",
         11: "a.m.taobao.com",
         12: "market.m.taobao.com",
@@ -663,7 +664,7 @@ class ActivateArticle(TBK):
         title = "商品" if not title else title
         domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
         renew_tpwd = None
-        if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
+        if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7, 8]] or force_update:
             renew_tpwd = self.convert2tpwd(url, title)
             if renew_tpwd is not None:
                 data = self.decoder_generated_tpwd(renew_tpwd)

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-12 22:59:32
+# @Last Modified time: 2021-04-28 20:30:40
 
 from __future__ import (
     absolute_import,
@@ -135,6 +135,8 @@ def get_basic(
             result = ""
         elif mode == 0:
             result = BeautifulSoup("<html></html>", "html.parser")
+        elif mode == 1:
+            result = {}
         else:
             result = None
         if need_cookie:

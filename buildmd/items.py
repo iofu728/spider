@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-23 23:58:08
+# @Last Modified time: 2021-04-28 14:53:18
 
 import os
 import sys
@@ -401,7 +401,7 @@ class Items(object):
                     and self.items_detail_map[item_id]["price"] != "0"
                     and (
                         not expired_flag
-                        or np.random.rand() > 0.33
+                        or (not self.load_num < 10 and np.random.rand() > 0.33)
                         or self.load_num > 100
                     )
                 )

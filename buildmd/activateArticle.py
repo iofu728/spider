@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-28 21:52:21
+# @Last Modified time: 2021-04-29 14:36:55
 
 import json
 import os
@@ -1187,9 +1187,10 @@ class ActivateArticle(TBK):
 
     def update_normal_tpwd(self, o_tpwd: str, item_id: str, title: str):
         update_num = 0
-        is_expired = self.items.items_detail_map.get(item_id, {}).get("is_expired", 0)
+        is_expired = self.items.items_detail_map.get(item_id, {}).get("is_expired", 1)
         shop_id = self.items.items_detail_map.get(item_id, {}).get("shop_id", "")
-        if (item_id and shop_id) or (item_id.startswith("shop")):
+        url = ""
+        if (item_id and shop_id and is_expired) or (item_id.startswith("shop")):
             if item_id.startswith("shop"):
                 user_id = item_id[4:]
             else:
@@ -1199,9 +1200,10 @@ class ActivateArticle(TBK):
             if not user_id:
                 return o_tpwd, 0
             url = self.STORE_URL % int(user_id)
-        if not item_id or not shop_id or is_expired:
+        if not (not item_id or not shop_id or is_expired):
+            url = self.ITEM_URL % int(item_id)
+        if not url:
             return o_tpwd, 0
-        url = self.ITEM_URL % int(item_id)
         tpwd = self.generate_normal_tpwd(url, title)
         if not tpwd:
             return o_tpwd, 0

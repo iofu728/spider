@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-29 23:05:57
+# @Last Modified time: 2021-04-30 02:19:04
 
 import json
 import os
@@ -1545,6 +1545,19 @@ class ActivateArticle(TBK):
                 origin[ii] = text
         with open(yd_path, "w") as f:
             f.write("\n".join(origin))
+
+    def get_r_tpwds(self, yd_id: str):
+        xml = self.get_xml(yd_id)
+        tpwds = regex.findall(self.TPWD_REG2, xml)
+        r_tpwds = []
+        for tpwd in tpwds:
+            if f"3{tpwd}/" in xml:
+                tpwd = f"3{tpwd}/"
+            if f"{tpwd}(已失效)" in xml:
+                tpwd = f"{tpwd}(已失效)"
+            r_tpwds.append(tpwd)
+        echo(1, "yd_id: {} get {} tpwds.".format(yd_id, len(r_tpwds)))
+        return r_tpwds
 
 
 if __name__ == "__main__":

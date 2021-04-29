@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-04-29 18:09:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-29 23:21:06
+# @Last Modified time: 2021-04-29 23:30:51
 
 import json
 import os
@@ -54,7 +54,7 @@ class OfficialAccountObject(object):
         if key and time_stamp() - generated_stamp > self.ONE_HOURS // 6:
             return key
         url = self.ACCESS_TOKEN_URL % ("client_credential", self.app_id, self.secret)
-        req = basic_req(url, 1)
+        req = basic_req(url, 1, config={"encoding": "utf-8"})
         if self.is_failure(req, "Get Access Token Error"):
             return ""
         self.access_token = {
@@ -68,7 +68,7 @@ class OfficialAccountObject(object):
     ):
         url = self.MATERIAL_LIST_URL % self.get_access_token()
         data = {"type": types, "offset": offset, "count": count}
-        req = basic_req(url, 11, data=json.dumps(data))
+        req = basic_req(url, 11, data=json.dumps(data), config={"encoding": "utf-8"})
         if self.is_failure(
             req,
             "Get {} material list request failed, offset: {}, count: {}".format(
@@ -87,10 +87,10 @@ class OfficialAccountObject(object):
             self.get_material_list_req(20 * ii)
         echo(2, "Load {} material.".format(self.load_num))
 
-    def get_material_detail(self, media_id: str, encoding: str = "utf-8"):
+    def get_material_detail(self, media_id: str):
         url = self.GET_MATERIAL_URL % self.get_access_token()
         data = {"media_id": media_id}
-        req = basic_req(url, 11, data=json.dumps(data), config={"encoding": encoding})
+        req = basic_req(url, 11, data=json.dumps(data), config={"encoding": "utf-8"})
         if self.is_failure(req, "Get {} material detail failed".format(media_id)):
             return
         self.material_map[media_id] = req
@@ -98,7 +98,7 @@ class OfficialAccountObject(object):
 
     def get_material_num(self):
         url = self.MATERIAL_NUM_URL % self.get_access_token()
-        req = basic_req(url, 1)
+        req = basic_req(url, 1, config={"encoding": "utf-8"})
         self.count = {ii[:-6]: jj for ii, jj in req.items()}
         return req
 
@@ -121,7 +121,7 @@ class OfficialAccountObject(object):
                 "content_source_url": m.get("content_source_url", ""),
             },
         }
-        req = basic_req(url, 11, data=json.dumps(data))
+        req = basic_req(url, 11, data=json.dumps(data), config={"encoding": "utf-8"})
         if self.is_failure(req, "Update News {}({}) Error".format(title, media_id)):
             return
         echo(
@@ -168,7 +168,7 @@ class OfficialAccountObject(object):
                 }
             ]
         }
-        req = basic_req(url, 11, data=json.dumps(data))
+        req = basic_req(url, 11, data=json.dumps(data), config={"encoding": "utf-8"})
         return req
 
     def is_failure(self, req, info: str) -> bool:

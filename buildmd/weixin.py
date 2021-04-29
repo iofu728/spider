@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-04-29 18:09:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-29 23:02:19
+# @Last Modified time: 2021-04-29 23:21:06
 
 import json
 import os
@@ -87,10 +87,10 @@ class OfficialAccountObject(object):
             self.get_material_list_req(20 * ii)
         echo(2, "Load {} material.".format(self.load_num))
 
-    def get_material_detail(self, media_id: str):
+    def get_material_detail(self, media_id: str, encoding: str = "utf-8"):
         url = self.GET_MATERIAL_URL % self.get_access_token()
         data = {"media_id": media_id}
-        req = basic_req(url, 11, data=json.dumps(data))
+        req = basic_req(url, 11, data=json.dumps(data), config={"encoding": encoding})
         if self.is_failure(req, "Get {} material detail failed".format(media_id)):
             return
         self.material_map[media_id] = req

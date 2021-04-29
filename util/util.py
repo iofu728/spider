@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-28 20:30:40
+# @Last Modified time: 2021-04-29 23:19:36
 
 from __future__ import (
     absolute_import,
@@ -103,6 +103,7 @@ def get_basic(
     allow_redirects = config.get("allow_redirects", True)
     timeout = config.get("timeout", timeouts)
     return_proxy = config.get("return_proxy", False)
+    encoding = config.get("encoding", None)
     try:
         req = req_func(
             url,
@@ -113,6 +114,8 @@ def get_basic(
             data=data,
             allow_redirects=allow_redirects,
         )
+        if encoding:
+            req.encoding = encoding
         if mode == 2:
             if return_proxy:
                 return req, proxies

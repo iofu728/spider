@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-29 14:36:55
+# @Last Modified time: 2021-04-29 15:41:29
 
 import json
 import os
@@ -268,7 +268,9 @@ class ActivateArticle(TBK):
     DECODER_TPWD_URL_V2 = "https://taodaxiang.com/taopass/parse/get"
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
-    STORE_URL = "https://store.taobao.com/shop/view_shop.htm?user_number_id=%d"
+    STORE_URL = (
+        "http://shop.m.taobao.com/shop/shop_index.htm?user_id=%s&shop_navi=allitems"
+    )
     TPWD_LIST = [
         "`id`",
         "tpwd",
@@ -1199,7 +1201,7 @@ class ActivateArticle(TBK):
                 )
             if not user_id:
                 return o_tpwd, 0
-            url = self.STORE_URL % int(user_id)
+            url = self.STORE_URL % user_id
         if not (not item_id or not shop_id or is_expired):
             url = self.ITEM_URL % int(item_id)
         if not url:

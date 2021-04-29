@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-29 15:41:29
+# @Last Modified time: 2021-04-29 16:09:51
 
 import json
 import os
@@ -1419,8 +1419,6 @@ class ActivateArticle(TBK):
         )
         if not yd_ids_map:
             return
-        title = "链接需要更新#{}#篇".format(len(yd_ids_map))
-        content = f"{title}\n \n"
         yd_infos = []
         for yd_id, num in sorted(yd_ids_map.items(), key=lambda x: -(x[1])):
             t = self.lists_map.get(yd_id, {}).get("title", "")
@@ -1428,11 +1426,13 @@ class ActivateArticle(TBK):
                 "modified_at", self.BASIC_TIMEX_STR
             )
             dif_time = time_stamp() - time_stamp(modified_at)
-            if dif_time < 3 * self.ONE_HOURS * self.ONE_DAY:
+            if dif_time < 5 * self.ONE_HOURS * self.ONE_DAY or num < 10:
                 continue
             yd_infos.append(
                 f"{t}, 需要更新{num}个链接，上次更新时间:{modified_at}, {self.SHARE_URL % yd_id}\n"
             )
+        title = "链接需要更新#{}#篇".format(len(yd_infos))
+        content = f"{title}\n \n"
         if not yd_infos:
             echo("2|debug", title, "has updated. Don't send notification!")
             return

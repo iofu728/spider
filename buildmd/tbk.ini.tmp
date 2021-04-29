@@ -23,3 +23,7 @@ assign_email = xxx@qq.com
 cookie = ""
 UserAgent = ""
 tb_id = xxx
+
+[WX]
+app_id = wxxxxx
+secret = xxxxxx

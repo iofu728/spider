@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-29 16:09:51
+# @Last Modified time: 2021-04-29 23:05:57
 
 import json
 import os
@@ -21,6 +21,7 @@ import regex
 sys.path.append(os.getcwd())
 import top
 from buildmd.items import Items
+from buildmd.weixin import OfficialAccountObject
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
 from util.util import (
@@ -363,6 +364,7 @@ class ActivateArticle(TBK):
                 "is_local": is_local,
             }
         )
+        self.oa = OfficialAccountObject()
         self.Db = self.items.Db
         for table in self.TABLE_LISTS:
             self.Db.create_table(os.path.join(sql_dir, table))
@@ -1108,12 +1110,14 @@ class ActivateArticle(TBK):
         if flag:
             echo(1, f"Update {yd_id} Success!! replace {len(tpwds)} tpwds")
 
-    def update_article_pipeline(self, yd_id: str, mode: str = "normal"):
+    def update_article_pipeline(
+        self, yd_id: str, mode: str = "normal", media_id: str = ""
+    ):
         xml = self.get_xml(yd_id)
         if xml is None:
             echo("0|warning", "get xml error")
             return
-        xml, r_log, r_num, counter = self.replace_tpwd(yd_id, xml, mode)
+        xml, r_log, r_num, counter, r_tpwds = self.replace_tpwd(yd_id, xml, mode)
         if not r_num:
             echo("0|warning", "r_num == 0")
             return
@@ -1124,6 +1128,9 @@ class ActivateArticle(TBK):
             self.get_yd_detail(yd_id, True, True)
             self.update_yd2db(yd_id, True)
             self.share_yd_article(yd_id)
+        if media_id:
+            title = self.lists_map.get(yd_id, {}).get("title", "")
+            self.oa.update_tpwds(title, r_tpwds, media_id)
 
     def fix_failure(self, yd_id: str, store: bool = False):
         xml = self.get_xml(yd_id)
@@ -1225,6 +1232,7 @@ class ActivateArticle(TBK):
             tpwds = regex.findall(self.TPWD_REG2, xml)
         else:
             tpwds = regex.findall(self.TPWD_REG4, xml)
+        r_tpwds = []
         self.tpwds_list[yd_id] = tpwds
         m = self.new_tpwds_map
         counter, popup = defaultdict(int), defaultdict(int)
@@ -1305,6 +1313,7 @@ class ActivateArticle(TBK):
                     COMMISSION += ", 客服端不可弹出"
                     popup["不可弹出"] += 1
             r_log.append(f"{idx_log}{COMMISSION}")
+            r_tpwds.append(tpwd)
             counter[status_log] += 1
         echo(
             2,
@@ -1312,7 +1321,7 @@ class ActivateArticle(TBK):
                 popup["正常弹出"], popup["不可弹出"], len(r_log) - r_num
             ),
         )
-        return xml, r_log, r_num, counter
+        return xml, r_log, r_num, counter, r_tpwds
 
     def get_xml(self, yd_id: str):
         url = self.SYNC_URL % ("download", self.cstk)

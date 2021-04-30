@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-29 00:13:02
+# @Last Modified time: 2021-04-30 18:20:57
 
 import os
 import sys
@@ -140,13 +140,27 @@ class Items(object):
         return self.TaoShopURL % (user_id, item_id)
 
     def get_tb_getdetail_req(self, item_id: int, cookies: dict = {}):
-        """ tb getdetail api 2.6.1 @2021.04.05 ✔️Tested"""
-        data = {"itemNumId": str(item_id)}
+        """ tb getdetail api 2.6.1 @2021.04.30 ✔️Tested"""
+        data = {
+            "detail_v": "3.5.0",
+            "exParams": json_str(
+                {
+                    "appReqFrom": "detail",
+                    "container_type": "xdetail",
+                    "dinamic_v3": "true",
+                    "supportV7": "true",
+                    "ultron2": "true",
+                }
+            ),
+            "itemNumId": str(item_id),
+            "pageCode": "miniAppDetail",
+            "_from_": "miniapp",
+        }
         jsv = "2.6.1"
         api = "mtop.taobao.detail.getdetail"
         j_data_t = {
             "v": 6.0,
-            "ttid": "2018@taobao_h5_9.9.9",
+            "ttid": "202012@taobao_h5_9.17.0",
             "AntiCreep": True,
             "callback": "mtopjsonp1",
         }
@@ -340,7 +354,8 @@ class Items(object):
             headers["Cookie"] = encoder_cookie(cookies)
         appkey = "12574478"
 
-        token = cookies[self.M].split("_")[0] if step else ""
+        # token = cookies[self.M].split("_")[0] if step else ""
+        token = "undefined"
         t = int(time_stamp() * 1000)
 
         j_data = {
@@ -349,11 +364,13 @@ class Items(object):
             "t": t,
             "sign": self.get_tb_h5_token(token, t, appkey, data_str),
             "api": api,
-            "v": 1.0,
-            "timeout": 20000,
+            "v": 6.0,
+            "isSec": 0,
+            "ecode": 0,
             "AntiCreep": True,
             "AntiFlood": True,
-            "type": "originaljson",
+            "H5Request": True,
+            "type": "jsonp",
             "dataType": "jsonp",
             **j_data_t,
         }
@@ -501,6 +518,7 @@ class Items(object):
         apiStack = req_json["data"].get("apiStack", [{}])[0].get("value", "")
         try:
             apiStack = json.loads(apiStack)
+            apiStack = apiStack.get("global", {}).get("data", {})
             price = (
                 apiStack["price"]["price"].get("priceText", "0")
                 if "price" in apiStack and "price" in apiStack["price"]

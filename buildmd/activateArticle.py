@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-30 02:19:04
+# @Last Modified time: 2021-04-30 10:54:25
 
 import json
 import os
@@ -1117,7 +1117,7 @@ class ActivateArticle(TBK):
         if xml is None:
             echo("0|warning", "get xml error")
             return
-        xml, r_log, r_num, counter, r_tpwds = self.replace_tpwd(yd_id, xml, mode)
+        xml, r_log, r_num, counter = self.replace_tpwd(yd_id, xml, mode)
         if not r_num:
             echo("0|warning", "r_num == 0")
             return
@@ -1128,9 +1128,10 @@ class ActivateArticle(TBK):
             self.get_yd_detail(yd_id, True, True)
             self.update_yd2db(yd_id, True)
             self.share_yd_article(yd_id)
-        if media_id:
-            title = self.lists_map.get(yd_id, {}).get("title", "")
-            self.oa.update_tpwds(title, r_tpwds, media_id)
+            if media_id:
+                title = self.lists_map.get(yd_id, {}).get("title", "")
+                r_tpwds = self.get_r_tpwds(yd_id)
+                self.oa.update_tpwds(title, r_tpwds, media_id)
 
     def fix_failure(self, yd_id: str, store: bool = False):
         xml = self.get_xml(yd_id)
@@ -1232,7 +1233,6 @@ class ActivateArticle(TBK):
             tpwds = regex.findall(self.TPWD_REG2, xml)
         else:
             tpwds = regex.findall(self.TPWD_REG4, xml)
-        r_tpwds = []
         self.tpwds_list[yd_id] = tpwds
         m = self.new_tpwds_map
         counter, popup = defaultdict(int), defaultdict(int)
@@ -1313,7 +1313,6 @@ class ActivateArticle(TBK):
                     COMMISSION += ", 客服端不可弹出"
                     popup["不可弹出"] += 1
             r_log.append(f"{idx_log}{COMMISSION}")
-            r_tpwds.append(tpwd)
             counter[status_log] += 1
         echo(
             2,
@@ -1321,7 +1320,7 @@ class ActivateArticle(TBK):
                 popup["正常弹出"], popup["不可弹出"], len(r_log) - r_num
             ),
         )
-        return xml, r_log, r_num, counter, r_tpwds
+        return xml, r_log, r_num, counter
 
     def get_xml(self, yd_id: str):
         url = self.SYNC_URL % ("download", self.cstk)

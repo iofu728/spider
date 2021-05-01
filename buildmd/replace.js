@@ -2,7 +2,7 @@
  * @Author: gunjianpan
  * @Date:   2021-04-30 01:49:27
  * @Last Modified by:   gunjianpan
- * @Last Modified time: 2021-05-02 01:46:01
+ * @Last Modified time: 2021-05-02 03:12:38
  */
 
 // find tpwds length
@@ -17,18 +17,18 @@ for(let i = 0; i < tpwds.length; i++){
     tpwd = tpwds[i];
     r_tpwd = r_tpwds[i];
     tmp = "3" + tpwd + "/"
-    if (content.search(tmp) != -1){
+    if (content.indexOf(tmp) != -1){
         tpwd = tmp;
     }
     tmp = tpwd + "(已失效)"
-    if (content.search(tmp) != -1){
+    if (content.indexOf(tmp) != -1){
         tpwd = tmp;
     }
     tmp = tpwd + "(店铺链接)"
-    if (content.search(tmp) != -1){
+    if (content.indexOf(tmp) != -1){
         tpwd = tmp;
     }
-    content = content.replace(tpwd, r_tpwd);
+    content = content.replaceAll(tpwd, r_tpwd);
 }
 
 infos["item"][0]["multi_item"][0]["content"] = content

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-02 01:45:38
+# @Last Modified time: 2021-05-02 01:51:52
 
 import json
 import os
@@ -1281,7 +1281,7 @@ class ActivateArticle(TBK):
             xml = xml.replace(o_tpwd_pro, f"￥{tpwd}￥")
 
             if c_rate == 0:
-                if is_expired or not item_id or item_id == "expired":
+                if is_expired or item_id in ["expired", ""]:
                     status_log = ITEM_EXPIRED
                 else:
                     status_log = DNP_TBK

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-30 10:54:25
+# @Last Modified time: 2021-05-01 18:55:11
 
 import json
 import os
@@ -701,7 +701,9 @@ class ActivateArticle(TBK):
         item2tpwds = defaultdict(set)
         for o_tpwd, m in self.tpwds_map.items():
             item_id = m.get("item_id", "")
-            if item_id not in ["", "0"]:
+            if item_id not in ["", "0"] and (
+                item_id.startswith("shop") or item_id.isdigit()
+            ):
                 item2tpwds[item_id].add(o_tpwd)
 
         # generate new tpwd for each item_id
@@ -897,6 +899,9 @@ class ActivateArticle(TBK):
         else:
             echo("0|warning", "New Domain:", regex.findall("https://(.*?)/", url), url)
             idx, item_id = 20, ""
+        if item_id is None:
+            item_id = ""
+
         return idx, str(item_id)
 
     def decoder_tpwd_v1(self, tpwd: str):

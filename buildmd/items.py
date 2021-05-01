@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-30 18:20:57
+# @Last Modified time: 2021-05-01 19:01:51
 
 import os
 import sys
@@ -164,27 +164,7 @@ class Items(object):
             "AntiCreep": True,
             "callback": "mtopjsonp1",
         }
-        return self.get_tb_h5_api(api, jsv, "", data, j_data_t, cookies)
-
-    def get_tb_getdetail_req_from_url(self, url: str, item_id: str, cookies: dict = {}):
-        exParams = decoder_url(url)
-        data = {
-            **exParams,
-            "itemNumId": item_id,
-            "itemId": item_id,
-            "exParams": exParams,
-            "detail_v": "8.0.0",
-            "utdid": "1",
-        }
-        jsv = "2.6.1"
-        api = "mtop.taobao.detail.getdetail"
-        j_data_t = {
-            "v": 6.0,
-            "ttid": "2018@taobao_h5_9.9.9",
-            "AntiCreep": True,
-            "callback": "mtopjsonp1",
-        }
-        return self.get_tb_h5_api(api, jsv, "", data, j_data_t, cookies)
+        return self.get_tb_h5_api(api, jsv, "", data, j_data_t, cookies, v=6.0)
 
     def get_tb_getdetail(self, item_id: int):
         uland = self.get_m_h5_cookie("uland")
@@ -228,18 +208,17 @@ class Items(object):
         if finger_id is None:
             return
         echo(4, "finger id:", finger_id)
-        req = self.get_baichuan_req(item_id, finger_id, baichuan)
-        if req is not None:
-            return req.json()["data"]
+        return self.get_baichuan_req(self.DETAIL_URL % item_id, finger_id, baichuan)
 
-    def get_baichuan_req(self, item_id: int, finger_id: str, cookies: dict = {}):
-        refer_url = self.DETAIL_URL % item_id
+    def get_baichuan_req(
+        self, url: str, finger_id: str, pageCode: str = "mallDetail", cookies: dict = {}
+    ):
         data = {
-            "pageCode": "mallDetail",
+            "pageCode": pageCode,
             "ua": get_use_agent("mobile"),
             "params": json_str(
                 {
-                    "url": refer_url,
+                    "url": url,
                     "referrer": "",
                     "oneId": None,
                     "isTBInstalled": "null",
@@ -247,15 +226,11 @@ class Items(object):
                 }
             ),
         }
-        data_str = (
-            r'{"pageCode":"mallDetail","ua":"%s","params":"{\"url\":\"%s\",\"referrer\":\"\",\"oneId\":null,\"isTBInstalled\":\"null\",\"fid\":\"%s\"}"}'
-            % (get_use_agent("mobile"), refer_url, finger_id)
-        )
         api = "mtop.taobao.baichuan.smb.get"
-        jsv = "2.4.8"
+        jsv = "2.6.0"
 
         return self.get_tb_h5_api(
-            api, jsv, refer_url, data, cookies=cookies, mode=1, data_str=data_str
+            api, jsv, refer_url, data, cookies=cookies, mode=1, data_str=json_str(data)
         )
 
     def get_uland_url(self, uland_url: str):
@@ -264,50 +239,70 @@ class Items(object):
         if s_req is None:
             return ""
         req_text = s_req.text
-        try:
-            re_json = json.loads(req_text[req_text.find("{") : -1])
-            return re_json["data"]["resultList"][0]["itemId"]
-        except:
-            return ""
+        re_json = json.loads(req_text[req_text.find("{") : -1])
+        result = re_json.get("data", {}).get("resultList", [{}])[0]
+        if "url" in result and result["url"] is None:
+            return "expired"
+        return result.get("itemId", "")
 
     def get_uland_url_req(self, uland_url: str, cookies: dict = {}):
         """ tb h5 api @2020.01.18 ✔️Tested"""
 
-        def get_v1_tt(a: dict):
-            """mtop.alimama.union.xt.en.api.entry @2019.11.09"""
-            variableMap = json_str(
-                {"taoAppEnv": "0", "e": uland_params["e"], "scm": uland_params["scm"]}
-            )
-            api = "mtop.alimama.union.xt.en.api.entry"
-            return variableMap, api
-
-        def get_v2_tt(a: dict):
-            """mtop.alimama.union.xt.biz.quan.api.entry @2020.01.18"""
-            variableMap = json_str(
-                {
-                    "e": a["e"],
-                    "ptl": a["ptl"],
+        def get_scm_data(params: dict, step: int):
+            """ scm @2019.11.09"""
+            variableMap = {
+                "e": params["e"],
+                "scm": params["scm"],
+            }
+            if not step:
+                variableMap = {"taoAppEnv": "0", **variableMap}
+            else:
+                pvid = "201_11.88.140.18_9874679_{}".format(time_stamp() * 1000)
+                variableMap = {
+                    **variableMap,
                     "type": "nBuy",
                     "buyMoreSwitch": "0",
-                    "union_lens": a["union_lens"],
-                    "recoveryId": "201_11.168.242.104_{}".format(time_stamp() * 1000),
+                    "recoveryId": pvid,
+                    "pvid": pvid,
                 }
-            )
+
             api = "mtop.alimama.union.xt.biz.quan.api.entry"
-            return variableMap, api
+            return json_str(variableMap), api
+
+        def get_spm_data(params: dict, step: int):
+            """ spm @2020.01.18 """
+            variableMap = {
+                "e": params["e"],
+                "ptl": params["ptl"],
+            }
+            if not step:
+                variableMap = {"taoAppEnv": "0", **variableMap}
+            else:
+                pvid = "201_11.88.140.18_9874679_{}".format(time_stamp() * 1000)
+                variableMap = {
+                    **variableMap,
+                    "type": "nBuy",
+                    "buyMoreSwitch": "0",
+                    "union_lens": params["union_lens"],
+                    "recoveryId": pvid,
+                    "pv_id": pvid,
+                }
+
+            api = "mtop.alimama.union.xt.biz.quan.api.entry"
+            return json_str(variableMap), api
 
         step = self.M in cookies
         uland_params = decoder_url(uland_url, True)
         if "scm" in uland_params:
-            variableMap, api = get_v1_tt(uland_params)
+            variableMap, api = get_scm_data(uland_params, step)
         elif "spm" in uland_params:
-            variableMap, api = get_v2_tt(uland_params)
+            variableMap, api = get_spm_data(uland_params, step)
         else:
             echo(0, "UnKnowned ULAND mode,", uland_url)
             return
 
-        tt = {"floorId": "13193" if step else "13052", "variableMap": variableMap}
-        jsv = "2.4.0"
+        tt = {"floorId": "35320" if step else "13052", "variableMap": variableMap}
+        jsv = "2.6.0"
         j_data = {"type": "jsonp", "callback": "mtopjsonp{}".format(int(step) + 1)}
         return self.get_tb_h5_api(api, jsv, uland_url, tt, j_data, cookies)
 
@@ -339,6 +334,7 @@ class Items(object):
         cookies: dict = {},
         mode: int = 0,
         data_str: str = None,
+        v: float = 1.0,
     ):
         """ tb h5 api @2019.11.6 ✔️Tested"""
         step = self.M in cookies
@@ -364,7 +360,7 @@ class Items(object):
             "t": t,
             "sign": self.get_tb_h5_token(token, t, appkey, data_str),
             "api": api,
-            "v": 6.0,
+            "v": v,
             "isSec": 0,
             "ecode": 0,
             "AntiCreep": True,
@@ -376,14 +372,14 @@ class Items(object):
         }
         if mode == 0:
             j_data["data"] = data_str
-        mtop_url = encoder_url(j_data, self.MTOP_URL % (api, int(j_data["v"])))
+        mtop_url = encoder_url(j_data, self.MTOP_URL % (api, int(v)))
         req_func = basic_req if self.is_local else proxy_req
         if mode == 0:
             req = req_func(mtop_url, 2, header=headers)
         else:
             req = req_func(mtop_url, 12, data=data, header=headers)
         if req is None:
-            if can_retry(self.MTOP_URL % (api, int(j_data["v"]))):
+            if can_retry(self.MTOP_URL % (api, int(v))):
                 return self.get_tb_h5_api(
                     api, jsv, refer_url, data, j_data_t, cookies, mode
                 )

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-01 20:01:12
+# @Last Modified time: 2021-05-01 23:35:07
 
 import os
 import sys
@@ -106,7 +106,7 @@ class Items(object):
         self.Db = Db("tbk")
         for table in self.TABLE_LISTS:
             self.Db.create_table(os.path.join(sql_dir, table))
-        self.is_local = config.get("is_local", False)
+        self.use_local = config.get("use_local", False)
         self.shops_detail_map = {}
         self.items_detail_map = {}
         self.shops_seller_map = {}
@@ -164,7 +164,9 @@ class Items(object):
             "AntiCreep": True,
             "callback": "mtopjsonp1",
         }
-        return self.get_tb_h5_api(api, jsv, "", data, j_data_t, cookies, v=6.0)
+        return self.get_tb_h5_api(
+            api, jsv, "", data, j_data_t, cookies, v=6.0, use_token=False
+        )
 
     def get_tb_getdetail(self, item_id: int):
         uland = self.get_m_h5_cookie("uland")
@@ -315,6 +317,7 @@ class Items(object):
         mode: int = 0,
         data_str: str = None,
         v: float = 1.0,
+        use_token: bool = True,
     ):
         """ tb h5 api @2019.11.6 ✔️Tested"""
         step = self.M in cookies
@@ -330,7 +333,7 @@ class Items(object):
             headers["Cookie"] = encoder_cookie(cookies)
         appkey = "12574478"
 
-        token = cookies[self.M].split("_")[0] if step else "undefined"
+        token = cookies[self.M].split("_")[0] if step and use_token else "undefined"
         t = int(time_stamp() * 1000)
 
         j_data = {
@@ -352,7 +355,7 @@ class Items(object):
         if mode == 0:
             j_data["data"] = data_str
         mtop_url = encoder_url(j_data, self.MTOP_URL % (api, int(v)))
-        req_func = basic_req if self.is_local else proxy_req
+        req_func = basic_req if self.use_local else proxy_req
         if mode == 0:
             req = req_func(mtop_url, 2, header=headers)
         else:
@@ -493,7 +496,8 @@ class Items(object):
         apiStack = req_json["data"].get("apiStack", [{}])[0].get("value", "")
         try:
             apiStack = json.loads(apiStack)
-            apiStack = apiStack.get("global", {}).get("data", {})
+            if "global" in apiStack:
+                apiStack = apiStack.get("global", {}).get("data", {})
             price = (
                 apiStack["price"]["price"].get("priceText", "0")
                 if "price" in apiStack and "price" in apiStack["price"]

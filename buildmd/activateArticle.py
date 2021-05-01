@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-01 18:55:11
+# @Last Modified time: 2021-05-01 23:35:37
 
 import json
 import os
@@ -347,13 +347,13 @@ class ActivateArticle(TBK):
         - ONE_DAY * ONE_HOURS
     )
 
-    def __init__(self, is_local: bool = False):
+    def __init__(self, is_local: bool = False, is_debug: bool = False):
         super(ActivateArticle, self).__init__()
         if is_local:
             self.S_TPWD_SQL = self.S_TPWD_SQL.replace("article_tpwd", "tpwds_local")
             self.I_TPWD_SQL = self.I_TPWD_SQL.replace("article_tpwd", "tpwds_local")
             self.R_TPWD_SQL = self.R_TPWD_SQL.replace("article_tpwd", "tpwds_local")
-        self.is_local = is_local
+        self.use_local = is_local or is_debug
         self.BASIC_TIMEX_STR = time_str()
         self.BASIC_TIMEX_STAMP = time_stamp()
         self.items = Items(
@@ -361,7 +361,7 @@ class ActivateArticle(TBK):
                 "time_str": self.BASIC_TIMEX_STR,
                 "time_stamp": self.BASIC_TIMEX_STAMP,
                 "proxy_req": proxy_req,
-                "is_local": is_local,
+                "use_local": self.use_local,
             }
         )
         self.oa = OfficialAccountObject()
@@ -926,7 +926,7 @@ class ActivateArticle(TBK):
         item_id_map = self.decoder_sclick_url(s_click_url)
         if item_id_map is not None and item_id_map.get("item_id", ""):
             return item_id_map.get("item_id", "")
-        return self.get_s_click_v2(s_click_url)
+        return self.get_s_click_url_v2(s_click_url)
 
     def get_s_click_url_v2(self, s_click_url: str):
         """ decoder s.click real jump url @validation time: 2019.10.23"""
@@ -974,7 +974,7 @@ class ActivateArticle(TBK):
         is_direct: bool = False,
     ):
         headers = self.get_headers(refer_url=referer)
-        req_func = basic_req if is_direct or self.is_local else proxy_req
+        req_func = basic_req if is_direct or self.use_local else proxy_req
         req = req_func(
             s_click_url, 2, header=headers, config={"allow_redirects": allow_redirects}
         )
@@ -1015,7 +1015,7 @@ class ActivateArticle(TBK):
 
     def get_s_click_detail(self, redirect_url: str, tu_url: str):
         headers = self.get_headers(refer_url=tu_url)
-        req_func = basic_req if self.is_local else proxy_req
+        req_func = basic_req if self.use_local else proxy_req
         req = req_func(redirect_url, 2, header=headers)
         if req is None or "id=" not in req.url:
             if can_retry(redirect_url):

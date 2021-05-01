@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-01 19:01:51
+# @Last Modified time: 2021-05-01 20:01:12
 
 import os
 import sys
@@ -229,9 +229,7 @@ class Items(object):
         api = "mtop.taobao.baichuan.smb.get"
         jsv = "2.6.0"
 
-        return self.get_tb_h5_api(
-            api, jsv, refer_url, data, cookies=cookies, mode=1, data_str=json_str(data)
-        )
+        return self.get_tb_h5_api(api, jsv, refer_url, data, cookies=cookies, mode=1)
 
     def get_uland_url(self, uland_url: str):
         uland = self.get_m_h5_cookie("uland")
@@ -246,18 +244,25 @@ class Items(object):
         return result.get("itemId", "")
 
     def get_uland_url_req(self, uland_url: str, cookies: dict = {}):
-        """ tb h5 api @2020.01.18 ✔️Tested"""
+        """ tb h5 api @2021.05.01 ✔️Tested"""
 
-        def get_scm_data(params: dict, step: int):
-            """ scm @2019.11.09"""
+        def get_variableMap(params: dict, step: int):
+            """ scm/plt @2019.11.09"""
+            if "scm" in params:
+                key = "scm"
+            elif "ptl" in params:
+                key = "ptl"
+            else:
+                return None, None
+
             variableMap = {
                 "e": params["e"],
-                "scm": params["scm"],
+                key: params[key],
             }
             if not step:
                 variableMap = {"taoAppEnv": "0", **variableMap}
             else:
-                pvid = "201_11.88.140.18_9874679_{}".format(time_stamp() * 1000)
+                pvid = "201_11.88.140.18_9874679_{:.0f}".format(time_stamp() * 1000)
                 variableMap = {
                     **variableMap,
                     "type": "nBuy",
@@ -269,35 +274,10 @@ class Items(object):
             api = "mtop.alimama.union.xt.biz.quan.api.entry"
             return json_str(variableMap), api
 
-        def get_spm_data(params: dict, step: int):
-            """ spm @2020.01.18 """
-            variableMap = {
-                "e": params["e"],
-                "ptl": params["ptl"],
-            }
-            if not step:
-                variableMap = {"taoAppEnv": "0", **variableMap}
-            else:
-                pvid = "201_11.88.140.18_9874679_{}".format(time_stamp() * 1000)
-                variableMap = {
-                    **variableMap,
-                    "type": "nBuy",
-                    "buyMoreSwitch": "0",
-                    "union_lens": params["union_lens"],
-                    "recoveryId": pvid,
-                    "pv_id": pvid,
-                }
-
-            api = "mtop.alimama.union.xt.biz.quan.api.entry"
-            return json_str(variableMap), api
-
         step = self.M in cookies
         uland_params = decoder_url(uland_url, True)
-        if "scm" in uland_params:
-            variableMap, api = get_scm_data(uland_params, step)
-        elif "spm" in uland_params:
-            variableMap, api = get_spm_data(uland_params, step)
-        else:
+        variableMap, api = get_variableMap(uland_params, step)
+        if variableMap is None:
             echo(0, "UnKnowned ULAND mode,", uland_url)
             return
 
@@ -350,8 +330,7 @@ class Items(object):
             headers["Cookie"] = encoder_cookie(cookies)
         appkey = "12574478"
 
-        # token = cookies[self.M].split("_")[0] if step else ""
-        token = "undefined"
+        token = cookies[self.M].split("_")[0] if step else "undefined"
         t = int(time_stamp() * 1000)
 
         j_data = {

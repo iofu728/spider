@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-01 23:35:37
+# @Last Modified time: 2021-05-02 01:45:38
 
 import json
 import os
@@ -1276,10 +1276,12 @@ class ActivateArticle(TBK):
 
             if f"{o_tpwd_pro}/(已失效)" in xml:
                 xml = xml.replace(f"{o_tpwd_pro}/(已失效)", f"{o_tpwd_pro}/")
+            if f"{o_tpwd_pro}/(店铺链接)" in xml:
+                xml = xml.replace(f"{o_tpwd_pro}/(店铺链接)", f"{o_tpwd_pro}/")
             xml = xml.replace(o_tpwd_pro, f"￥{tpwd}￥")
 
             if c_rate == 0:
-                if is_expired or not item_id:
+                if is_expired or not item_id or item_id == "expired":
                     status_log = ITEM_EXPIRED
                 else:
                     status_log = DNP_TBK
@@ -1290,6 +1292,7 @@ class ActivateArticle(TBK):
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, 保持原链接, {status_log}, {title}"
             elif c_rate == 2:
                 status_log = GEN_SHOP_TPWD
+                xml = xml.replace(f"￥{tpwd}￥/", f"￥{tpwd}￥/(店铺链接)")
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, 透出店铺链接, {GEN_SHOP_TPWD}, {title}"
             elif c_rate == 3:
                 status_log = GEN_DIR_TPWD
@@ -1559,6 +1562,8 @@ class ActivateArticle(TBK):
                 tpwd = f"3{tpwd}/"
             if f"{tpwd}(已失效)" in xml:
                 tpwd = f"{tpwd}(已失效)"
+            if f"{tpwd}(店铺链接)" in xml:
+                tpwd = f"{tpwd}(店铺链接)"
             r_tpwds.append(tpwd)
         echo(1, "yd_id: {} get {} tpwds.".format(yd_id, len(r_tpwds)))
         return r_tpwds

@@ -2,7 +2,7 @@
  * @Author: gunjianpan
  * @Date:   2021-04-30 01:49:27
  * @Last Modified by:   gunjianpan
- * @Last Modified time: 2021-04-30 02:39:45
+ * @Last Modified time: 2021-05-02 01:46:01
  */
 
 // find tpwds length
@@ -21,6 +21,10 @@ for(let i = 0; i < tpwds.length; i++){
         tpwd = tmp;
     }
     tmp = tpwd + "(已失效)"
+    if (content.search(tmp) != -1){
+        tpwd = tmp;
+    }
+    tmp = tpwd + "(店铺链接)"
     if (content.search(tmp) != -1){
         tpwd = tmp;
     }

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-08 01:01:06
+# @Last Modified time: 2021-05-08 01:27:28
 
 
 import codecs
@@ -207,14 +207,14 @@ class Up(BasicBilibili):
         if not ranks:
             return {}
         now_time = time_str()
-        ranks = [
-            dict(
+        ranks = {
+            jj["bvid"]: dict(
                 {ii: map_get(jj, ii) for ii in self.RANK_KEYS},
                 **{"time": time_str(), "idx": idx + 1},
             )
             for idx, jj in enumerate(ranks["list"])
             if jj["tid"] == self.assign_tid
-        ]
+        }
         self.rank_map = ranks
         return ranks
 
@@ -343,14 +343,14 @@ class Up(BasicBilibili):
         send_email(context_text, title_text, self.special_info_email)
         echo("4|error", title_text)
 
-    def load_ranking_detail(self):
+    def load_ranking(self):
         ranks = self.load_ranking_detail()
         others_text = []
         for bv_id, rank in ranks.items():
             self.load_rank2local(bv_id, rank)
             self.send_realtime_rank(bv_id, rank)
             others_text.append(self.get_str_text(rank, self.RANK_LOCAL_KEYS))
-        self.send_data_miss()
+        self.send_data_miss(ranks)
         self.rank_local_map = ranks
         write(f"{data_dir}rank.csv", "\n".join(others_text))
         echo("4|debug", "Rank_map_len:", len(ranks))
@@ -359,7 +359,7 @@ class Up(BasicBilibili):
         for idx in range(num):
             flag = begin_time()
             if idx % 5 == 0:
-                self.load_ranking_detail()
+                self.load_ranking()
             for bv_id in self.bv_ids:
                 self.load_bv_stat_detail(bv_id)
                 if np.random.rand() < 0.2:

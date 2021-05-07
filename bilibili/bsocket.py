@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-06 11:32:49
+# @Last Modified time: 2021-05-08 01:07:55
 
 
 import asyncio
@@ -23,11 +23,12 @@ import aiohttp
 import regex
 
 sys.path.append(os.getcwd())
+from bilibili.basicBilibili import BasicBilibili
 from proxy.getproxy import GetFreeProxy
 from util.util import basic_req, can_retry, echo, mkdir, time_stamp, time_str
 
 logger = logging.getLogger(__name__)
-proxy_req = GetFreeProxy().proxy_req
+proxy_req = None
 data_dir = "bilibili/data/"
 websocket_dir = "%swebsocket/" % data_dir
 assign_path = "bilibili/assign_up.ini"
@@ -55,7 +56,6 @@ class BWebsocketClient:
 
     ROOM_INIT_URL = "https://www.bilibili.com/video/bv%s"
     WEBSOCKET_URL = "wss://broadcast.chat.bilibili.com:7823/sub"
-    PLAYLIST_URL = "https://api.bilibili.com/x/player/pagelist?bvid=%s&jsonp=jsonp"
     HEARTBEAT_BODY = "[object Object]"
     JSON_KEYS = ["code", "message", "ttl", "data"]
 
@@ -70,9 +70,10 @@ class BWebsocketClient:
         )
     }
 
-    def __init__(self, av_id: int, bv_id: str, types: int = 0, p: int = -1):
+    def __init__(self, bv_id: str, types: int = 0, p: int = -1):
         """ init class """
-        self._av_id = av_id
+        self.basic = BasicBilibili()
+        self._av_id = self.basic.bv2av(bv_id)
         self._bv_id = bv_id
         self._room_id = None
         self._count = 1
@@ -95,18 +96,9 @@ class BWebsocketClient:
         self._is_running = True
         return asyncio.ensure_future(self._message_loop(), loop=self._loop)
 
-    def get_cid(self, bv_id: str):
-        playlist_url = self.PLAYLIST_URL % bv_id
-        headers = {"Accept": "*/*", "Referer": self.ROOM_INIT_URL % bv_id}
-        req = basic_req(playlist_url, 1, header=headers)
-        if req is None or list(req.keys()) != self.JSON_KEYS:
-            return
-        cid = [ii["cid"] for ii in req["data"]]
-        return cid
-
-    def _getroom_id(self, proxy: bool = True):
+    def _getroom_id(self):
         """ get av room id """
-        cid = self.get_cid(self._bv_id)
+        cid = self.basic.get_cid(self._bv_id)
         assert (
             cid and len(cid) >= self._p
         ), "Actual Page len: {} <=> Need Pages Num: {}".format(len(cid), self._p)
@@ -284,8 +276,8 @@ class OneBWebsocketClient(BWebsocketClient):
         return "%s%d_%s%s.csv" % (websocket_dir, self._av_id, types, p_path)
 
 
-async def async_main(av_id: int, bv_id: str, types: int, p: int):
-    client = OneBWebsocketClient(av_id, bv_id, types, p=p)
+async def async_main(bv_id: str, types: int, p: int):
+    client = OneBWebsocketClient(bv_id, types, p=p)
     future = client.run()
     try:
         await future
@@ -293,11 +285,11 @@ async def async_main(av_id: int, bv_id: str, types: int, p: int):
         await client.close()
 
 
-def BSocket(av_id: int, bv_id: str, types: int = 0, p: int = -1):
+def BSocket(bv_id: str, types: int = 0, p: int = -1):
     """ build a loop websocket connect"""
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(async_main(av_id, bv_id, types, p))
+        loop.run_until_complete(async_main(bv_id, types, p))
     finally:
         loop.close()
 
@@ -310,15 +302,12 @@ if __name__ == "__main__":
 
     """ Test for San Diego demon """
     """ PS: the thread of BSocket have to be currentThread in its processing. """
-    if len(sys.argv) == 4:
-        bv_id = sys.argv[2]
-        av_id = int(sys.argv[1])
-        p = int(sys.argv[3])
+    if len(sys.argv) == 3:
+        bv_id = sys.argv[1]
+        p = int(sys.argv[2])
     else:
         cfg = ConfigParser()
         cfg.read(assign_path, "utf-8")
-        av_id = cfg.getint("basic", "av_id")
         bv_id = cfg.getint("basic", "bv_id")
-        p = cfg.getint("basic", "basic_av_p") if len(cfg["basic"]["basic_av_p"]) else -1
-
-    BSocket(av_id, bv_id, p=p)
+        p = cfg["basic"].getint("pid", -1)
+    BSocket(bv_id, p=p)

@@ -2,12 +2,11 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-01 23:35:07
+# @Last Modified time: 2021-05-05 16:01:42
 
 import os
 import sys
 import json
-import hashlib
 import time
 import numpy as np
 from configparser import ConfigParser
@@ -30,6 +29,7 @@ from util.util import (
     get_time_str,
     get_use_agent,
     json_str,
+    md5,
     mkdir,
     time_stamp,
     time_str,
@@ -370,10 +370,8 @@ class Items(object):
         return req
 
     def get_tb_h5_token(self, *data: list):
-        md5 = hashlib.md5()
         wait_enc = "&".join([str(ii) for ii in data])
-        md5.update(wait_enc.encode())
-        return md5.hexdigest()
+        return md5(wait_enc)
 
     def get_item_detail(
         self, item_id: str, is_wait: bool = False, force_update: bool = False
@@ -386,7 +384,7 @@ class Items(object):
                     "updated_at", self.config["time_str"]
                 )
             )
-            >= self.ONE_HOURS * self.ONE_DAY * 10
+            >= self.ONE_HOURS * self.ONE_DAY * 15
         )
         if (
             item_id in self.items_detail_map
@@ -697,6 +695,7 @@ if __name__ == "__main__":
             "time_str": time_str(),
             "time_stamp": time_stamp(),
             "proxy_req": GetFreeProxy().proxy_req,
+            "use_local": True,
         }
     )
     items.get_m_h5_tk()

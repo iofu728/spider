@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-29 23:19:36
+# @Last Modified time: 2021-05-08 01:11:22
 
 from __future__ import (
     absolute_import,
@@ -14,6 +14,7 @@ from __future__ import (
 
 import codecs
 import datetime
+import hashlib
 import json
 import logging
 import os
@@ -204,13 +205,14 @@ def empty():
     spend_list = []
 
 
-def can_retry(url: str, time: int = 3) -> bool:
+def can_retry(url: str, times: int = 2) -> bool:
     """ judge can retry once """
     global failure_map
+    time.sleep(0.1 + np.random.rand())
     if url not in failure_map:
         failure_map[url] = 0
         return True
-    elif failure_map[url] < time:
+    elif failure_map[url] < times:
         failure_map[url] += 1
         return True
     else:
@@ -414,12 +416,12 @@ def log(types: str, *log_args: list):
 
 
 def decoder_url(url: str, do_decoder: bool = False) -> dict:
-    if "?" not in url:
-        return {}
+    if "?" in url:
+        url = url.split("?", 1)[1]
     try:
         decoder_dict = {
             ii.split("=", 1)[0]: ii.split("=", 1)[1]
-            for ii in url.split("?", 1)[1].split("&")
+            for ii in url.split("&")
             if ii != ""
         }
     except:
@@ -432,16 +434,15 @@ def decoder_url(url: str, do_decoder: bool = False) -> dict:
     return decoder_dict
 
 
-def encoder_url(url_dict: {}, origin_url: str) -> str:
-    return "{}?{}".format(
-        origin_url,
-        "&".join(
+def encoder_url(params, origin_url: str) -> str:
+    if isinstance(params, dict):
+        params = "&".join(
             [
                 "{}={}".format(ii, urllib.parse.quote(str(jj)))
-                for ii, jj in url_dict.items()
+                for ii, jj in params.items()
             ]
-        ),
-    )
+        )
+    return f"{origin_url}?{params}"
 
 
 def json_str(data: dict):
@@ -530,6 +531,8 @@ def get_use_agent(types: str = "pc") -> str:
     """ @param: types => pc, mobile"""
     if types == "pc":
         return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"
+    if types == "ios":
+        return "bili-universal/62305200 CFNetwork/1240.0.2 Darwin/20.5.0 os/ios model/iPhone 12 Pro mobi_app/iphone build/62305200 osVer/14.6 network/2 channel/AppStore"
     return "Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1"
 
 
@@ -579,6 +582,25 @@ def generate_sql(types: str, table_name: str, LIST: list):
     return "REPLACE INTO {} ({}, is_deleted) VALUES %s;".format(
         table_name, ", ".join(LIST)
     )
+
+
+def md5(wait_enc: str):
+    encoder = hashlib.md5()
+    encoder.update(wait_enc.encode())
+    return encoder.hexdigest()
+
+
+def map_get(params: dict, key: str):
+    keys = key.split("/")
+    res = params
+    for ii, jj in enumerate(keys):
+        res = res.get(jj, {} if ii == len(keys) - 1 else "")
+    return res
+
+
+def write(path: str, text: str, types: str = "w"):
+    with codecs.open(path, types, encoding="utf-8") as f:
+        f.write(text)
 
 
 headers = {

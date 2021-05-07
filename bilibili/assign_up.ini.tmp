@@ -1,13 +1,12 @@
 [basic]
 bv_id = BV1GW411g7mc
-av_id = 21061574
-basic_av_p = -1
+pid = -1
 author = 还有一天就放假了
 mid = 7792521
-rank_id = 119
+rid = 119
 tid = 126
 view_abnormal = 1000
-history_check_list = 1,3,6
+history_ids = 1,3,6
 ;split by ','
 special_info_email = 123456@163.com
 assign_email = 123456@163.com
@@ -30,3 +29,7 @@ email_limit = 5
 [login]
 username = 123
 password = 123
+
+[app]
+appkey_list = xxx,xxx,xxx
+platform = ios

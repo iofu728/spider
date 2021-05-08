@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-08 13:11:29
+# @Last Modified time: 2021-05-08 13:35:24
 
 
 import codecs
@@ -281,6 +281,10 @@ class Up(BasicBilibili):
             if rank == view_len:
                 continue
             bv = bv_ids[rank]
+            if bv not in self.view_detail_map:
+                view = self.load_bv_stat_detail(bv)
+                if not view:
+                    continue
             view = self.view_detail_map[bv]
             context_text += "{}, {}, 本年度No.{}, {}, 累计播放: {}, 发布时间: {}\n".format(
                 self.get_title_part(view),
@@ -451,4 +455,4 @@ if __name__ == "__main__":
     mkdir(history_data_dir)
     mkdir(ranks_dir)
     bb = Up()
-    bb.schedule_main()
+    bb.load_click()

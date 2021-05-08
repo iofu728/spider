@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-02 01:51:52
+# @Last Modified time: 2021-05-09 01:55:11
 
 import json
 import os
@@ -1285,14 +1285,16 @@ class ActivateArticle(TBK):
                     status_log = ITEM_EXPIRED
                 else:
                     status_log = DNP_TBK
-                xml = xml.replace(f"￥{tpwd}￥/", f"￥{tpwd}￥/(已失效)")
+                if f"￥{tpwd}￥/(已失效)" not in xml:
+                    xml = xml.replace(f"￥{tpwd}￥/", f"￥{tpwd}￥/(已失效)")
                 COMMISSION = f"未能更新淘口令, {status_log}, {title}"
             elif c_rate == 1:
                 status_log = RENEW_TPWD
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, 保持原链接, {status_log}, {title}"
             elif c_rate == 2:
                 status_log = GEN_SHOP_TPWD
-                xml = xml.replace(f"￥{tpwd}￥/", f"￥{tpwd}￥/(店铺链接)")
+                if f"￥{tpwd}￥/(店铺链接)" not in xml:
+                    xml = xml.replace(f"￥{tpwd}￥/", f"￥{tpwd}￥/(店铺链接)")
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, 透出店铺链接, {GEN_SHOP_TPWD}, {title}"
             elif c_rate == 3:
                 status_log = GEN_DIR_TPWD

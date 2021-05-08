@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-05 16:01:42
+# @Last Modified time: 2021-05-09 02:53:59
 
 import os
 import sys
@@ -231,7 +231,7 @@ class Items(object):
         api = "mtop.taobao.baichuan.smb.get"
         jsv = "2.6.0"
 
-        return self.get_tb_h5_api(api, jsv, refer_url, data, cookies=cookies, mode=1)
+        return self.get_tb_h5_api(api, jsv, url, data, cookies=cookies, mode=1)
 
     def get_uland_url(self, uland_url: str):
         uland = self.get_m_h5_cookie("uland")
@@ -384,7 +384,7 @@ class Items(object):
                     "updated_at", self.config["time_str"]
                 )
             )
-            >= self.ONE_HOURS * self.ONE_DAY * 15
+            >= self.ONE_HOURS * self.ONE_DAY * 10
         )
         if (
             item_id in self.items_detail_map
@@ -695,7 +695,7 @@ if __name__ == "__main__":
             "time_str": time_str(),
             "time_stamp": time_stamp(),
             "proxy_req": GetFreeProxy().proxy_req,
-            "use_local": True,
+            # "use_local": True,
         }
     )
     items.get_m_h5_tk()

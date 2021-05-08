@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-08 01:11:58
+# @Last Modified time: 2021-05-08 01:34:34
 
 import json
 import numpy as np
@@ -297,4 +297,4 @@ class BasicBilibili(object):
                     if data.get(ii, 0)
                 ]
             )
-        return split_flag.join([get_value(ii) for ii in keys if data.get(ii, 0)])
+        return split_flag.join([str(get_value(ii)) for ii in keys if data.get(ii, 0)])

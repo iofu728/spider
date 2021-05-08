@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-08 01:27:28
+# @Last Modified time: 2021-05-08 13:11:29
 
 
 import codecs
@@ -148,7 +148,7 @@ class Up(BasicBilibili):
         )
         context_text = (
             self.get_str_text(space_view, self.BVLIST_KEYS, self.BVLIST_ZH, "\n")
-            .replace(space_view["created"], time_str(space_view["created"]))
+            .replace(str(space_view["created"]), time_str(space_view["created"]))
             .replace(space_view["bvid"], self.BASIC_BV_URL % space_view["bvid"])
             .replace(space_view["pic"], self.IMG_MARKDOWN % ("img", space_view["pic"]))
         )
@@ -170,9 +170,9 @@ class Up(BasicBilibili):
         last_data = {ii: 0 for ii in self.STAT_LOCAL_KEYS}
         for ii in self.h_map.keys():
             if ii in time_map:
-                for value, key in zip(time_map[ii], self.STAT_LOCAL_KEYS):
+                for value, key in zip(time_map[ii][1:], self.STAT_LOCAL_KEYS):
                     last_data[key] = value
-            self.h_map[ii][bv_id] = last_data
+            self.h_map[ii][bv_id] = last_data.copy()
 
     def load_history_data(self):
         self.load_bv_list()
@@ -190,7 +190,7 @@ class Up(BasicBilibili):
             return
         info = {ii: map_get(view, ii) for ii in self.VIEW_KEYS}
         self.view_detail_map[bv_id] = info
-        return self.load_stat_detail(view["stat"])
+        return self.load_stat_detail(bv_id, view["stat"])
 
     def load_stat_detail(self, bv_id: str, stat=None) -> dict:
         if stat is None:
@@ -210,7 +210,7 @@ class Up(BasicBilibili):
         ranks = {
             jj["bvid"]: dict(
                 {ii: map_get(jj, ii) for ii in self.RANK_KEYS},
-                **{"time": time_str(), "idx": idx + 1},
+                **{"time": time_stamp(), "idx": idx + 1},
             )
             for idx, jj in enumerate(ranks["list"])
             if jj["tid"] == self.assign_tid
@@ -219,7 +219,7 @@ class Up(BasicBilibili):
         return ranks
 
     def load_bv_stat_detail(self, bv_id: str):
-        pub_data = self.view_detail_map.get(bv_id, {}).get("pubdata", time_stamp())
+        pub_data = self.view_detail_map.get(bv_id, {}).get("pubdate", time_stamp())
         if time_stamp() - pub_data > one_day * 8:
             return
         rank_info = self.rank_map.get(bv_id, {})
@@ -227,7 +227,9 @@ class Up(BasicBilibili):
             view = self.load_view_detail(bv_id)
         else:
             view = self.load_stat_detail(bv_id)
-        data = {**stat, "time": time_str(), **rank_info}
+        if not view:
+            return
+        data = {**view, "time": time_stamp(), **rank_info}
         need = ["time"] + self.STAT_KEYS + ["score", "idx"]
         output = [str(data.get(ii, "")) for ii in need]
         write(f"{history_dir}{bv_id}.csv", ",".join(output) + "\n", "a")
@@ -242,7 +244,7 @@ class Up(BasicBilibili):
             clean_csv(bv_id)
             self.pv["clean_csv"].add(bv_id)
         time_gap = (now_time - pub_date) / 60
-        echo("0|debug", bv_id, time_gap < (4.5 * one_day / 60), pub_date)
+        echo("0|debug", bv_id, time_gap < (4.5 * one_day / 60), time_str(pub_date))
         if time_gap >= (4.5 * one_day / 60):
             return
         echo("3|info", "Time Gap:", int(time_gap / 10))
@@ -268,11 +270,11 @@ class Up(BasicBilibili):
         view_list.append(view["view"])
         view_sort_idx = np.argsort(-np.array(view_list))
         bv_ids = list(h_map.keys())
-        now_sorted = view_sort_idx.index(view_len) + 1
+        now_sorted = list(view_sort_idx).index(view_len) + 1
 
         time_tt = get_time_str(time_gap)
         title = self.get_title_part(view)
-        title_rank_text = f"本年度排名No.{now_sorted}/{view_len}, {get_ZH_view_detail(view)}"
+        title_rank_text = f"No.{now_sorted}/{view_len}, {self.get_ZH_view_detail(view)}"
         title_text = f"排名(发布{time_tt}){title}{title_rank_text}"
         context_text = f"{bv_id}发布{time_tt}, {title_rank_text}\n\n"
         for idx, rank in enumerate(view_sort_idx[: self.rank_len + 1]):
@@ -284,16 +286,16 @@ class Up(BasicBilibili):
                 self.get_title_part(view),
                 bv,
                 idx + 1,
-                get_ZH_view_detail(h_map[bv]),
-                view["play"],
-                time_str(view["created"]),
+                self.get_ZH_view_detail(h_map[bv]),
+                view["view"],
+                time_str(view["pubdate"]),
             )
-        send_email(context_text, title_text)
+        send_email(context_text, title_text, mode="single")
         self.pv["history_rank"].add(f"{bv_id}-{time_gap / 10:.0f}")
 
     def get_star_num(self, mid: int, load_disk: bool = False):
         star_json = self.get_people_stat_info(mid)
-        if star_json:
+        if not star_json:
             return
         follower = star_json["follower"]
         self.mid_stat[mid] = follower
@@ -326,7 +328,7 @@ class Up(BasicBilibili):
 
     def load_rank2local(self, bv_id: str, rank: dict):
         local_rank = self.rank_local_map.get(bv_id, {})
-        if rank["score"] == local_rank["score"]:
+        if rank["score"] == local_rank.get("score", 0):
             return
         rank_text = self.get_str_text(rank, self.RANK_LOCAL_KEYS)
         write(f"{ranks_dir}{bv_id}.csv", rank_text + "\n", "a")
@@ -385,7 +387,7 @@ class Up(BasicBilibili):
         proxy_req = self.proxy_req
 
     def load_comment_detail(self, bv_id: str):
-        pub_data = self.view_detail_map.get(bv_id, {}).get("pubdata", time_stamp())
+        pub_data = self.view_detail_map.get(bv_id, {}).get("pubdate", time_stamp())
         if time_stamp() - pub_data > one_day * 8:
             return
         for pn in range(1, 4):
@@ -401,10 +403,12 @@ class Up(BasicBilibili):
         if pn == 1:
             replies = comments["hots"] + replies
         for ii, reply in enumerate(replies):
-            idx = f"{self.SORT[sort]}第{pn}页第{idx + 1}条评论"
+            idx = f"{self.SORT[sort]}第{pn}页第{ii + 1}条评论"
             r = {ii: map_get(reply, ii) for ii in self.COMMENT_KEYS}
             r["idx"] = idx
             self.send_comment_warning(bv_id, r)
+            if not reply["replies"]:
+                continue
             for jj, subreply in enumerate(reply["replies"]):
                 idx += f"的第{jj + 1}条子评论"
                 r = {ii: map_get(subreply, ii) for ii in self.COMMENT_KEYS}
@@ -412,16 +416,16 @@ class Up(BasicBilibili):
                 self.send_comment_warning(bv_id, r)
 
     def send_comment_warning(self, bv_id: str, reply: dict):
-        if reply["idx"] in self.pv["comment"]:
+        if reply["rpid"] in self.pv["comment"]:
             return
-        if not len(regex.findall(self.keyword, reply["content"])):
+        if not len(regex.findall(self.keyword, reply["content/message"])):
             return
         url = self.BASIC_BV_URL % bv_id
         view = self.view_detail_map[bv_id]
         title = self.get_title_part(view)
         context_text = (
             self.get_str_text(reply, self.COMMENT_KEYS, self.COMMENT_ZH, ",\n")
-            .replace(reply["rpid"], f"{url}/#" + reply["rpid"])
+            .replace(str(reply["rpid"]), f"{url}/#" + str(reply["rpid"]))
             .replace(
                 reply["member/avatar"],
                 self.IMG_MARKDOWN % ("img", reply["member/avatar"]),
@@ -433,7 +437,7 @@ class Up(BasicBilibili):
         )
         echo("4|warning", title_text, context_text)
         send_email(context_text, title_text, assign_rec=self.assign_rec)
-        self.pv["comment"].add(reply["idx"])
+        self.pv["comment"].add(reply["rpid"])
 
     def is_hot(self, bv_id: str) -> bool:
         m_html = self.get_m_html(bv_id, False)

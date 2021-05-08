@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-08 01:11:22
+# @Last Modified time: 2021-05-08 13:11:01
 
 from __future__ import (
     absolute_import,
@@ -231,14 +231,19 @@ def send_server_chan(context: str, subject: str):
         echo("2|warning", "Send sever chan success!!")
 
 
-def send_email(context: str, subject: str, add_rec=None, assign_rec=None) -> bool:
+def send_email(
+    context: str, subject: str, add_rec=None, assign_rec=None, mode: str = "normal"
+) -> bool:
     """ send email """
     load_configure()
-    send_server_chan(context, subject)
+    if mode != "single":
+        send_server_chan(context, subject)
     email_rec = [ii for ii, jj in rec_lists if jj == "0"]
     email_cc = [ii for ii, jj in rec_lists if jj == "1"]
     if assign_rec:
         email_rec = email_rec + assign_rec
+    if mode == "single":
+        email_rec = email_rec[:1]
     send_email_once(email_rec, email_cc, context, subject)
     if not add_rec is None:
         send_email_once(add_rec, [], context, subject)

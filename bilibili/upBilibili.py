@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-08 13:35:24
+# @Last Modified time: 2021-05-09 15:09:35
 
 
 import codecs
@@ -250,7 +250,7 @@ class Up(BasicBilibili):
         echo("3|info", "Time Gap:", int(time_gap / 10))
         if (
             int(time_gap / 10) in self.history_ids
-            and f"{bv_id}-{time_gap/10:.0f}" not in self.pv["history_rank"]
+            and f"{bv_id}-{int(time_gap/10)}" not in self.pv["history_rank"]
         ):
             self.send_history_rank(bv_id, view, int(time_gap / 10) * 10)
 
@@ -295,7 +295,7 @@ class Up(BasicBilibili):
                 time_str(view["pubdate"]),
             )
         send_email(context_text, title_text, mode="single")
-        self.pv["history_rank"].add(f"{bv_id}-{time_gap / 10:.0f}")
+        self.pv["history_rank"].add(f"{bv_id}-{int(time_gap / 10)}")
 
     def get_star_num(self, mid: int, load_disk: bool = False):
         star_json = self.get_people_stat_info(mid)
@@ -404,7 +404,9 @@ class Up(BasicBilibili):
             return
         echo("2|debug", "Comment check, bv_id:", bv_id, "pn:", pn, "sort:", sort)
         replies = comments["replies"]
-        if pn == 1:
+        if not replies:
+            replies = []
+        if pn == 1 and comments["hots"]:
             replies = comments["hots"] + replies
         for ii, reply in enumerate(replies):
             idx = f"{self.SORT[sort]}第{pn}页第{ii + 1}条评论"

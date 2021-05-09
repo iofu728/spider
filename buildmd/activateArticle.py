@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-09 12:35:12
+# @Last Modified time: 2021-05-09 15:11:33
 
 import json
 import os
@@ -629,9 +629,9 @@ class ActivateArticle(TBK):
             for user_id, tpwd in shop_tpwds.items():
                 if not self.can_tpwd_popup(tpwd):
                     continue
+                updated_num += 1
                 shop_id = user2shop[user_id]
                 self.items.shops_detail_map[shop_id]["tpwd"] = tpwd
-            updated_num += len(shop_tpwds)
         spend_time = end_time(flag, 0)
         echo(
             2,
@@ -694,7 +694,7 @@ class ActivateArticle(TBK):
     def update_tpwds(
         self, is_renew: bool = True, yd_id: str = None, use_direct: bool = False
     ):
-        """ c_rate: 0: origin, 1: renew, 2: shop tpwd, 3: direct convert, 4: normal tpwd, >5: dg matrical """
+        """ c_rate: 0: origin, 1: renew, 2: shop tpwd, 3: direct convert, 4: normal tpwd, 5: normal shop, >6: dg matrical """
         can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] == 1])
         echo(2, f"{can_num} tpwds's url can renew.")
         flag = begin_time()
@@ -1233,7 +1233,7 @@ class ActivateArticle(TBK):
                 continue
             update_num += 1
             self.new_tpwds_map[k]["tpwd"] = tpwd
-            self.new_tpwds_map[k]["commission_rate"] = 4
+            self.new_tpwds_map[k]["commission_rate"] = 5 if "shop" in url else 4
         echo(
             1, "Update ITEM {} by Normal TPWD of {} tpwds.".format(item_id, update_num)
         )
@@ -1305,9 +1305,11 @@ class ActivateArticle(TBK):
             elif c_rate == 3:
                 status_log = GEN_DIR_TPWD
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, 淘口令直接更新, {GEN_DIR_TPWD}, {title}"
-            elif c_rate == 4:
+            elif c_rate in [4, 5]:
                 status_log = GEN_NORM_TPWD
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, 一般分享淘口令, {GEN_NORM_TPWD}, {title}"
+                if c_rate == 5 and f"￥{tpwd}￥/(店铺链接)" not in xml:
+                    xml = xml.replace(f"￥{tpwd}￥/", f"￥{tpwd}￥/(店铺链接)")
             else:
                 status_log = GEN_ITEM_TPWD
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, {status_log}, 佣金: {c_rate}, 类型: {c_type}, {title}"

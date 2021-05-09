@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-10 01:59:50
+# @Last Modified time: 2021-05-10 02:36:00
 
 
 import codecs
@@ -452,7 +452,7 @@ class Up(BasicBilibili):
                 self.send_comment_warning(bv_id, r)
 
     def send_comment_warning(self, bv_id: str, reply: dict):
-        if reply["rpid"] in self.pv["comment"]:
+        if reply["rpid"] in self.pv["comment"] or reply["rpid"] in self.ignore_rpid:
             return
         if not len(regex.findall(self.keyword, reply["content/message"])):
             return

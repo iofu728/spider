@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-10 00:57:58
+# @Last Modified time: 2021-05-10 02:25:14
 
 import json
 import numpy as np
@@ -100,7 +100,7 @@ class BasicBilibili(object):
         rank_map = {ii: {} for ii in self.assign_ids if ii not in self.del_map}
         self.rank_map = {**rank_map, **self.rank_map}
         self.keyword = cfg.get("comment", "keyword")
-        self.ignore_rpid = json.loads(cfg.get("comment", "ignore_rpid"))
+        self.ignore_rpid = set(cfg.get("comment", "ignore_rpid").split(","))
         self.ignore_list = cfg.get("comment", "ignore_list")
         self.ignore_start = cfg.getfloat("comment", "ignore_start")
         self.ignore_end = cfg.getfloat("comment", "ignore_end")

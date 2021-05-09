@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-09 01:55:11
+# @Last Modified time: 2021-05-09 12:35:12
 
 import json
 import os
@@ -627,6 +627,8 @@ class ActivateArticle(TBK):
             }
             shop_tpwds = self.generate_shop_tpwds(shop_ids_map)
             for user_id, tpwd in shop_tpwds.items():
+                if not self.can_tpwd_popup(tpwd):
+                    continue
                 shop_id = user2shop[user_id]
                 self.items.shops_detail_map[shop_id]["tpwd"] = tpwd
             updated_num += len(shop_tpwds)
@@ -661,6 +663,18 @@ class ActivateArticle(TBK):
             ),
         )
 
+    def can_tpwd_popup(self, tpwd: str):
+        check_data = self.decoder_generated_tpwd(tpwd)
+        if (
+            check_data is None
+            or not isinstance(check_data, dict)
+            or not isinstance(check_data.get("data", {}), dict)
+        ):
+            url = ""
+        else:
+            url = check_data.get("data", {}).get("url", "")
+        return url
+
     def renew_tpwd(self, tpwd: str, force_update: bool = False):
         m = self.tpwds_map.get(tpwd, {})
         if m.get("url_can_renew", 0) == 0 and not force_update:
@@ -673,15 +687,7 @@ class ActivateArticle(TBK):
         if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7, 8]]:
             renew_tpwd = self.convert2tpwd(url, title)
             if renew_tpwd is not None:
-                data = self.decoder_generated_tpwd(renew_tpwd)
-                if (
-                    data is None
-                    or not isinstance(data, dict)
-                    or not isinstance(data.get("data", {}), dict)
-                ):
-                    return
-                url = data.get("data", {}).get("url", "")
-                if not url:
+                if not self.can_tpwd_popup(renew_tpwd):
                     renew_tpwd = None
         return renew_tpwd
 
@@ -1307,16 +1313,7 @@ class ActivateArticle(TBK):
                 COMMISSION = f"->￥{tpwd}￥ SUCCESS, {status_log}, 佣金: {c_rate}, 类型: {c_type}, {title}"
             if c_rate != 0:
                 r_num += 1
-                check_data = self.decoder_generated_tpwd(tpwd)
-                if (
-                    check_data is None
-                    or not isinstance(check_data, dict)
-                    or not isinstance(check_data.get("data", {}), dict)
-                ):
-                    url = ""
-                else:
-                    url = check_data.get("data", {}).get("url", "")
-                if url:
+                if self.can_tpwd_popup(tpwd):
                     COMMISSION += ", 客服端可正常弹出"
                     popup["正常弹出"] += 1
                 else:

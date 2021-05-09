@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-09 15:09:35
+# @Last Modified time: 2021-05-09 15:30:01
 
 
 import codecs
@@ -427,6 +427,10 @@ class Up(BasicBilibili):
         if not len(regex.findall(self.keyword, reply["content/message"])):
             return
         url = self.BASIC_BV_URL % bv_id
+        if bv_id not in self.view_detail_map:
+            view = self.load_bv_stat_detail(bv_id)
+            if not view:
+                return
         view = self.view_detail_map[bv_id]
         title = self.get_title_part(view)
         context_text = (

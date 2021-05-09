@@ -11,6 +11,7 @@ history_ids = 1,3,6
 special_info_email = 123456@163.com
 assign_email = 123456@163.com
 rank_len = 3
+channel_ids = 1833,搞笑
 
 [assign]
 av_ids = 21061574,11624347

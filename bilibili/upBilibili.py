@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-09 15:30:01
+# @Last Modified time: 2021-05-10 01:59:50
 
 
 import codecs
@@ -104,7 +104,7 @@ class Up(BasicBilibili):
     ]
     COMMENT_ZH = ["序号", "链接", "评论时间", "点赞", "昵称", "性别", "级别", "签名", "头像", "评论内容"]
     LOAD_KEYS = ["time"] + STAT_KEYS + ["pts", "type", "day"]
-    PV_KEYS = ["history_rank", "realtime_rank", "clean_csv", "comment"]
+    PV_KEYS = ["history_rank", "realtime_rank", "channel_rank", "clean_csv", "comment"]
     STAT_LOCAL_KEYS = STAT_KEYS + ["score", "idx"]
     RANK_LOCAL_KEYS = ["time", "idx"] + RANK_KEYS
     SORT = ["按热度", "按热度+时间", "按时间"]
@@ -330,6 +330,32 @@ class Up(BasicBilibili):
         last_star = self.mid_stat[mid]
         return abs(last_star - star) < self.view_abnormal
 
+    def send_channel_rank(self, channel_id: str):
+        ranks = self.get_rank_info(rid=channel_id, types="channel")
+        if not ranks:
+            return
+        items = [map_get(ii, "author/mid") for ii in ranks.get("items", [])]
+        if self.assign_mid not in items:
+            return
+        idx = items.index(self.assign_mid)
+        rank = ranks.get("items", [])[idx]
+        bv_id = rank.get("id", "")
+
+        rank_id = "{}-{}-{}".format(channel_id, bv_id, idx)
+        if bv_id not in self.view_detail_map or rank_id in self.pv["channel_rank"]:
+            return
+        view = self.view_detail_map[bv_id]
+        is_hot = self.is_hot(bv_id)
+        is_hot = "[热门]" if is_hot else ""
+        title = self.get_title_part(rank)
+        pub_data = view.get("pubdate", time_stamp())
+        gap_str = get_time_str((time_stamp() - pub_data) / 60)
+        title_text = "热榜{}({}){}, {}频道排名: {}".format(
+            is_hot, title, gap_str, self.channel_ids[channel_id], idx + 1
+        )
+        send_email(title_text, title_text)
+        self.pv["channel_rank"].add(rank_id)
+
     def load_rank2local(self, bv_id: str, rank: dict):
         local_rank = self.rank_local_map.get(bv_id, {})
         if rank["score"] == local_rank.get("score", 0):
@@ -370,7 +396,11 @@ class Up(BasicBilibili):
                 self.load_bv_stat_detail(bv_id)
                 if np.random.rand() < 0.2:
                     self.load_comment_detail(bv_id)
-            self.get_star_num(self.assign_mid, True)
+            if np.random.rand() < 0.02:
+                self.get_star_num(self.assign_mid, True)
+            for channel_id in self.channel_ids:
+                if np.random.rand() < 0.2:
+                    self.send_channel_rank(channel_id)
             self.load_configure()
             self.load_bv_list()
             if idx % 20 == 9:
@@ -392,7 +422,7 @@ class Up(BasicBilibili):
 
     def load_comment_detail(self, bv_id: str):
         pub_data = self.view_detail_map.get(bv_id, {}).get("pubdate", time_stamp())
-        if time_stamp() - pub_data > one_day * 8:
+        if not 600 < time_stamp() - pub_data < one_day * 8:
             return
         for pn in range(1, 4):
             for sort in range(3):

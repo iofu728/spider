@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-08 01:34:34
+# @Last Modified time: 2021-05-10 00:57:58
 
 import json
 import numpy as np
@@ -50,6 +50,7 @@ class BasicBilibili(object):
     RANKING_URL = f"{API_WEB_URL}ranking/v2?rid=%d"
     RANK_REGION_URL = f"{API_WEB_URL}ranking/region?rid=%d&day=%d"
     DM_URL = f"{API_BASIC_URL}v2/dm/h5/seg.so?type=1&oid=%s&pid=%s&segment_index=1"
+    CHANNEL_URL = f"{APP_BASIC_URL}v2/channel/rank?id=%s"
     GET_KEY_URL = "http://passport.bilibili.com/login?act=getkey&r=%f"
     LOGIN_URL = "https://passport.bilibili.com/login"
     LOGIN_V2_URL = "https://passport.bilibili.com/web/login/v2"
@@ -91,6 +92,10 @@ class BasicBilibili(object):
         self.history_ids = [
             int(ii) for ii in cfg.get("basic", "history_ids").split(",")
         ]
+        channel_str = [
+            ii.split(",") for ii in cfg.get("basic", "channel_ids").split("|") if ii
+        ]
+        self.channel_ids = {ii: jj for ii, jj in channel_str}
         self.assign_ids = cfg.get("assign", "bv_ids").split(",")
         rank_map = {ii: {} for ii in self.assign_ids if ii not in self.del_map}
         self.rank_map = {**rank_map, **self.rank_map}
@@ -237,6 +242,8 @@ class BasicBilibili(object):
             rank_url = self.RANKING_URL % (rid)
         elif types == "region":
             rank_url = self.RANK_REGION_URL % (rid, day)
+        elif types == "channel":
+            rank_url = self.CHANNEL_URL % (rid)
         return self.get_web_api(rank_url)
 
     def get_comment_info(self, aid: str, pn: int, sort: int):

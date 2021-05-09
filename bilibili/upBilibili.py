@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-10 02:36:00
+# @Last Modified time: 2021-05-10 02:46:35
 
 
 import codecs
@@ -68,12 +68,11 @@ class Up(BasicBilibili):
     STAT_KEYS = ["view", "like", "coin", "favorite", "reply", "share", "danmaku"]
     STAT_ZH = ["播放量", "点赞", "硬币", "收藏", "评论", "分享", "弹幕", "评分", "排名"]
     RANK_KEYS = (
-        ["score"]
+        ["pubdate", "score"]
         + [f"stat/{ii}" for ii in STAT_KEYS]
         + [
             "bvid",
             "title",
-            "pubdate",
             "owner/mid",
             "owner/name",
         ]
@@ -334,7 +333,9 @@ class Up(BasicBilibili):
         ranks = self.get_rank_info(rid=channel_id, types="channel")
         if not ranks:
             return
+        channel_name = self.channel_ids[channel_id]
         items = [map_get(ii, "author/mid") for ii in ranks.get("items", [])]
+        echo("1|debug", channel_name, channel_id, self.assign_mid in items)
         if self.assign_mid not in items:
             return
         idx = items.index(self.assign_mid)
@@ -351,7 +352,7 @@ class Up(BasicBilibili):
         pub_data = view.get("pubdate", time_stamp())
         gap_str = get_time_str((time_stamp() - pub_data) / 60)
         title_text = "热榜{}({}){}, {}频道排名: {}".format(
-            is_hot, title, gap_str, self.channel_ids[channel_id], idx + 1
+            is_hot, title, gap_str, channel_name, idx + 1
         )
         send_email(title_text, title_text)
         self.pv["channel_rank"].add(rank_id)
@@ -452,7 +453,10 @@ class Up(BasicBilibili):
                 self.send_comment_warning(bv_id, r)
 
     def send_comment_warning(self, bv_id: str, reply: dict):
-        if reply["rpid"] in self.pv["comment"] or reply["rpid"] in self.ignore_rpid:
+        if (
+            reply["rpid"] in self.pv["comment"]
+            or str(reply["rpid"]) in self.ignore_rpid
+        ):
             return
         if not len(regex.findall(self.keyword, reply["content/message"])):
             return

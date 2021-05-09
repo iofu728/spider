@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-10 02:25:14
+# @Last Modified time: 2021-05-10 02:44:52
 
 import json
 import numpy as np
@@ -294,7 +294,7 @@ class BasicBilibili(object):
         self, data: dict, keys: list, keys2: list = None, split_flag: str = "\t"
     ):
         def get_value(key):
-            return time_str(data[key]) if "time" in key else data[key]
+            return time_str(data[key]) if "time" in key or "pubdate" in key else data[key]
 
         if keys2:
             return split_flag.join(

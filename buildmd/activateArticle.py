@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-09 15:11:33
+# @Last Modified time: 2021-05-12 18:53:16
 
 import json
 import os
@@ -515,12 +515,16 @@ class ActivateArticle(TBK):
         )
 
     def get_yd_tpwds_detail(
-        self, yd_id: str, is_wait: bool = False, force_update: bool = False
+        self,
+        yd_id: str,
+        is_wait: bool = False,
+        force_update: bool = False,
+        only_url: bool = False,
     ):
         self.get_article_tpwds(yd_id, is_wait, force_update)
         self.load_num = [0, 0]
         for tpwd in set(self.tpwds_list.get(yd_id, [])):
-            self.get_tpwd_detail_pro(tpwd, yd_id, is_wait, force_update)
+            self.get_tpwd_detail_pro(tpwd, yd_id, is_wait, force_update, only_url)
         self.store_db()
         echo(
             2,
@@ -533,8 +537,9 @@ class ActivateArticle(TBK):
         yd_id: str,
         is_wait: bool = False,
         force_update: bool = False,
+        only_url: bool = False,
     ):
-        self.get_tpwd_detail(tpwd, yd_id, is_wait, force_update)
+        self.get_tpwd_detail(tpwd, yd_id, is_wait, force_update, only_url)
         return self.decoder_tpwd_item(tpwd, force_update)
 
     def get_tpwd_detail(
@@ -543,6 +548,7 @@ class ActivateArticle(TBK):
         yd_id: str,
         is_wait: bool = False,
         force_update: bool = False,
+        only_url: bool = False,
     ):
         o_info = self.tpwds_map.get(tpwd, {})
         is_updated = o_info.get("is_updated", 0)
@@ -568,7 +574,6 @@ class ActivateArticle(TBK):
                 ("picUrl", ""),
             ]
         ]
-        url_can_renew = self.renew_tpwd(tpwd, True)
 
         self.tpwds_map[tpwd] = {
             "tpwd": tpwd,
@@ -579,13 +584,17 @@ class ActivateArticle(TBK):
             "domain": o_info.get("domain", 0),
             "commission_rate": o_info.get("commission_rate", 0),
             "commission_type": o_info.get("commission_type", ""),
-            "url_can_renew": int(url_can_renew is not None),
+            "url_can_renew": 0,
             "renew_prior": o_info.get("renew_prior", 0),
             "expire_at": expire_at,
         }
         self.tpwds_map[tpwd]["is_updated"] = (
             1 if (content and o_info.get("item_id", "")) or is_updated else 0
         )
+        if only_url:
+            return self.tpwds_map[tpwd]
+        url_can_renew = self.renew_tpwd(tpwd, True)
+        self.tpwds_map[tpwd]["url_can_renew"] = int(url_can_renew is not None)
         self.new_tpwds_map[tpwd] = self.tpwds_map[tpwd].copy()
         self.new_tpwds_map[tpwd]["picUrl"] = picUrl
         self.decoder_tpwd_item(tpwd)
@@ -1443,7 +1452,7 @@ class ActivateArticle(TBK):
                 "modified_at", self.BASIC_TIMEX_STR
             )
             dif_time = time_stamp() - time_stamp(modified_at)
-            if dif_time < 5 * self.ONE_HOURS * self.ONE_DAY or num < 10:
+            if dif_time < 15 * self.ONE_HOURS * self.ONE_DAY or num < 10:
                 continue
             yd_infos.append(
                 f"{t}, 需要更新{num}个链接，上次更新时间:{modified_at}, {self.SHARE_URL % yd_id}\n"

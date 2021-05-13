@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-12 18:53:16
+# @Last Modified time: 2021-05-14 00:32:29
 
 import json
 import os
@@ -96,6 +96,7 @@ class TBK(object):
         self.unlogin_id = cfg.get("YNOTE", "unlogin_id")
         self.cookie = cfg.get("YNOTE", "cookie")[1:-1]
         self.assign_rec = cfg.get("YNOTE", "assign_email").split(",")
+        self.gzh_query = cfg.get("WX", "query")
         cookie_de = decoder_cookie(self.cookie)
         self.cstk = cookie_de[self.CSTK_KEY] if self.CSTK_KEY in cookie_de else ""
         top.setDefaultAppInfo(self.appkey, self.secret)
@@ -272,6 +273,7 @@ class ActivateArticle(TBK):
     STORE_URL = (
         "http://shop.m.taobao.com/shop/shop_index.htm?user_id=%s&shop_navi=allitems"
     )
+    WX_SOUGOU_URL = "https://weixin.sogou.com/weixinwap"
     TPWD_LIST = [
         "`id`",
         "tpwd",
@@ -346,6 +348,7 @@ class ActivateArticle(TBK):
         time_stamp(time_format="%d天%H小时%M分%S秒", time_str="1天0小时0分0秒")
         - ONE_DAY * ONE_HOURS
     )
+    PV_KEYS = ["gzh", "overdue"]
 
     def __init__(self, is_local: bool = False, is_debug: bool = False):
         super(ActivateArticle, self).__init__()
@@ -378,6 +381,7 @@ class ActivateArticle(TBK):
         self.ynote_list = {}
         self.load_num = [0, 0]
         self.tpwd_exec = ThreadPoolExecutor(max_workers=5)
+        self.pv = {ii: {} for ii in self.PV_KEYS}
 
     def load_process(self):
         self.load_yd_ids()
@@ -540,7 +544,7 @@ class ActivateArticle(TBK):
         only_url: bool = False,
     ):
         self.get_tpwd_detail(tpwd, yd_id, is_wait, force_update, only_url)
-        return self.decoder_tpwd_item(tpwd, force_update)
+        return self.decoder_tpwd_item(tpwd, force_update and not only_url)
 
     def get_tpwd_detail(
         self,
@@ -1445,7 +1449,7 @@ class ActivateArticle(TBK):
         )
         if not yd_ids_map:
             return
-        yd_infos = []
+        yd_infos, idxs = [], []
         for yd_id, num in sorted(yd_ids_map.items(), key=lambda x: -(x[1])):
             t = self.lists_map.get(yd_id, {}).get("title", "")
             modified_at = self.lists_map.get(yd_id, {}).get(
@@ -1457,9 +1461,12 @@ class ActivateArticle(TBK):
             yd_infos.append(
                 f"{t}, 需要更新{num}个链接，上次更新时间:{modified_at}, {self.SHARE_URL % yd_id}\n"
             )
+            idxs.append(yd_id)
         title = "链接需要更新#{}#篇".format(len(yd_infos))
         content = f"{title}\n \n"
-        if not yd_infos:
+        idxs = "\n".join(sorted(idxs))
+        idx = self.pv["overdue"].get(idxs, 0)
+        if not yd_infos or idx > 2:
             echo("2|debug", title, "has updated. Don't send notification!")
             return
         content = "{}{}\n\nPlease update within 6 hours, Thx!".format(
@@ -1467,6 +1474,7 @@ class ActivateArticle(TBK):
         )
         echo("2|debug", title, content)
         send_email(content, title)
+        self.pv["overdue"][idxs] = idx + 1
 
     def load_share_total(self):
         for yd_id in self.yd_ids:
@@ -1489,6 +1497,8 @@ class ActivateArticle(TBK):
                 self.load_yds()
             if index % 6 == 5:
                 self.load_share_total()
+            if idex % 6 == 4:
+                self.get_gzh_lists(self.gzh_query)
             spend_time = end_time(flag, 0)
             echo(
                 3,
@@ -1577,6 +1587,32 @@ class ActivateArticle(TBK):
             r_tpwds.append(tpwd)
         echo(1, "yd_id: {} get {} tpwds.".format(yd_id, len(r_tpwds)))
         return r_tpwds
+
+    def send_gzh(self, gzh_lists: list):
+        context_text = "\n".join(gzh_lists)
+        idx = self.pv["gzh"].get(context_text, 0)
+        if idx > 2:
+            return
+        title_text = "侵权({})公众号".format(
+            time_str(space_view["created"], time_format=self.T_FORMAT),
+        )
+        send_email(context_text, title_text)
+        self.pv["gzh"][context_text] = idx + 1
+
+    def get_gzh_lists(self, query: str):
+        data = {
+            "query": query,
+            "type": "1",
+            "ie": "utf8",
+            "_sug_": "y",
+            "_sug_type_": "",
+            "s_from": "input",
+        }
+        url = encoder_url(data, self.WX_SOUGOU_URL)
+        req = proxy_req(url, 3)
+        gzh_lists = regex.findall('\<p class="gzh-tit">(.*?)</p>', req)
+        if [ii for ii in gzh_lists if query in ii]:
+            self.send_gzh(gzh_lists)
 
 
 if __name__ == "__main__":

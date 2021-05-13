@@ -27,3 +27,4 @@ tb_id = xxx
 [WX]
 app_id = wxxxxx
 secret = xxxxxx
+query = xxxxxx

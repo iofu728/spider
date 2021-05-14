@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-14 00:32:29
+# @Last Modified time: 2021-05-14 19:00:16
 
 import json
 import os
@@ -97,6 +97,7 @@ class TBK(object):
         self.cookie = cfg.get("YNOTE", "cookie")[1:-1]
         self.assign_rec = cfg.get("YNOTE", "assign_email").split(",")
         self.gzh_query = cfg.get("WX", "query")
+        self.sougou_cookie = cfg.get("WX", "cookie")[1:-1]
         cookie_de = decoder_cookie(self.cookie)
         self.cstk = cookie_de[self.CSTK_KEY] if self.CSTK_KEY in cookie_de else ""
         top.setDefaultAppInfo(self.appkey, self.secret)
@@ -1497,7 +1498,7 @@ class ActivateArticle(TBK):
                 self.load_yds()
             if index % 6 == 5:
                 self.load_share_total()
-            if idex % 6 == 4:
+            if index % 6 == 4:
                 self.get_gzh_lists(self.gzh_query)
             spend_time = end_time(flag, 0)
             echo(
@@ -1589,17 +1590,29 @@ class ActivateArticle(TBK):
         return r_tpwds
 
     def send_gzh(self, gzh_lists: list):
-        context_text = "\n".join(gzh_lists)
+        gzh_lists = [ii for ii in gzh_lists if ii["expired_flag"]]
+        if not gzh_lists:
+            return
+        idxs = "\n".join([ii["idx"] for ii in gzh_lists])
         idx = self.pv["gzh"].get(context_text, 0)
         if idx > 2:
             return
         title_text = "侵权({})公众号".format(
-            time_str(space_view["created"], time_format=self.T_FORMAT),
+            time_str(time_format=self.T_FORMAT),
         )
+
+        context_text = "\n".join([", ".format(["{}: {}".format(kk, ii[jj]) for jj, kk in zip(["name", "idx"], ["名称", "微信号"])]) for ii in gzh_lists])
         send_email(context_text, title_text)
         self.pv["gzh"][context_text] = idx + 1
 
     def get_gzh_lists(self, query: str):
+        def decoder_gzh_detail(gzh_list) -> dict:
+            name, idx = [ii.text for ii in gzh_list.find_all("p")]
+            idx = idx.split("：")[1]
+            url = gzh_list.a.get("href")
+            expired_flag = self.get_gzh_check(url, query)
+            return {"name": name, "idx": idx, "expired_flag": expired_flag}
+
         data = {
             "query": query,
             "type": "1",
@@ -1609,10 +1622,31 @@ class ActivateArticle(TBK):
             "s_from": "input",
         }
         url = encoder_url(data, self.WX_SOUGOU_URL)
-        req = proxy_req(url, 3)
-        gzh_lists = regex.findall('\<p class="gzh-tit">(.*?)</p>', req)
-        if [ii for ii in gzh_lists if query in ii]:
+        req = basic_req(url, 0)
+        if not req:
+            return
+        gzh_lists = req.find_all("div", class_="gzh-box")
+        gzh_lists = [decoder_gzh_detail(ii) for ii in gzh_lists if query in ii]
+        if gzh_lists:
             self.send_gzh(gzh_lists)
+
+    def get_gzh_check(self, url: str, query: str):
+        def generate_url(url: str):
+            a = url.find("url=")
+            b = np.random.randint(0, 100)
+            return f"{url}&k={b}&h={url[a + b + 25]}"
+
+        headers = {
+            "Accept": get_accept("html"),
+            "Cookie": self.sougou_cookie,
+        }
+
+        req = basic_req(generate_url(url), 3, header=headers)
+        url = "".join(regex.findall("url \+\= '(.*?)';", req))
+        if not url:
+            return
+        req = basic_req(url, 3)
+        return "该帐号已注销" not in req and query in req
 
 
 if __name__ == "__main__":

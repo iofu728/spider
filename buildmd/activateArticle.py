@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-14 19:00:16
+# @Last Modified time: 2021-05-14 19:02:35
 
 import json
 import os
@@ -1601,7 +1601,17 @@ class ActivateArticle(TBK):
             time_str(time_format=self.T_FORMAT),
         )
 
-        context_text = "\n".join([", ".format(["{}: {}".format(kk, ii[jj]) for jj, kk in zip(["name", "idx"], ["名称", "微信号"])]) for ii in gzh_lists])
+        context_text = "\n".join(
+            [
+                ", ".format(
+                    [
+                        "{}: {}".format(kk, ii[jj])
+                        for jj, kk in zip(["name", "idx"], ["名称", "微信号"])
+                    ]
+                )
+                for ii in gzh_lists
+            ]
+        )
         send_email(context_text, title_text)
         self.pv["gzh"][context_text] = idx + 1
 
@@ -1611,6 +1621,7 @@ class ActivateArticle(TBK):
             idx = idx.split("：")[1]
             url = gzh_list.a.get("href")
             expired_flag = self.get_gzh_check(url, query)
+            echo("2|debug", expired_flag)
             return {"name": name, "idx": idx, "expired_flag": expired_flag}
 
         data = {

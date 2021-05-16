@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-14 19:02:35
+# @Last Modified time: 2021-05-17 00:12:18
 
 import json
 import os
@@ -669,7 +669,9 @@ class ActivateArticle(TBK):
                 renew += 1
         spend_time = end_time(flag, 0)
         self.store_db()
-        can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] in [1, 2]])
+        can_num = len(
+            [1 for v in self.tpwds_map.values() if v["url_can_renew"] in [1, 2]]
+        )
         echo(
             2,
             "Renew {} tpwds Success, {} tpwds's url can renew spend {}!!".format(
@@ -709,7 +711,9 @@ class ActivateArticle(TBK):
         self, is_renew: bool = True, yd_id: str = None, use_direct: bool = False
     ):
         """ c_rate: 0: origin, 1: renew, 2: shop tpwd, 3: direct convert, 4: normal tpwd, 5: normal shop, >6: dg matrical """
-        can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] in [1, 2]])
+        can_num = len(
+            [1 for v in self.tpwds_map.values() if v["url_can_renew"] in [1, 2]]
+        )
         echo(2, f"{can_num} tpwds's url can renew.")
         flag = begin_time()
         self.load_num, shop_num, self.direct_convert_num = [0, 0], 0, 0
@@ -885,7 +889,14 @@ class ActivateArticle(TBK):
         if tpwd not in self.tpwds_map or not self.tpwds_map[tpwd].get("url", ""):
             return {}
         m = self.tpwds_map.get(tpwd, {})
-        if m.get("item_id", "") and not force_update and not (self.URL_DOMAIN[5] in m.get("url", "") and m.get("url_can_renew", 0) == 1):
+        if (
+            m.get("item_id", "")
+            and not force_update
+            and not (
+                self.URL_DOMAIN[5] in m.get("url", "")
+                and m.get("url_can_renew", 0) == 1
+            )
+        ):
             return self.tpwds_map[tpwd]
         self.load_num[1] += 1
         domain, item_id = self.analysis_tpwd_url(m["url"])
@@ -899,6 +910,10 @@ class ActivateArticle(TBK):
             item_id = m["item_id"] if m.get("item_id", "") else item_id
         else:
             m["url_can_renew"] = 2
+        if not item_id:
+            item_id = m.get("item_id", "")
+        if not item_id:
+            return
         self.tpwds_map[tpwd] = {
             **m,
             "domain": domain,

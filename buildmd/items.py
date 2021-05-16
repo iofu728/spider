@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-15 02:07:12
+# @Last Modified time: 2021-05-17 00:13:18
 
 import os
 import sys
@@ -244,7 +244,7 @@ class Items(object):
         if "url" in result and result["url"] is None:
             return self.EXPIRED
         coupon_amount = result.get("couponAmount", "")
-        return result.get("itemId", "") + "" if coupon_amount else self.FAILURE
+        return result.get("itemId", "") + ("" if coupon_amount else self.FAILURE)
 
     def get_uland_url_req(self, uland_url: str, cookies: dict = {}):
         """ tb h5 api @2021.05.01 ✔️Tested"""
@@ -256,12 +256,11 @@ class Items(object):
             elif "ptl" in params:
                 key = "ptl"
             else:
-                return None, None
+                key = None
 
-            variableMap = {
-                "e": params["e"],
-                key: params[key],
-            }
+            variableMap = {"e": params["e"]}
+            if key:
+                variableMap[key] = params[key]
             if not step:
                 variableMap = {"taoAppEnv": "0", **variableMap}
             else:

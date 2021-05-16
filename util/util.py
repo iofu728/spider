@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-08 13:11:01
+# @Last Modified time: 2021-05-15 00:53:47
 
 from __future__ import (
     absolute_import,
@@ -425,7 +425,7 @@ def decoder_url(url: str, do_decoder: bool = False) -> dict:
         url = url.split("?", 1)[1]
     try:
         decoder_dict = {
-            ii.split("=", 1)[0]: ii.split("=", 1)[1]
+            ii.split("=", 1)[0]: ii.split("=", 1)[1] if "=" in ii else None
             for ii in url.split("&")
             if ii != ""
         }
@@ -536,6 +536,8 @@ def get_use_agent(types: str = "pc") -> str:
     """ @param: types => pc, mobile"""
     if types == "pc":
         return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3682.0 Safari/537.36"
+    if types == "mobile":
+        return "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1"
     if types == "ios":
         return "bili-universal/62305200 CFNetwork/1240.0.2 Darwin/20.5.0 os/ios model/iPhone 12 Pro mobi_app/iphone build/62305200 osVer/14.6 network/2 channel/AppStore"
     return "Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1"

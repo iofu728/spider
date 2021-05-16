@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-09 02:53:59
+# @Last Modified time: 2021-05-15 02:07:12
 
 import os
 import sys
@@ -98,6 +98,8 @@ class Items(object):
     ONE_HOURS = 3600
     ONE_DAY = 24
     M = "_m_h5_tk"
+    FAILURE = "(failure)"
+    EXPIRED = "expired"
 
     def __init__(self, config):
         global proxy_req
@@ -159,9 +161,7 @@ class Items(object):
         jsv = "2.6.1"
         api = "mtop.taobao.detail.getdetail"
         j_data_t = {
-            "v": 6.0,
             "ttid": "202012@taobao_h5_9.17.0",
-            "AntiCreep": True,
             "callback": "mtopjsonp1",
         }
         return self.get_tb_h5_api(
@@ -242,8 +242,9 @@ class Items(object):
         re_json = json.loads(req_text[req_text.find("{") : -1])
         result = re_json.get("data", {}).get("resultList", [{}])[0]
         if "url" in result and result["url"] is None:
-            return "expired"
-        return result.get("itemId", "")
+            return self.EXPIRED
+        coupon_amount = result.get("couponAmount", "")
+        return result.get("itemId", "") + "" if coupon_amount else self.FAILURE
 
     def get_uland_url_req(self, uland_url: str, cookies: dict = {}):
         """ tb h5 api @2021.05.01 ✔️Tested"""
@@ -327,7 +328,7 @@ class Items(object):
         headers = {
             "Accept": get_accept("all"),
             "referer": self.API_REFER_URL,
-            "Agent": get_use_agent("pc"),
+            "Agent": get_use_agent("mobile"),
         }
         if step:
             headers["Cookie"] = encoder_cookie(cookies)
@@ -345,9 +346,9 @@ class Items(object):
             "v": v,
             "isSec": 0,
             "ecode": 0,
-            "AntiCreep": True,
-            "AntiFlood": True,
-            "H5Request": True,
+            "AntiCreep": "true",
+            "AntiFlood": "true",
+            "H5Request": "true",
             "type": "jsonp",
             "dataType": "jsonp",
             **j_data_t,
@@ -404,7 +405,7 @@ class Items(object):
         ):
             return self.items_detail_map[item_id]
         if is_wait:
-            time.sleep(np.random.rand() * 8 + 2)
+            time.sleep(np.random.rand() * 80 + 100)
         uland = self.get_m_h5_cookie("uland")
         self.load_num += 1
         req = self.get_tb_getdetail_req(int(item_id), uland)
@@ -418,7 +419,7 @@ class Items(object):
         if "data" not in req_json:
             return {}
         is_expired = int(
-            "expired" in req_json["data"].get("trade", {}).get("redirectUrl", "")
+            self.EXPIRED in req_json["data"].get("trade", {}).get("redirectUrl", "")
         )
         title, category_id, comment_count, favcount = [
             req_json["data"]["item"].get(ii, jj) if "item" in req_json["data"] else jj
@@ -695,7 +696,7 @@ if __name__ == "__main__":
             "time_str": time_str(),
             "time_stamp": time_stamp(),
             "proxy_req": GetFreeProxy().proxy_req,
-            # "use_local": True,
+            "use_local": False,
         }
     )
     items.get_m_h5_tk()

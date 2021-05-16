@@ -659,7 +659,7 @@ class ActivateArticle(TBK):
         renew = 0
         flag = begin_time()
         for tpwd in self.tpwds_db_map:
-            if mode == "one" and self.tpwds_map[tpwd].get("url_can_renew", 0) == 1:
+            if mode == "one" and self.tpwds_map[tpwd].get("url_can_renew", 0) >= 1:
                 continue
             if mode == "recheck" and self.tpwds_map[tpwd].get("url_can_renew", 0) == 0:
                 continue
@@ -669,7 +669,7 @@ class ActivateArticle(TBK):
                 renew += 1
         spend_time = end_time(flag, 0)
         self.store_db()
-        can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] == 1])
+        can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] in [1, 2]])
         echo(
             2,
             "Renew {} tpwds Success, {} tpwds's url can renew spend {}!!".format(
@@ -691,7 +691,7 @@ class ActivateArticle(TBK):
 
     def renew_tpwd(self, tpwd: str, force_update: bool = False):
         m = self.tpwds_map.get(tpwd, {})
-        if m.get("url_can_renew", 0) == 0 and not force_update:
+        if m.get("url_can_renew", 0) in [0, 3] and not force_update:
             return
         url = m.get("url", "")
         title = m.get("content", "商品")
@@ -709,7 +709,7 @@ class ActivateArticle(TBK):
         self, is_renew: bool = True, yd_id: str = None, use_direct: bool = False
     ):
         """ c_rate: 0: origin, 1: renew, 2: shop tpwd, 3: direct convert, 4: normal tpwd, 5: normal shop, >6: dg matrical """
-        can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] == 1])
+        can_num = len([1 for v in self.tpwds_map.values() if v["url_can_renew"] in [1, 2]])
         echo(2, f"{can_num} tpwds's url can renew.")
         flag = begin_time()
         self.load_num, shop_num, self.direct_convert_num = [0, 0], 0, 0
@@ -884,13 +884,21 @@ class ActivateArticle(TBK):
     def decoder_tpwd_item(self, tpwd: str, force_update: bool = False):
         if tpwd not in self.tpwds_map or not self.tpwds_map[tpwd].get("url", ""):
             return {}
-        if self.tpwds_map.get(tpwd, {}).get("item_id", "") and not force_update:
+        m = self.tpwds_map.get(tpwd, {})
+        if m.get("item_id", "") and not force_update and not (self.URL_DOMAIN[5] in m.get("url", "") and m.get("url_can_renew", 0) == 1):
             return self.tpwds_map[tpwd]
         self.load_num[1] += 1
-        m = self.tpwds_map[tpwd]
         domain, item_id = self.analysis_tpwd_url(m["url"])
         if not item_id:
             return self.tpwds_map[tpwd]
+        if self.items.FAILURE in item_id:
+            m["url_can_renew"] = 3
+            item_id = item_id.replace(self.items.FAILURE, "")
+        elif self.items.EXPIRED in item_id:
+            m["url_can_renew"] = 3
+            item_id = m["item_id"] if m.get("item_id", "") else item_id
+        else:
+            m["url_can_renew"] = 2
         self.tpwds_map[tpwd] = {
             **m,
             "domain": domain,

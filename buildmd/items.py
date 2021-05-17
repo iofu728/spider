@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-17 16:28:05
+# @Last Modified time: 2021-05-17 16:30:09
 
 import os
 import sys
@@ -398,7 +398,7 @@ class Items(object):
                     and (
                         not expired_flag
                         or (not self.load_num < 10 and np.random.rand() > 0.33)
-                        or self.load_num > 100
+                        or self.load_num > 30
                     )
                 )
                 or self.items_detail_map[item_id]["is_expired"]

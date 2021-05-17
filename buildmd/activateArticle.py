@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-17 14:38:09
+# @Last Modified time: 2021-05-17 18:21:42
 
 import json
 import os
@@ -1074,7 +1074,7 @@ class ActivateArticle(TBK):
                 return "shop{}".format(item["user_number_id"])
             shop_id = regex.findall("shop(\d*?)\.m\.taobao", item_url)
             if shop_id in self.items.shops_detail_map:
-                user_id = self.items.shops_detail_map[shop_id]["user_id"]
+                user_id = self.items.shops_detail_map[shop_id[0]]["user_id"]
                 if user_id:
                     return f"shop{user_id}"
             echo(0, "id not found:", item_url)
@@ -1517,6 +1517,7 @@ class ActivateArticle(TBK):
         np.random.shuffle(yd_ids)
         for yd_id in yd_ids:
             self.get_yd_tpwds_detail(yd_id, is_wait=True)
+            self.load_db()
         self.check_overdue()
 
     def load_click(self, num=1000000):

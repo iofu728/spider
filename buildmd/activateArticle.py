@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-17 18:21:42
+# @Last Modified time: 2021-05-17 18:25:49
 
 import json
 import os
@@ -421,13 +421,15 @@ class ActivateArticle(TBK):
             self.tpwds_map = tpwds
             self.new_tpwds_map = tpwds.copy()
             self.lists_map = lists
-        need_update = [1 for ii in self.tpwds_db_map.values() if not ii["is_updated"]]
-        echo(
-            1,
-            "Load {} Articles and {} Tpwds from db, {} Tpwds need update.".format(
-                len(self.lists_db_map), len(self.tpwds_db_map), len(need_update)
-            ),
-        )
+            need_update = [
+                1 for ii in self.tpwds_db_map.values() if not ii["is_updated"]
+            ]
+            echo(
+                1,
+                "Load {} Articles and {} Tpwds from db, {} Tpwds need update.".format(
+                    len(self.lists_db_map), len(self.tpwds_db_map), len(need_update)
+                ),
+            )
 
     def store_db(self):
         self.load_db(False)
@@ -1623,7 +1625,7 @@ class ActivateArticle(TBK):
         if not gzh_lists:
             return
         idxs = "\n".join([ii["idx"] for ii in gzh_lists])
-        idx = self.pv["gzh"].get(context_text, 0)
+        idx = self.pv["gzh"].get(idxs, 0)
         if idx > 2:
             return
         title_text = "侵权({})公众号".format(
@@ -1642,7 +1644,7 @@ class ActivateArticle(TBK):
             ]
         )
         send_email(context_text, title_text)
-        self.pv["gzh"][context_text] = idx + 1
+        self.pv["gzh"][idxs] = idx + 1
 
     def get_gzh_lists(self, query: str):
         def decoder_gzh_detail(gzh_list) -> dict:

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-17 18:25:49
+# @Last Modified time: 2021-05-17 18:55:12
 
 import json
 import os
@@ -1075,7 +1075,7 @@ class ActivateArticle(TBK):
             if "user_number_id" in item:
                 return "shop{}".format(item["user_number_id"])
             shop_id = regex.findall("shop(\d*?)\.m\.taobao", item_url)
-            if shop_id in self.items.shops_detail_map:
+            if shop_id and shop_id[0] in self.items.shops_detail_map:
                 user_id = self.items.shops_detail_map[shop_id[0]]["user_id"]
                 if user_id:
                     return f"shop{user_id}"

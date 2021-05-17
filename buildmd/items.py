@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-17 00:13:18
+# @Last Modified time: 2021-05-17 16:28:05
 
 import os
 import sys
@@ -51,7 +51,7 @@ class Items(object):
     DETAIL_URL = "https://detail.m.tmall.com/item.htm?id=%d"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
     MTOP_URL = "https://h5api.m.taobao.com/h5/%s/%d.0/"
-    API_REFER_URL = "https://h5.m.taobao.com/"
+    API_REFER_URL = "https://h5.m.taobao.com/awp/core/detail.htm?ut_sk=1.WuIHdlPVy%2B4DAClUN4kufI2B_21380790_1621238886992.Copy.1&id=588671617214&sourceType=item&price=99&suid=F278DD60-9271-4AB6-AD90-D909C4D517D6&shareUniqueId=9936381156&un=5af22fd2e5a80220dfb454b3d994b7d3&share_crt_v=1&spm=a2159r.13376460.0.0&sp_tk=RnQ1ZlhWQmVXVnc=&cpp=1&shareurl=true&short_name=h.4rJK5LZ&bxsign=scdYNFfg6E7klM-YCR0m_ZXusSiLmOiiCobSgnoj_upbPSkFAnpffzwC9eaUm6PwTTQzSBLn_gpMX3j_2VoP_snLQwqoz_oDFbm43nAW6V56go&sm=25b3a6&app=macos_safari"
     ITEMS_LIST = [
         "`id`",
         "item_id",
@@ -165,7 +165,7 @@ class Items(object):
             "callback": "mtopjsonp1",
         }
         return self.get_tb_h5_api(
-            api, jsv, "", data, j_data_t, cookies, v=6.0, use_token=False
+            api, jsv, "", data, j_data_t, cookies, v=6.0, use_token=False, base_wait=15
         )
 
     def get_tb_getdetail(self, item_id: int):
@@ -318,6 +318,7 @@ class Items(object):
         data_str: str = None,
         v: float = 1.0,
         use_token: bool = True,
+        base_wait: float = 0.1,
     ):
         """ tb h5 api @2019.11.6 ✔️Tested"""
         step = self.M in cookies
@@ -326,11 +327,13 @@ class Items(object):
 
         headers = {
             "Accept": get_accept("all"),
-            "referer": self.API_REFER_URL,
-            "Agent": get_use_agent("mobile"),
+            "Referer": self.API_REFER_URL,
+            "User-Agent": get_use_agent("mobile"),
         }
         if step:
             headers["Cookie"] = encoder_cookie(cookies)
+        if not use_token:
+            headers["Cookie"] = "thw=cn"
         appkey = "12574478"
 
         token = cookies[self.M].split("_")[0] if step and use_token else "undefined"
@@ -361,7 +364,7 @@ class Items(object):
         else:
             req = req_func(mtop_url, 12, data=data, header=headers)
         if req is None:
-            if can_retry(self.MTOP_URL % (api, int(v))):
+            if can_retry(self.MTOP_URL % (api, int(v)), base_wait=base_wait):
                 return self.get_tb_h5_api(
                     api, jsv, refer_url, data, j_data_t, cookies, mode
                 )

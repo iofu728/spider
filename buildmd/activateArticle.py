@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-17 00:12:18
+# @Last Modified time: 2021-05-17 14:38:09
 
 import json
 import os
@@ -1072,6 +1072,11 @@ class ActivateArticle(TBK):
         if not "id" in item or not item["id"].isdigit():
             if "user_number_id" in item:
                 return "shop{}".format(item["user_number_id"])
+            shop_id = regex.findall("shop(\d*?)\.m\.taobao", item_url)
+            if shop_id in self.items.shops_detail_map:
+                user_id = self.items.shops_detail_map[shop_id]["user_id"]
+                if user_id:
+                    return f"shop{user_id}"
             echo(0, "id not found:", item_url)
             return ""
         return item["id"]

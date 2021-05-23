@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-17 18:55:12
+# @Last Modified time: 2021-05-23 23:22:32
 
 import json
 import os
@@ -1519,8 +1519,8 @@ class ActivateArticle(TBK):
         np.random.shuffle(yd_ids)
         for yd_id in yd_ids:
             self.get_yd_tpwds_detail(yd_id, is_wait=True)
-            self.load_db()
         self.check_overdue()
+        self.load_db()
 
     def load_click(self, num=1000000):
         for index in range(num):

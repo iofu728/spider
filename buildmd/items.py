@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-17 16:30:09
+# @Last Modified time: 2021-05-23 23:23:14
 
 import os
 import sys
@@ -566,6 +566,8 @@ class Items(object):
 
     def load_db_table(self, sql: str, LIST: list, db_map: dict, key: str):
         lines = self.Db.select_db(sql)
+        if not lines:
+            return {}
         for line in lines:
             line = {
                 ii: jj.strftime("%Y-%m-%d %H:%M:%S") if ii.endswith("_at") else jj

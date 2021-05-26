@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-23 23:22:32
+# @Last Modified time: 2021-05-27 00:37:33
 
 import json
 import os
@@ -274,6 +274,7 @@ class ActivateArticle(TBK):
     STORE_URL = (
         "http://shop.m.taobao.com/shop/shop_index.htm?user_id=%s&shop_navi=allitems"
     )
+    STORE_URL_V2 = "http://shop%s.m.taobao.com"
     WX_SOUGOU_URL = "https://weixin.sogou.com/weixinwap"
     TPWD_LIST = [
         "`id`",
@@ -288,6 +289,7 @@ class ActivateArticle(TBK):
         "is_updated",
         "url_can_renew",
         "renew_prior",
+        "is_existed",
         "expire_at",
         "created_at",
     ]
@@ -350,6 +352,7 @@ class ActivateArticle(TBK):
         - ONE_DAY * ONE_HOURS
     )
     PV_KEYS = ["gzh", "overdue"]
+    SHOP = self.SHOP
 
     def __init__(self, is_local: bool = False, is_debug: bool = False):
         super(ActivateArticle, self).__init__()
@@ -593,6 +596,7 @@ class ActivateArticle(TBK):
             "commission_type": o_info.get("commission_type", ""),
             "url_can_renew": 0,
             "renew_prior": o_info.get("renew_prior", 0),
+            "is_existed": 0,
             "expire_at": expire_at,
         }
         self.tpwds_map[tpwd]["is_updated"] = (
@@ -728,7 +732,7 @@ class ActivateArticle(TBK):
         for o_tpwd, m in self.tpwds_map.items():
             item_id = m.get("item_id", "")
             if item_id not in ["", "0"] and (
-                item_id.startswith("shop") or item_id.isdigit()
+                item_id.startswith(self.SHOP) or item_id.isdigit()
             ):
                 item2tpwds[item_id].add(o_tpwd)
 
@@ -738,7 +742,7 @@ class ActivateArticle(TBK):
             tpwds = sorted(
                 tpwds, key=lambda i: -self.tpwds_map.get(i, {}).get("renew_prior", 0)
             )
-            if item_id.startswith("shop"):
+            if item_id.startswith(self.SHOP):
                 user_id = item_id[4:]
                 renew_tpwd, m, o_tpwd, title = None, None, None, ""
                 for o_tpwd in tpwds:
@@ -1245,6 +1249,8 @@ class ActivateArticle(TBK):
     def update_yd2db(self, yd_id: str, is_tpwd_update: bool = False):
         for tpwd_pro in set(self.tpwds_list[yd_id]):
             tpwd = tpwd_pro[1:-1]
+            if tpwd not in self.new_tpwds_map:
+                continue
             new_m = self.new_tpwds_map[tpwd]
             new_m["is_updated"] = 0
             self.tpwds_map[new_m["tpwd"]] = new_m
@@ -1254,10 +1260,12 @@ class ActivateArticle(TBK):
         update_num = 0
         is_expired = self.items.items_detail_map.get(item_id, {}).get("is_expired", 1)
         shop_id = self.items.items_detail_map.get(item_id, {}).get("shop_id", "")
+        shell2shop = {v["user_id"]: k for k, v in self.items.shops_detail_map.items()}
         url = ""
-        if (item_id and shop_id and is_expired) or (item_id.startswith("shop")):
-            if item_id.startswith("shop"):
+        if (item_id and shop_id and is_expired) or (item_id.startswith(self.SHOP)):
+            if item_id.startswith(self.SHOP):
                 user_id = item_id[4:]
+                shop_id = shell2shop.get(user_id, "")
             else:
                 user_id = self.items.shops_detail_map.get(shop_id, {}).get(
                     "user_id", ""
@@ -1272,16 +1280,24 @@ class ActivateArticle(TBK):
         tpwd = self.generate_normal_tpwd(url, title)
         if not tpwd:
             return o_tpwd, 0
+        if not self.can_tpwd_popup(tpwd):
+            if self.SHOP in url and shop_id:
+                url = self.STORE_URL_V2 % shop_id
+                tpwd = self.generate_normal_tpwd(url, title)
+                if not self.can_tpwd_popup(tpwd):
+                    return o_tpwd, 0
+            else:
+                return o_tpwd, 0
         for k, v in self.tpwds_map.items():
             if v.get("item_id", "") != item_id:
                 continue
             update_num += 1
             self.new_tpwds_map[k]["tpwd"] = tpwd
-            self.new_tpwds_map[k]["commission_rate"] = 5 if "shop" in url else 4
+            self.new_tpwds_map[k]["commission_rate"] = 5 if self.SHOP in url else 4
         echo(
             1, "Update ITEM {} by Normal TPWD of {} tpwds.".format(item_id, update_num)
         )
-        return tpwd, 4
+        return tpwd, 5 if self.SHOP in url else 4
 
     def replace_tpwd(self, yd_id: str, xml: str, mode: str):
         if mode == "normal":
@@ -1467,8 +1483,13 @@ class ActivateArticle(TBK):
 
     def check_overdue(self):
         def check_overdue_req(tpwd_data: map) -> bool:
+            is_existed = tpwd_data.get("tpwd_data", 0)
             dif_time = abs(time_stamp(tpwd_data["expire_at"]) - time_stamp())
-            return dif_time > 0 and dif_time <= self.ONE_HOURS * self.ONE_DAY
+            return (
+                is_existed == 1
+                and dif_time > 0
+                and dif_time <= self.ONE_HOURS * self.ONE_DAY
+            )
 
         overdue_tpwds = [
             tpwd
@@ -1519,6 +1540,7 @@ class ActivateArticle(TBK):
         np.random.shuffle(yd_ids)
         for yd_id in yd_ids:
             self.get_yd_tpwds_detail(yd_id, is_wait=True)
+        self.flag_tpwds_in_articles()
         self.check_overdue()
         self.load_db()
 
@@ -1689,6 +1711,13 @@ class ActivateArticle(TBK):
             return
         req = basic_req(url, 3)
         return "该帐号已注销" not in req and query in req
+
+    def flag_tpwds_in_articles(self):
+        for yd_id in self.yd_ids:
+            tpwds = self.tpwds_list.get(yd_id, [])
+            for tpwd in tpwds:
+                self.tpwds_map[tpwd]["is_existed"] = 1
+        self.store_db()
 
 
 if __name__ == "__main__":

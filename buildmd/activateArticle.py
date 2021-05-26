@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-27 01:25:52
+# @Last Modified time: 2021-05-27 01:35:53
 
 import json
 import os
@@ -1272,6 +1272,8 @@ class ActivateArticle(TBK):
                 )
             if not user_id:
                 return o_tpwd, 0
+            if "tpwd" in self.items.shops_detail_map.get(shop_id, {}):
+                return self.items.shops_detail_map.get(shop_id, {})["tpwd"], 5
             url = self.STORE_URL % user_id
         if not (not item_id or not shop_id or is_expired):
             url = self.ITEM_URL % int(item_id)
@@ -1297,6 +1299,8 @@ class ActivateArticle(TBK):
         echo(
             1, "Update ITEM {} by Normal TPWD of {} tpwds.".format(item_id, update_num)
         )
+        if self.SHOP in url and shop_id in self.items.shops_detail_map[shop_id]:
+            self.items.shops_detail_map[shop_id]["tpwd"] = tpwd
         return tpwd, 5 if self.SHOP in url else 4
 
     def replace_tpwd(self, yd_id: str, xml: str, mode: str):

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-27 00:37:33
+# @Last Modified time: 2021-05-27 01:25:52
 
 import json
 import os
@@ -272,9 +272,9 @@ class ActivateArticle(TBK):
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
     STORE_URL = (
-        "http://shop.m.taobao.com/shop/shop_index.htm?user_id=%s&shop_navi=allitems"
+        "https://shop.m.taobao.com/shop/shop_index.htm?user_id=%s&shop_navi=allitems"
     )
-    STORE_URL_V2 = "http://shop%s.m.taobao.com"
+    STORE_URL_V2 = "https://shop%s.m.taobao.com"
     WX_SOUGOU_URL = "https://weixin.sogou.com/weixinwap"
     TPWD_LIST = [
         "`id`",

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-27 01:35:53
+# @Last Modified time: 2021-05-27 01:36:35
 
 import json
 import os
@@ -352,7 +352,7 @@ class ActivateArticle(TBK):
         - ONE_DAY * ONE_HOURS
     )
     PV_KEYS = ["gzh", "overdue"]
-    SHOP = self.SHOP
+    SHOP = "shop"
 
     def __init__(self, is_local: bool = False, is_debug: bool = False):
         super(ActivateArticle, self).__init__()

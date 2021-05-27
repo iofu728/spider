@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-27 01:36:35
+# @Last Modified time: 2021-05-27 22:20:24
 
 import json
 import os
@@ -1717,10 +1717,15 @@ class ActivateArticle(TBK):
         return "该帐号已注销" not in req and query in req
 
     def flag_tpwds_in_articles(self):
+        num = 0
         for yd_id in self.yd_ids:
             tpwds = self.tpwds_list.get(yd_id, [])
             for tpwd in tpwds:
+                if tpwd not in self.tpwds_map:
+                    continue
+                num += 1
                 self.tpwds_map[tpwd]["is_existed"] = 1
+        echo("2|debug", f"{num} tpwds exist in articles.")
         self.store_db()
 
 

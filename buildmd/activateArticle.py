@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-27 22:20:24
+# @Last Modified time: 2021-05-29 13:14:53
 
 import json
 import os
@@ -1489,11 +1489,7 @@ class ActivateArticle(TBK):
         def check_overdue_req(tpwd_data: map) -> bool:
             is_existed = tpwd_data.get("tpwd_data", 0)
             dif_time = abs(time_stamp(tpwd_data["expire_at"]) - time_stamp())
-            return (
-                is_existed == 1
-                and dif_time > 0
-                and dif_time <= self.ONE_HOURS * self.ONE_DAY
-            )
+            return is_existed == 1 and dif_time <= self.ONE_HOURS * self.ONE_DAY
 
         overdue_tpwds = [
             tpwd
@@ -1512,7 +1508,11 @@ class ActivateArticle(TBK):
                 "modified_at", self.BASIC_TIMEX_STR
             )
             dif_time = time_stamp() - time_stamp(modified_at)
-            if dif_time < 15 * self.ONE_HOURS * self.ONE_DAY or num < 10:
+            echo(
+                "2|debug",
+                f"Article {yd_id} last updated in {modified_at} expired {num} tpwds.",
+            )
+            if dif_time < 10 * self.ONE_HOURS * self.ONE_DAY:
                 continue
             yd_infos.append(
                 f"{t}, 需要更新{num}个链接，上次更新时间:{modified_at}, {self.SHARE_URL % yd_id}\n"
@@ -1718,6 +1718,8 @@ class ActivateArticle(TBK):
 
     def flag_tpwds_in_articles(self):
         num = 0
+        for tpwd in self.tpwds_map:
+            self.tpwds_map[tpwd]["is_existed"] = 0
         for yd_id in self.yd_ids:
             tpwds = self.tpwds_list.get(yd_id, [])
             for tpwd in tpwds:

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-29 13:14:53
+# @Last Modified time: 2021-05-30 22:56:49
 
 import json
 import os
@@ -562,7 +562,12 @@ class ActivateArticle(TBK):
     ):
         o_info = self.tpwds_map.get(tpwd, {})
         is_updated = o_info.get("is_updated", 0)
-        if tpwd in self.tpwds_map and is_updated and not force_update:
+        if (
+            tpwd in self.tpwds_map
+            and is_updated
+            and not force_update
+            and np.random.rand() > 0.975
+        ):
             return self.tpwds_map[tpwd]
         self.load_num[0] += 1
         if is_wait:

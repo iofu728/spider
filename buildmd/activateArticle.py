@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-30 22:56:49
+# @Last Modified time: 2021-06-06 22:57:06
 
 import json
 import os
@@ -156,6 +156,19 @@ class TBK(object):
         except Exception as e:
             echo(0, "get dg material failed.", title, num_iid, e)
             return {}
+
+    def get_opt_material(self, material_id: int, page_no: int = 1):
+        req = top.api.TbkDgOptimusMaterialRequest()
+        req.adzone_id = self.adzone_id
+        req.material_id = material_id
+        req.page_size = 100
+        req.page_no = page_no
+        try:
+            goods = req.getResponse()
+            return goods["tbk_dg_optimus_material_response"]["result_list"]["map_data"]
+        except Exception as e:
+            echo(0, "get optimus material failed.", material_id)
+            return []
 
     def convert2tpwd(self, url: str, title: str):
         req = top.api.TbkTpwdCreateRequest()
@@ -311,7 +324,7 @@ class ActivateArticle(TBK):
     END_TEXT = "</text><inline-styles/><styles/></para></body></note>"
     TPWD_REG = "\p{Sc}(\w{8,12}?)\p{Sc}"
     TPWD_REG2 = "(\p{Sc}\w{8,12}\p{Sc})"
-    TPWD_REG3 = "(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》])([a-zA-Z0-9]{8,12}?)(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》])"
+    TPWD_REG3 = "(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》]\(\/)([a-zA-Z0-9]{8,12}?)(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》]\)\/)"
     TPWD_REG4 = "(\p{Sc}\w{8,12}\p{Sc})/\(已失效\)"
     JSON_KEYS = [
         "p",
@@ -1492,7 +1505,7 @@ class ActivateArticle(TBK):
 
     def check_overdue(self):
         def check_overdue_req(tpwd_data: map) -> bool:
-            is_existed = tpwd_data.get("tpwd_data", 0)
+            is_existed = tpwd_data.get("is_existed", 0)
             dif_time = abs(time_stamp(tpwd_data["expire_at"]) - time_stamp())
             return is_existed == 1 and dif_time <= self.ONE_HOURS * self.ONE_DAY
 

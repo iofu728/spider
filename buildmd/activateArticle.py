@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-10 18:11:19
+# @Last Modified time: 2021-06-10 23:45:08
 
 import json
 import os
@@ -1299,12 +1299,7 @@ class ActivateArticle(TBK):
         if not tpwd:
             return o_tpwd, 0
         if not self.can_tpwd_popup(tpwd):
-            if self.SHOP in url and shop_id:
-                url = self.STORE_URL_V2 % shop_id
-                tpwd = self.generate_normal_tpwd(url, title)
-                if not self.can_tpwd_popup(tpwd):
-                    return o_tpwd, 0
-            else:
+            if not self.SHOP in url:
                 return o_tpwd, 0
         for k, v in self.tpwds_map.items():
             if v.get("item_id", "") != item_id:
@@ -1529,7 +1524,7 @@ class ActivateArticle(TBK):
                 "2|debug",
                 f"Article {yd_id} last updated in {modified_at} expired {num} tpwds.",
             )
-            if dif_time < 10 * self.ONE_HOURS * self.ONE_DAY:
+            if dif_time < 10 * self.ONE_HOURS * self.ONE_DAY or num <= 5:
                 continue
             yd_infos.append(
                 f"{t}, 需要更新{num}个链接，上次更新时间:{modified_at}, {self.SHARE_URL % yd_id}\n"

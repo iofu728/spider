@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-10 16:04:15
+# @Last Modified time: 2021-06-10 17:27:44
 
 import json
 import os
@@ -1276,7 +1276,7 @@ class ActivateArticle(TBK):
         update_num = 0
         is_expired = self.items.items_detail_map.get(item_id, {}).get("is_expired", 1)
         shop_id = self.items.items_detail_map.get(item_id, {}).get("shop_id", "")
-        shell2shop = {v["user_id"]: k for k, v in self.items.shops_detail_map.items()}
+        shell2shop = {k: v["shop_id"] for k, v in self.items.shops_seller_map.items()()}
         url = ""
         if (item_id and shop_id and is_expired) or (item_id.startswith(self.SHOP)):
             if item_id.startswith(self.SHOP):
@@ -1324,6 +1324,7 @@ class ActivateArticle(TBK):
             tpwds = regex.findall(self.TPWD_REG2, xml)
         else:
             tpwds = regex.findall(self.TPWD_REG4, xml)
+        xml = xml.replace("(店铺链接)", "").replace("(已失效)", "")
         self.tpwds_list[yd_id] = tpwds
         m = self.new_tpwds_map
         counter, popup = defaultdict(int), defaultdict(int)

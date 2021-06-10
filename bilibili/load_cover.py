@@ -1,4 +1,6 @@
+import argparse
 import os
+import regex
 import sys
 
 sys.path.append(os.getcwd())
@@ -45,6 +47,36 @@ def store_cover_info(vlist: list):
         f.write("\n".join(infos))
 
 
+def load_gzh_img(url: str):
+    mkdir(PIC_DIR)
+    flag = begin_time()
+    req = basic_req(url, 3)
+    img_list = regex.findall('data-src="(http.*?)"', req)
+    for ii, jj in enumerate(img_list):
+        load_picture(jj, ii + 1)
+    spend_time = end_time(flag, 0)
+    optim_image()
+    echo(2, "Load {} img spend {:.2f}s.".format(len(img_list), spend_time))
+
+
+def update_cover(dir: str):
+    global PIC_DIR
+    PIC_DIR = PIC_DIR.replace("cover", dir)
+    optim_image()
+
+
+def optim_image():
+    os.system(f"imageoptim {PIC_DIR}")
+
+
 if __name__ == "__main__":
-    assign_mid = BasicBilibili().assign_mid
-    load_cover_pipeline(assign_mid)
+    parser = argparse.ArgumentParser(description="load pictures")
+    parser.add_argument("--dir", type=str, default="cover")
+    parser.add_argument("--url", type=str, default="")
+    args = parser.parse_args()
+    update_cover(args.dir)
+    if args.url:
+        load_gzh_img(args.url)
+    else:
+        assign_mid = BasicBilibili().assign_mid
+        load_cover_pipeline(assign_mid)

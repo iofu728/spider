@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-06 22:57:06
+# @Last Modified time: 2021-06-10 16:04:15
 
 import json
 import os
@@ -284,9 +284,7 @@ class ActivateArticle(TBK):
     DECODER_TPWD_URL_V2 = "https://taodaxiang.com/taopass/parse/get"
     Y_DOC_JS_URL = "https://shared-https.ydstatic.com/ynote/ydoc/index-6f5231c139.js"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
-    STORE_URL = (
-        "https://shop.m.taobao.com/shop/shop_index.htm?user_id=%s&shop_navi=allitems"
-    )
+    STORE_URL = "https://shop.m.taobao.com/shop/shop_index.htm?user_id=%s"
     STORE_URL_V2 = "https://shop%s.m.taobao.com"
     WX_SOUGOU_URL = "https://weixin.sogou.com/weixinwap"
     TPWD_LIST = [
@@ -579,7 +577,7 @@ class ActivateArticle(TBK):
             tpwd in self.tpwds_map
             and is_updated
             and not force_update
-            and np.random.rand() > 0.975
+            # and np.random.rand() > 0.975
         ):
             return self.tpwds_map[tpwd]
         self.load_num[0] += 1
@@ -592,9 +590,9 @@ class ActivateArticle(TBK):
             is_updated = 1
         NEED_KEY = ["content", "url", "expire", "picUrl"]
         content, url, expire_at, picUrl = [
-            req["data"].get(ii, o_info.get(ii, jj))
-            if "data" in req
-            else o_info.get(ii, jj)
+            req["data"].get(ii, jj).strip()
+            if "data" in req and req["data"].get(ii, jj).strip()
+            else o_info.get(ii, jj).strip()
             for ii, jj in [
                 ("content", ""),
                 ("url", ""),
@@ -1594,7 +1592,7 @@ class ActivateArticle(TBK):
 
     def generate_local_yd_info(self, yd_path: str):
         o_text = "\n".join(read_file(yd_path))
-        for tpwd in self.tpwds_list[yd_path]:
+        for tpwd in set(self.tpwds_list[yd_path]):
             item_id = self.tpwds_map.get(tpwd, {}).get("item_id", "")
             if not item_id or item_id not in self.items.items_detail_map:
                 continue

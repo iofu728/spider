@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-10 17:27:44
+# @Last Modified time: 2021-06-10 18:11:19
 
 import json
 import os
@@ -722,7 +722,7 @@ class ActivateArticle(TBK):
         title = "商品" if not title else title
         domain_url = url.split("//")[1].split("/")[0] if "//" in url else ""
         renew_tpwd = None
-        if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7, 8]]:
+        if domain_url in [self.URL_DOMAIN[jj] for jj in [0, 5, 6, 7]]:
             renew_tpwd = self.convert2tpwd(url, title)
             if renew_tpwd is not None:
                 if not self.can_tpwd_popup(renew_tpwd):
@@ -1276,7 +1276,7 @@ class ActivateArticle(TBK):
         update_num = 0
         is_expired = self.items.items_detail_map.get(item_id, {}).get("is_expired", 1)
         shop_id = self.items.items_detail_map.get(item_id, {}).get("shop_id", "")
-        shell2shop = {k: v["shop_id"] for k, v in self.items.shops_seller_map.items()()}
+        shell2shop = {k: v["shop_id"] for k, v in self.items.shops_seller_map.items()}
         url = ""
         if (item_id and shop_id and is_expired) or (item_id.startswith(self.SHOP)):
             if item_id.startswith(self.SHOP):

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-17 16:26:39
+# @Last Modified time: 2021-06-11 21:27:59
 
 from __future__ import (
     absolute_import,
@@ -72,7 +72,15 @@ def basic_req(
     else:
         timeout = json_timeout
     return get_basic(
-        req_func, url, proxies, data, header, need_cookie, config, mode, timeout
+        req_func,
+        url,
+        proxies,
+        data,
+        header,
+        need_cookie,
+        config,
+        mode,
+        timeout,
     )
 
 
@@ -105,16 +113,28 @@ def get_basic(
     timeout = config.get("timeout", timeouts)
     return_proxy = config.get("return_proxy", False)
     encoding = config.get("encoding", None)
+    json_data = config.get("json_data", None)
     try:
-        req = req_func(
-            url,
-            headers=header,
-            verify=False,
-            timeout=timeout,
-            proxies=proxies,
-            data=data,
-            allow_redirects=allow_redirects,
-        )
+        if json_data:
+            req = req_func(
+                url,
+                headers=header,
+                verify=False,
+                timeout=timeout,
+                proxies=proxies,
+                json=json_data,
+                allow_redirects=allow_redirects,
+            )
+        else:
+            req = req_func(
+                url,
+                headers=header,
+                verify=False,
+                timeout=timeout,
+                proxies=proxies,
+                data=data,
+                allow_redirects=allow_redirects,
+            )
         if encoding:
             req.encoding = encoding
         if mode == 2:

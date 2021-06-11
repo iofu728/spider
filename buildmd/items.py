@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-23 23:23:14
+# @Last Modified time: 2021-06-11 21:29:14
 
 import os
 import sys
@@ -239,12 +239,15 @@ class Items(object):
         if s_req is None:
             return ""
         req_text = s_req.text
-        re_json = json.loads(req_text[req_text.find("{") : -1])
-        result = re_json.get("data", {}).get("resultList", [{}])[0]
-        if "url" in result and result["url"] is None:
-            return self.EXPIRED
-        coupon_amount = result.get("couponAmount", "")
-        return result.get("itemId", "") + ("" if coupon_amount else self.FAILURE)
+        try:
+            re_json = json.loads(req_text[req_text.find("{") : -1])
+            result = re_json.get("data", {}).get("resultList", [{}])[0]
+            if "url" in result and result["url"] is None:
+                return self.EXPIRED
+            coupon_amount = result.get("couponAmount", "")
+            return result.get("itemId", "") + ("" if coupon_amount else self.FAILURE)
+        except:
+            return ""
 
     def get_uland_url_req(self, uland_url: str, cookies: dict = {}):
         """ tb h5 api @2021.05.01 ✔️Tested"""

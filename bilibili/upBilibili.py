@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-10 02:46:35
+# @Last Modified time: 2021-06-12 01:37:53
 
 
 import codecs
@@ -340,7 +340,8 @@ class Up(BasicBilibili):
             return
         idx = items.index(self.assign_mid)
         rank = ranks.get("items", [])[idx]
-        bv_id = rank.get("id", "")
+        av_id = rank.get("id", "")
+        bv_id = self.av2bv(av_id)
 
         rank_id = "{}-{}-{}".format(channel_id, bv_id, idx)
         if bv_id not in self.view_detail_map or rank_id in self.pv["channel_rank"]:

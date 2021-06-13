@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-03-27 23:38:47
+# @Last Modified time: 2021-06-13 19:15:15
 
 
 import argparse
@@ -305,31 +305,30 @@ class GetFreeProxy:
         proxies = {type_map[http_type]: urls}
 
         test_url = (
-            type_map[http_type] + "://music.163.com/api/playlist/detail?id=432853362"
+            type_map[http_type] + "://music.163.com/api/song/lyric?os=pc&id=548556492"
         )
         ss_url = "https://www.google.com/?gws_rd=ssl"
-        try:
-            data = basic_req(test_url, 1, proxies)
-            result = data["result"]
-            tracks = result["tracks"]
-            if len(tracks) == 10:
-                if times < 0:
-                    self.judge_url(urls, index, times + 1)
-                else:
-                    echo("1|debug", urls, proxies, "Proxies can use.")
-                    self.canuse_proxies.append(urls)
-                    self.can_use_ip[index] = [urls, int(http_type)]
-                    if ss_test:
-                        data = basic_req(ss_url, 0)
-                        if len(str(data)) > 5000:
-                            self.can_use_ip[index] = [urls, int(http_type) + 2]
-            else:
-                echo("0|debug", urls, proxies, "Tracks len error ^--<^>--^ ")
-                self.cannot_use_ip[index] = urls
-        except:
-            echo("0|debug", urls, proxies, "return error [][][][][][]")
-            if not index in self.can_use_ip:
-                self.cannot_use_ip[index] = urls
+        data = basic_req(test_url, 1, proxies)
+        if (
+            data is None
+            or not isinstance(data, dict)
+            or list(data.keys())
+            != ["sgc", "sfy", "qfy", "transUser", "lyricUser", "code"]
+            or data["code"] != 200
+        ):
+            echo("0|debug", urls, proxies, "return error ^--<^>--^ ")
+            self.cannot_use_ip[index] = urls
+            return
+        if times < 0:
+            self.judge_url(urls, index, times + 1)
+        else:
+            echo("1|debug", urls, proxies, "Proxies can use.")
+            self.canuse_proxies.append(urls)
+            self.can_use_ip[index] = [urls, int(http_type)]
+            if ss_test:
+                data = basic_req(ss_url, 0)
+                if len(str(data)) > 5000:
+                    self.can_use_ip[index] = [urls, int(http_type) + 2]
 
     def thread_judge(self, batch_size: int = 500):
         """ threading to judge proxy """
@@ -729,7 +728,7 @@ class GetFreeProxy:
         t_list = []
         for ii in range(7):
             tt = basic_req(url, 1)
-            if tt is None:
+            if not isinstance(tt, dict) or "origin" not in tt:
                 continue
             t_list.append(tt["origin"])
         echo(1, "Get scraperapi", len(t_list))
@@ -742,7 +741,7 @@ class GetFreeProxy:
             tt = basic_req(url, 1)
         else:
             tt = self.proxy_req(url, 1)
-        if tt is None:
+        if not isinstance(tt, list) or len(tt) < 1:
             return []
         tt_list = tt[0]["LISTA"]
         echo(1, "Get download", types, len(tt_list))

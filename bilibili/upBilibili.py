@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-14 00:32:16
+# @Last Modified time: 2021-06-14 01:18:00
 
 
 import codecs
@@ -20,6 +20,7 @@ import regex
 sys.path.append(os.getcwd())
 from util.util import (
     begin_time,
+    decoder_cookie,
     echo,
     encoder_cookie,
     end_time,
@@ -122,8 +123,9 @@ class Up(BasicBilibili):
         self.rank_local_map = {}
         self.pv = {key: set() for key in self.PV_KEYS}
         self.mid_stat = {}
-        self.pool = ThreadPoolExecutor(max_workers=10)
+        self.pool = ThreadPoolExecutor(max_workers=50)
         self.load_history_data()
+        self.click_map = {"buvid": {}, "cookies": {}}
 
     def load_bv_list(self):
         url = self.SPACE_AVS_URL % (self.assign_mid, 1)
@@ -515,7 +517,10 @@ class Up(BasicBilibili):
             "jsonp": "jsonp",
         }
         req = proxy_req(self.CLICK_URL, 11, data=data, header=header)
-        return req == {"code": 0, "message": "0", "ttl": 1}
+        if req == {"code": 0, "message": "0", "ttl": 1}:
+            self.pv["click"] += 1
+            if self.pv["click"] % 20 == 0:
+                echo(2, "Click", self.pv["click"])
 
     def get_did(self, cid: str, bvid: str, buvid: str):
         url = self.PLAYER_URL % (cid, self.bv2av(bvid), bvid, buvid)
@@ -529,17 +534,41 @@ class Up(BasicBilibili):
         req, cookies = proxy_req(url, 3, header=header, need_cookie=True)
         if "sid" in cookies:
             cookies["buvid3"] = buvid
-            if self.click(bvid, cid, cookies):
-                self.pv["click"] += 1
-                if self.pv["click"] % 20 == 0:
-                    echo(2, "Click", self.pv["click"])
+            self.click_map["cookies"].add(encoder_cookie(cookies))
+            for _ in range(10):
+                self.pool.submit(self.click, bvid, cid, cookies)
+                times.sleep(np.random.rand() * 3)
+
+    def get_buvid(self, cid: str, bvid: str):
+        url = self.M_BILIBILI_URL % bvid
+        header = {
+            "Accept": get_accept("html"),,
+            "User-Agent": generate_user_agent(device_type="smartphone"),
+        }
+        req, cookies = proxy_req(url, 3, header=header, need_cookie=True)
+        if "buvid3" in cookies:
+            buvid = cookies["buvid3"]
+            self.click_map["buvid"].add(buvid)
+            for _ in range(10):
+                self.pool.submit(self.get_did, cid, bvid, buvid)
+                times.sleep(np.random.rand() * 3)
+        
 
     def click_pipeline(self, cid: str, bvid: str, buvid: str, n: int):
         self.pv["click"] = 0
         for _ in range(n):
-            pp = [self.pool.submit(self.get_did(cid, bvid, buvid)) for ii in range(10)]
+            pp = [self.pool.submit(self.get_buvid, cid, bvid) for ii in range(5)]
             as_completed(pp)
-            echo(1, f"===== No. {__ + 1} =====")
+            time.sleep(3)
+            if self.click_map["buvid"]:
+                pp = [self.pool.submit(self.get_did, cid, bvid, np.random.choice(list(self.click_map["buvid"]))) for ii in range(5)]
+                as_completed(pp)
+                time.sleep(3)
+            if self.click_map["cookies"]:
+                pp = [self.pool.submit(self.click, bvid, cid, decoder_cookie(np.random.choice(list(self.click_map["cookies"])))) for ii in range(20)]
+                as_completed(pp)
+                time.sleep(3)
+            echo(1, "===== No. {}, buvid {}, cookies {} =====".format(_ + 1, len(self.pv["buvid"]), len(self.pv["cookies"])))
 
 
 if __name__ == "__main__":

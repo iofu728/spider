@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-12 01:37:53
+# @Last Modified time: 2021-06-14 00:32:16
 
 
 import codecs
@@ -12,6 +12,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
+from user_agent import generate_user_agent
 
 import numpy as np
 import regex
@@ -19,8 +20,11 @@ import regex
 sys.path.append(os.getcwd())
 from util.util import (
     begin_time,
-    end_time,
     echo,
+    encoder_cookie,
+    end_time,
+    get_accept,
+    get_content_type,
     get_time_str,
     mkdir,
     read_file,
@@ -487,6 +491,55 @@ class Up(BasicBilibili):
     def is_hot(self, bv_id: str) -> bool:
         m_html = self.get_m_html(bv_id, False)
         return "<span>热门</span>" in m_html
+
+    def click(self, bvid: str, cid: str, cookies: dict):
+        header = {
+            "Accept": get_accept("*"),
+            "Content-Type": get_content_type("*"),
+            "Origin": self.M_B_URL,
+            "Referer": f"{self.M_B_URL}/",
+            "Cookie": encoder_cookie(cookies),
+            "User-Agent": generate_user_agent(device_type="smartphone"),
+        }
+        t = int(time_stamp())
+        data = {
+            "aid": self.bv2av(bvid),
+            "cid": cid,
+            "bvid": bvid,
+            "part": "1",
+            "did": cookies.get("sid", ""),
+            "mid": "",
+            "lv": "0",
+            "ftime": t,
+            "stime": t,
+            "jsonp": "jsonp",
+        }
+        req = proxy_req(self.CLICK_URL, 11, data=data, header=header)
+        return req == {"code": 0, "message": "0", "ttl": 1}
+
+    def get_did(self, cid: str, bvid: str, buvid: str):
+        url = self.PLAYER_URL % (cid, self.bv2av(bvid), bvid, buvid)
+        header = {
+            "Accept": get_accept("json"),
+            "Origin": self.M_B_URL,
+            "Referer": f"{self.M_B_URL}/",
+            "Cookie": f"buvid3={buvid};",
+            "User-Agent": generate_user_agent(device_type="smartphone"),
+        }
+        req, cookies = proxy_req(url, 3, header=header, need_cookie=True)
+        if "sid" in cookies:
+            cookies["buvid3"] = buvid
+            if self.click(bvid, cid, cookies):
+                self.pv["click"] += 1
+                if self.pv["click"] % 20 == 0:
+                    echo(2, "Click", self.pv["click"])
+
+    def click_pipeline(self, cid: str, bvid: str, buvid: str, n: int):
+        self.pv["click"] = 0
+        for _ in range(n):
+            pp = [self.pool.submit(self.get_did(cid, bvid, buvid)) for ii in range(10)]
+            as_completed(pp)
+            echo(1, f"===== No. {__ + 1} =====")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-10 02:44:52
+# @Last Modified time: 2021-06-14 00:12:13
 
 import json
 import numpy as np
@@ -58,7 +58,10 @@ class BasicBilibili(object):
     CAPTCHA_URL = "https://passport.bilibili.com/web/captcha/combine?plat=11"
     GET_KEY_URL = "https://passport.bilibili.com/api/oauth2/getKey"
     GETTYPE_URL = "https://api.geetest.com/gettype.php?gt=%s&callback=geetest_%d"
-    M_BILIBILI_URL = "https://m.bilibili.com/video/%s"
+    M_B_URL = "https://m.bilibili.com"
+    M_BILIBILI_URL = f"{M_B_URL}/video/%s"
+    CLICK_URL = f"{API_BASIC_URL}click-interface/click/h5"
+    PLAYER_URL = f"{API_BASIC_URL}player.so?id=cid:%s&aid=%s&bvid=%s&buvid=%s"
     TABLE = "fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF"
     S = [11, 10, 3, 8, 4, 6]
     XOR = 177451812
@@ -294,7 +297,9 @@ class BasicBilibili(object):
         self, data: dict, keys: list, keys2: list = None, split_flag: str = "\t"
     ):
         def get_value(key):
-            return time_str(data[key]) if "time" in key or "pubdate" in key else data[key]
+            return (
+                time_str(data[key]) if "time" in key or "pubdate" in key else data[key]
+            )
 
         if keys2:
             return split_flag.join(

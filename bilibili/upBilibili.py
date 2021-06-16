@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-14 01:18:00
+# @Last Modified time: 2021-06-16 12:05:34
 
 
 import codecs
@@ -125,7 +125,7 @@ class Up(BasicBilibili):
         self.mid_stat = {}
         self.pool = ThreadPoolExecutor(max_workers=50)
         self.load_history_data()
-        self.click_map = {"buvid": {}, "cookies": {}}
+        self.click_map = {"buvid": set(), "cookies": set()}
 
     def load_bv_list(self):
         url = self.SPACE_AVS_URL % (self.assign_mid, 1)
@@ -245,7 +245,7 @@ class Up(BasicBilibili):
             return
         pub_date = view.get("pubdate", time_stamp())
         now_time = time_stamp()
-        if (now_time - pub_date > one_day * 4) and bv_id in self.pv["clean_csv"]:
+        if (now_time - pub_date > one_day * 4) and bv_id not in self.pv["clean_csv"]:
             clean_csv(bv_id)
             self.pv["clean_csv"].add(bv_id)
         time_gap = (now_time - pub_date) / 60
@@ -324,7 +324,7 @@ class Up(BasicBilibili):
         pub_data = view.get("pubdate", time_stamp())
         gap_str = get_time_str((time_stamp() - pub_data) / 60)
         title_text = "热榜{}({}){}, 排名: {}, 评分: {}".format(
-            is_hot, title, gap_str, idx, score
+            is_hot, gap_str, title, idx, score
         )
         send_email(title_text, title_text)
         self.pv["realtime_rank"].add(rank_id)
@@ -359,7 +359,7 @@ class Up(BasicBilibili):
         pub_data = view.get("pubdate", time_stamp())
         gap_str = get_time_str((time_stamp() - pub_data) / 60)
         title_text = "热榜{}({}){}, {}频道排名: {}".format(
-            is_hot, title, gap_str, channel_name, idx + 1
+            is_hot, gap_str, title, channel_name, idx + 1
         )
         send_email(title_text, title_text)
         self.pv["channel_rank"].add(rank_id)
@@ -537,12 +537,12 @@ class Up(BasicBilibili):
             self.click_map["cookies"].add(encoder_cookie(cookies))
             for _ in range(10):
                 self.pool.submit(self.click, bvid, cid, cookies)
-                times.sleep(np.random.rand() * 3)
+                time.sleep(np.random.rand() * 3)
 
     def get_buvid(self, cid: str, bvid: str):
         url = self.M_BILIBILI_URL % bvid
         header = {
-            "Accept": get_accept("html"),,
+            "Accept": get_accept("html"),
             "User-Agent": generate_user_agent(device_type="smartphone"),
         }
         req, cookies = proxy_req(url, 3, header=header, need_cookie=True)
@@ -551,8 +551,7 @@ class Up(BasicBilibili):
             self.click_map["buvid"].add(buvid)
             for _ in range(10):
                 self.pool.submit(self.get_did, cid, bvid, buvid)
-                times.sleep(np.random.rand() * 3)
-        
+                time.sleep(np.random.rand() * 3)
 
     def click_pipeline(self, cid: str, bvid: str, buvid: str, n: int):
         self.pv["click"] = 0
@@ -561,14 +560,37 @@ class Up(BasicBilibili):
             as_completed(pp)
             time.sleep(3)
             if self.click_map["buvid"]:
-                pp = [self.pool.submit(self.get_did, cid, bvid, np.random.choice(list(self.click_map["buvid"]))) for ii in range(5)]
+                pp = [
+                    self.pool.submit(
+                        self.get_did,
+                        cid,
+                        bvid,
+                        np.random.choice(list(self.click_map["buvid"])),
+                    )
+                    for ii in range(5)
+                ]
                 as_completed(pp)
                 time.sleep(3)
             if self.click_map["cookies"]:
-                pp = [self.pool.submit(self.click, bvid, cid, decoder_cookie(np.random.choice(list(self.click_map["cookies"])))) for ii in range(20)]
+                pp = [
+                    self.pool.submit(
+                        self.click,
+                        bvid,
+                        cid,
+                        decoder_cookie(
+                            np.random.choice(list(self.click_map["cookies"]))
+                        ),
+                    )
+                    for ii in range(20)
+                ]
                 as_completed(pp)
                 time.sleep(3)
-            echo(1, "===== No. {}, buvid {}, cookies {} =====".format(_ + 1, len(self.pv["buvid"]), len(self.pv["cookies"])))
+            echo(
+                1,
+                "===== No. {}, buvid {}, cookies {} =====".format(
+                    _ + 1, len(self.click_map["buvid"]), len(self.click_map["cookies"])
+                ),
+            )
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-14 00:12:13
+# @Last Modified time: 2021-06-18 21:31:55
 
 import json
 import numpy as np
@@ -294,19 +294,49 @@ class BasicBilibili(object):
         return view.get("title", "").split("|", 1)[0]
 
     def get_str_text(
-        self, data: dict, keys: list, keys2: list = None, split_flag: str = "\t"
+        self,
+        data: dict,
+        keys: list,
+        keys2: list = None,
+        split_flag: str = "\t",
+        compare_data: dict = None,
     ):
-        def get_value(key):
+        def get_value(key, d: dict = data):
             return (
-                time_str(data[key]) if "time" in key or "pubdate" in key else data[key]
+                time_str(d[key]) if "time" in key or "pubdate" in key else d.get(key, 0)
             )
 
         if keys2:
             return split_flag.join(
                 [
-                    "{}: {}".format(jj, get_value(ii))
+                    "{}: {}{}".format(
+                        jj,
+                        get_value(ii),
+                        "({:.2f}%)".format(
+                            int(get_value(ii, compare_data)) * 100 / int(get_value(ii))
+                            if get_value(ii) not in ["0", "", 0]
+                            else 0
+                        )
+                        if compare_data
+                        else "",
+                    )
                     for ii, jj in zip(keys, keys2)
                     if data.get(ii, 0)
                 ]
             )
-        return split_flag.join([str(get_value(ii)) for ii in keys if data.get(ii, 0)])
+        return split_flag.join(
+            [
+                str(get_value(ii))
+                + (
+                    "({:.2f}%)".format(
+                        int(get_value(ii, compare_data)) * 100 / int(get_value(ii))
+                        if get_value(ii) not in ["0", "", 0]
+                        else 0
+                    )
+                    if compare_data
+                    else "",
+                )
+                for ii in keys
+                if data.get(ii, 0)
+            ]
+        )

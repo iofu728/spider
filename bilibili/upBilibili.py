@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-16 12:05:34
+# @Last Modified time: 2021-06-18 21:32:07
 
 
 import codecs
@@ -161,7 +161,7 @@ class Up(BasicBilibili):
         self.update_ini(bv_id)
 
     def load_history_file(self, bv_id: str, bv_info: dict):
-        data_path = "{}{}_new.csv".format(history_data_dir, bv_id)
+        data_path = f"{history_data_dir}{bv_id}_new.csv"
         history_list = read_file(data_path)[:3660]
         if not history_list:
             return
@@ -170,7 +170,7 @@ class Up(BasicBilibili):
         time_map = {
             round((time_stamp(ii[0]) - created) / 120) * 2: ii
             for ii in history_list
-            if ii[0]
+            if ii[0].strip()
         }
         last_data = {ii: 0 for ii in self.STAT_LOCAL_KEYS}
         for ii in self.h_map.keys():
@@ -246,7 +246,7 @@ class Up(BasicBilibili):
         pub_date = view.get("pubdate", time_stamp())
         now_time = time_stamp()
         if (now_time - pub_date > one_day * 4) and bv_id not in self.pv["clean_csv"]:
-            clean_csv(bv_id)
+            clean_csv(self.bv2av(bv_id), bv_id, self.bv_ids[bv_id])
             self.pv["clean_csv"].add(bv_id)
         time_gap = (now_time - pub_date) / 60
         echo("0|debug", bv_id, time_gap < (4.5 * one_day / 60), time_str(pub_date))
@@ -259,8 +259,10 @@ class Up(BasicBilibili):
         ):
             self.send_history_rank(bv_id, view, int(time_gap / 10) * 10)
 
-    def get_ZH_view_detail(self, view: dict):
-        return self.get_str_text(view, self.STAT_LOCAL_KEYS, self.STAT_ZH, ", ")
+    def get_ZH_view_detail(self, view: dict, compare_data: dict = None):
+        return self.get_str_text(
+            view, self.STAT_LOCAL_KEYS, self.STAT_ZH, ", ", compare_data=compare_data
+        )
 
     def send_history_rank(self, bv_id: str, view: dict, time_gap: int):
         echo(
@@ -282,22 +284,22 @@ class Up(BasicBilibili):
         title_rank_text = f"No.{now_sorted}/{view_len}, {self.get_ZH_view_detail(view)}"
         title_text = f"排名(发布{time_tt}){title}{title_rank_text}"
         context_text = f"{bv_id}发布{time_tt}, {title_rank_text}\n\n"
-        for idx, rank in enumerate(view_sort_idx[: self.rank_len + 1]):
+        for idx, rank in enumerate(view_sort_idx[:3]):
             if rank == view_len:
                 continue
             bv = bv_ids[rank]
             if bv not in self.view_detail_map:
-                view = self.load_bv_stat_detail(bv)
-                if not view:
+                view_o = self.load_bv_stat_detail(bv)
+                if not view_o:
                     continue
-            view = self.view_detail_map[bv]
+            view_o = self.view_detail_map[bv]
             context_text += "{}, {}, 本年度No.{}, {}, 累计播放: {}, 发布时间: {}\n".format(
-                self.get_title_part(view),
+                self.get_title_part(view_o),
                 bv,
                 idx + 1,
-                self.get_ZH_view_detail(h_map[bv]),
-                view["view"],
-                time_str(view["pubdate"]),
+                self.get_ZH_view_detail(h_map[bv], compare_data=view),
+                view_o["view"],
+                time_str(view_o["pubdate"]),
             )
         send_email(context_text, title_text, mode="single")
         self.pv["history_rank"].add(f"{bv_id}-{int(time_gap / 10)}")

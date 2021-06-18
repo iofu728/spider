@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-04 10:57:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-16 12:04:04
+# @Last Modified time: 2021-06-18 20:53:52
 
 import pandas as pd
 import numpy as np
@@ -67,31 +67,33 @@ def analysis_csv():
     result_df.to_csv("%spublic_re.csv" % data_dir, index=False)
 
 
-def clean_csv(av_id: int):
-    """ clean csv """
-    csv_path = os.path.join(history_dir, "{}.csv".format(av_id))
-    output_path = os.path.join(history_data_dir, "{}_new.csv".format(av_id))
-    print(csv_path)
+def clean_csv(av_id: int, bv_id: str, bv_info: dict):
+    csv_path = os.path.join(history_dir, f"{av_id}.csv")
+    if not os.path.exists(csv_path):
+        csv_path = os.path.join(history_dir, f"{bv_id}.csv")
+    output_path = os.path.join(history_data_dir, f"{bv_id}_new.csv")
     csv = read_file(csv_path)
-    last_time, last_view = csv[0].split(",")[:2]
-    result = [csv[0]]
-    last_time = time_stamp(last_time)
-    last_view = int(last_view)
-    empty_line = ",".join([" "] * (len(csv[0].split(",")) + 1))
-    for line in csv[1:]:
+    last_time, last_view = bv_info["created"], 0
+    result, t_idx, idx, N = [], 2, 0, len(csv)
+    empty_line = ",".join([" "] * 12)
+    for line in csv:
         now_time, now_view = line.split(",")[:2]
-        line = line.replace(now_time, time_str(float(now_view)))
-        now_time = float(now_time)
+        if not now_time.strip():
+            continue
+        if "-" not in now_time:
+            line = line.replace(now_time, time_str(float(now_time)))
+            now_time = float(now_time)
+        else:
+            now_time = time_stamp(now_time)
         now_view = int(now_view)
         time_gap = now_time - last_time
-
-        if now_view < last_view or now_view - last_view > 5000:
+        idx = round(time_gap / 120)
+        if idx == 0:
             continue
-        if abs(time_gap) > 150:
-            for ii in range(int((time_gap - 30) // 120)):
-                result.append(empty_line)
-        if abs(time_gap) > 90:
-            result.append(line)
-            last_view, last_time = now_view, now_time
+        if idx > 20000:
+            break
+        result.extend([empty_line] * (idx - 1))
+        result.append(line)
+        last_view, last_time = now_view, now_time
     with open(output_path, "w") as f:
         f.write("\n".join(result))

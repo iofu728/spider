@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-18 21:32:07
+# @Last Modified time: 2021-06-19 00:13:46
 
 
 import codecs
@@ -284,7 +284,7 @@ class Up(BasicBilibili):
         title_rank_text = f"No.{now_sorted}/{view_len}, {self.get_ZH_view_detail(view)}"
         title_text = f"排名(发布{time_tt}){title}{title_rank_text}"
         context_text = f"{bv_id}发布{time_tt}, {title_rank_text}\n\n"
-        for idx, rank in enumerate(view_sort_idx[:3]):
+        for idx, rank in enumerate(view_sort_idx):
             if rank == view_len:
                 continue
             bv = bv_ids[rank]

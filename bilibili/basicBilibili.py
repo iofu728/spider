@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-18 21:31:55
+# @Last Modified time: 2021-06-18 21:45:21
 
 import json
 import numpy as np
@@ -294,7 +294,7 @@ class BasicBilibili(object):
         return view.get("title", "").split("|", 1)[0]
 
     def get_str_text(
-        self,
+        # self,
         data: dict,
         keys: list,
         keys2: list = None,
@@ -302,6 +302,7 @@ class BasicBilibili(object):
         compare_data: dict = None,
     ):
         def get_value(key, d: dict = data):
+            print(key)
             return (
                 time_str(d[key]) if "time" in key or "pubdate" in key else d.get(key, 0)
             )
@@ -326,8 +327,8 @@ class BasicBilibili(object):
             )
         return split_flag.join(
             [
-                str(get_value(ii))
-                + (
+                "{}{}".format(
+                    str(get_value(ii)),
                     "({:.2f}%)".format(
                         int(get_value(ii, compare_data)) * 100 / int(get_value(ii))
                         if get_value(ii) not in ["0", "", 0]

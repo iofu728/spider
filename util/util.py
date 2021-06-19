@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-11 21:27:59
+# @Last Modified time: 2021-06-16 18:07:49
 
 from __future__ import (
     absolute_import,
@@ -615,6 +615,30 @@ def md5(wait_enc: str):
     encoder = hashlib.md5()
     encoder.update(wait_enc.encode())
     return encoder.hexdigest()
+
+
+def dhash(path: str):
+    import cv2
+
+    image = cv2.imread(path)
+    image = cv2.resize(image, (9, 8), interpolation=cv2.INTER_CUBIC)
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    dhash_str = ""
+    for i in range(8):
+        for j in range(8):
+            if gray[i, j] > gray[i, j + 1]:
+                dhash_str = dhash_str + "1"
+            else:
+                dhash_str = dhash_str + "0"
+    return hex(int(dhash_str, 2))[2:]
+
+
+def hash_distance(hash1: str, hash2: str):
+    if len(hash1) != len(hash2):
+        return -1
+    hash1 = bin(int(hash1, 16))[2:]
+    hash2 = bin(int(hash2, 16))[2:]
+    return len([1 for ii, jj in zip(hash1, hash2) if ii == jj]) / len(hash1)
 
 
 def map_get(params: dict, key: str):

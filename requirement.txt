@@ -13,3 +13,4 @@ fonttools
 regex
 rsa
 opencv-python
+emoji>=1.0.0

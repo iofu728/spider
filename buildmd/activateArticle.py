@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-10 23:45:08
+# @Last Modified time: 2021-06-19 20:10:06
 
 import json
 import os
@@ -22,6 +22,7 @@ sys.path.append(os.getcwd())
 import top
 from buildmd.items import Items
 from buildmd.weixin import OfficialAccountObject
+from buildmd.parser import YNParser
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
 from util.util import (
@@ -322,7 +323,7 @@ class ActivateArticle(TBK):
     END_TEXT = "</text><inline-styles/><styles/></para></body></note>"
     TPWD_REG = "\p{Sc}(\w{8,12}?)\p{Sc}"
     TPWD_REG2 = "(\p{Sc}\w{8,12}\p{Sc})"
-    TPWD_REG3 = "(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》]\(\/)([a-zA-Z0-9]{8,12}?)(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》]\)\/)"
+    TPWD_REG3 = "(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》\(\/])([a-zA-Z0-9]{8,12}?)(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》\)\/])"
     TPWD_REG4 = "(\p{Sc}\w{8,12}\p{Sc})/\(已失效\)"
     JSON_KEYS = [
         "p",
@@ -397,6 +398,7 @@ class ActivateArticle(TBK):
         self.load_num = [0, 0]
         self.tpwd_exec = ThreadPoolExecutor(max_workers=5)
         self.pv = {ii: {} for ii in self.PV_KEYS}
+        self.parser = YNParser()
 
     def load_process(self):
         self.load_yd_ids()
@@ -1632,7 +1634,8 @@ class ActivateArticle(TBK):
     def change_tpwd(self, yd_path):
         origin = read_file(yd_path)
         origin = [
-            "".join(["￥" if jj in UNICODE_EMOJI else jj for jj in ii]) for ii in origin
+            "".join(["￥" if jj in UNICODE_EMOJI["en"] else jj for jj in ii])
+            for ii in origin
         ]
         for ii in range(len(origin)):
             text = origin[ii]
@@ -1643,8 +1646,9 @@ class ActivateArticle(TBK):
         with open(yd_path, "w") as f:
             f.write("\n".join(origin))
 
-    def get_r_tpwds(self, yd_id: str):
-        xml = self.get_xml(yd_id)
+    def get_r_tpwds(self, yd_id: str, xml: str = None):
+        if xml is None:
+            xml = self.get_xml(yd_id)
         tpwds = regex.findall(self.TPWD_REG2, xml)
         r_tpwds = []
         for tpwd in tpwds:
@@ -1741,6 +1745,15 @@ class ActivateArticle(TBK):
                 self.tpwds_map[tpwd]["is_existed"] = 1
         echo("2|debug", f"{num} tpwds exist in articles.")
         self.store_db()
+
+    def parser_article(self, yd_id: str, xml: str = None):
+        if xml is None:
+            xml = self.get_xml(yd_id)
+        if xml is None:
+            echo("0|warning", "get xml error")
+            return
+        self.get_r_tpwds(yd_id, xml)
+        return self.parser.parse(xml, yd_id)
 
 
 if __name__ == "__main__":

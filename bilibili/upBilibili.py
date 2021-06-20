@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-19 00:13:46
+# @Last Modified time: 2021-06-21 00:42:48
 
 
 import codecs
@@ -225,7 +225,7 @@ class Up(BasicBilibili):
 
     def load_bv_stat_detail(self, bv_id: str):
         pub_data = self.view_detail_map.get(bv_id, {}).get("pubdate", time_stamp())
-        if time_stamp() - pub_data > one_day * 8:
+        if time_stamp() - pub_data > one_day * 8 and np.random.rand() > 1 / 50:
             return
         rank_info = self.rank_map.get(bv_id, {})
         if bv_id not in self.view_detail_map:

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:29:04
+# @Last Modified time: 2021-06-21 18:22:04
 
 import os
 import sys
@@ -33,6 +33,8 @@ from util.util import (
     mkdir,
     time_stamp,
     time_str,
+    create_argparser,
+    set_args,
 )
 
 proxy_req = None
@@ -697,6 +699,8 @@ class Items(object):
 
 
 if __name__ == "__main__":
+    parser = create_argparser("Item Loader")
+    args = set_args(parser)
     items = Items(
         {
             "time_str": time_str(),

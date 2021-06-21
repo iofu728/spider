@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:22:50
+# @Last Modified time: 2021-06-21 17:56:27
 
 
 import asyncio
@@ -24,7 +24,17 @@ import regex
 sys.path.append(os.getcwd())
 from bilibili.basicBilibili import BasicBilibili
 from proxy.getproxy import GetFreeProxy
-from util.util import basic_req, can_retry, echo, mkdir, time_stamp, time_str, load_cfg
+from util.util import (
+    basic_req,
+    can_retry,
+    echo,
+    mkdir,
+    time_stamp,
+    time_str,
+    load_cfg,
+    create_argparser,
+    set_args,
+)
 
 logger = logging.getLogger(__name__)
 proxy_req = None
@@ -294,6 +304,8 @@ def BSocket(bv_id: str, types: int = 0, p: int = -1):
 
 
 if __name__ == "__main__":
+    parser = create_argparser("Bilibili ws")
+    args = set_args(parser)
     mkdir(data_dir)
     mkdir(websocket_dir)
     if not os.path.exists(assign_path):

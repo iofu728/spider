@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:25:43
+# @Last Modified time: 2021-06-21 17:57:03
 
 import json
 import os
@@ -49,6 +49,8 @@ from util.util import (
     time_str,
     load_bigger,
     dump_bigger,
+    create_argparser,
+    set_args,
 )
 
 
@@ -1782,6 +1784,8 @@ class ActivateArticle(TBK):
 
 
 if __name__ == "__main__":
+    parser = create_argparser("Article")
+    args = set_args(parser)
     ba = ActivateArticle()
     ba.load_process()
     ba.load_click()

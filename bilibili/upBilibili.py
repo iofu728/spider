@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 00:42:48
+# @Last Modified time: 2021-06-21 17:55:44
 
 
 import codecs
@@ -34,6 +34,8 @@ from util.util import (
     time_str,
     map_get,
     write,
+    create_argparser,
+    set_args,
 )
 from bilibili.analysis import clean_csv
 from bilibili.basicBilibili import BasicBilibili
@@ -596,6 +598,8 @@ class Up(BasicBilibili):
 
 
 if __name__ == "__main__":
+    parser = create_argparser("Bilibili")
+    args = set_args(parser)
     mkdir(data_dir)
     mkdir(comment_dir)
     mkdir(history_dir)

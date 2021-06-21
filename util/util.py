@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:30:16
+# @Last Modified time: 2021-06-21 17:50:17
 
 from __future__ import (
     absolute_import,
@@ -12,6 +12,7 @@ from __future__ import (
     with_statement,
 )
 
+import argparse
 import codecs
 import datetime
 import hashlib
@@ -662,6 +663,19 @@ def load_cfg(path: str, no_interpolation: bool = False):
         cfg = ConfigParser()
     cfg.read(path, "utf-8")
     return cfg
+
+
+def create_argparser(description: str = ""):
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("--is_service", type=bool, default=False)
+    return parser
+
+
+def set_args(parser):
+    global is_service
+    args = parser.parse_args()
+    is_service = args.is_service
+    return args
 
 
 headers = {

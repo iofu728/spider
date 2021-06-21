@@ -2,10 +2,8 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-13 19:15:15
+# @Last Modified time: 2021-06-21 17:50:23
 
-
-import argparse
 import codecs
 import functools
 import http.cookiejar as cj
@@ -29,12 +27,14 @@ from util.util import (
     can_retry,
     changeHtmlTimeout,
     changeJsonTimeout,
+    create_argparser,
     echo,
     end_time,
     read_file,
     time_str,
     get_accept,
     get_content_type,
+    set_args,
 )
 
 
@@ -803,26 +803,20 @@ class GetFreeProxy:
 if __name__ == "__main__":
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
-    parser = argparse.ArgumentParser(description="gunjianpan proxy pool code")
+    parser = create_argparser("Proxy Pool")
     parser.add_argument(
         "--model", type=int, default=0, metavar="model", help="model 0/1"
     )
     parser.add_argument(
-        "--is_service",
-        type=bool,
-        default=False,
-        metavar="service",
-        help="True or False",
-    )
-    parser.add_argument(
         "--test_time", type=int, default=1, metavar="test_time", help="test_time"
     )
-    model = parser.parse_args().model
-    a = GetFreeProxy()
+    args = set_args(parser)
+    model = args.model
+    proxy = GetFreeProxy()
     if model == 1:
-        a.get_proxy_free()
+        proxy.get_proxy_free()
     elif model == 0:
-        a.load_proxies_test()
-        a.test_db(2)
+        proxy.load_proxies_test()
+        proxy.test_db(2)
     else:
-        a.test_db(2)
+        proxy.test_db(2)

@@ -1,11 +1,20 @@
-import argparse
 import os
 import regex
 import sys
 
 sys.path.append(os.getcwd())
 from bilibili.basicBilibili import BasicBilibili
-from util.util import time_str, echo, basic_req, mkdir, begin_time, end_time, get_accept
+from util.util import (
+    time_str,
+    echo,
+    basic_req,
+    mkdir,
+    begin_time,
+    end_time,
+    get_accept,
+    create_argparser,
+    set_args,
+)
 
 SPACE_AVS_URL = "https://api.bilibili.com/x/space/arc/search?mid=%s&ps=50&tid=0&pn=%s&keyword=&order=pubdate&jsonp=jsonp"
 PIC_DIR = "bilibili/data/cover"
@@ -70,10 +79,10 @@ def optim_image():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="load pictures")
+    parser = create_argparser("Load pictures")
     parser.add_argument("--dir", type=str, default="cover")
     parser.add_argument("--url", type=str, default="")
-    args = parser.parse_args()
+    args = set_args(parser)
     update_cover(args.dir)
     if args.url:
         load_gzh_img(args.url)

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:50:23
+# @Last Modified time: 2021-06-21 18:11:00
 
 import codecs
 import functools
@@ -35,6 +35,7 @@ from util.util import (
     get_accept,
     get_content_type,
     set_args,
+    load_cfg,
 )
 
 
@@ -55,6 +56,7 @@ from util.util import (
 data_dir = "proxy/data/"
 MAXN = 0x3FFFFFFF
 type_map = {1: "https", 0: "http"}
+ASSIGN_PATH = f"{data_dir}proxy.ini"
 
 
 class GetFreeProxy:
@@ -76,6 +78,7 @@ class GetFreeProxy:
         self.failured_time = {}
         self.canuse_proxies = []
         self.init_proxy()
+        self.load_configure()
 
     def proxy_req(
         self,
@@ -721,7 +724,7 @@ class GetFreeProxy:
         return re.findall(">(.*?)</a", data)
 
     def get_api(self):
-        API_KEY = "xxx"
+        API_KEY = self.scraper_key
         url = "http://api.scraperapi.com/?api_key={}&url=http://httpbin.org/ip".format(
             API_KEY
         )
@@ -798,6 +801,10 @@ class GetFreeProxy:
         )
         with open("{}canuse_proxies.txt".format(data_dir), "w") as f:
             f.write("\n".join(self.canuse_proxies))
+
+    def load_configure(self):
+        cfg = load_cfg(ASSIGN_PATH)
+        self.scraper_key = cfg["PROXY"].get("scraper_key", "")
 
 
 if __name__ == "__main__":

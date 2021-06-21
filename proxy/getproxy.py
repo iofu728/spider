@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 18:11:00
+# @Last Modified time: 2021-06-21 18:13:58
 
 import codecs
 import functools
@@ -53,10 +53,11 @@ from util.util import (
     └── passage      // gather passage
 """
 
-data_dir = "proxy/data/"
+BASIC_DIR = "proxy/"
+data_dir = f"{BASIC_DIR}data/"
 MAXN = 0x3FFFFFFF
 type_map = {1: "https", 0: "http"}
-ASSIGN_PATH = f"{data_dir}proxy.ini"
+ASSIGN_PATH = f"{BASIC_DIR}proxy.ini"
 
 
 class GetFreeProxy:

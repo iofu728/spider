@@ -2,10 +2,9 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:29:44
+# @Last Modified time: 2021-06-21 18:04:53
 
 import os
-import shutil
 import sys
 import threading
 
@@ -30,8 +29,6 @@ class Db(object):
 
     def load_configure(self):
         """ load configure """
-        if not os.path.exists(configure_path):
-            shutil.copy(configure_path + ".tmp", configure_path)
         cfg = load_cfg(configure_path)
         self.mysql_host = cfg.get("mysql", "hostname")
         self.mysql_user = cfg.get("mysql", "username")

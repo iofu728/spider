@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:56:27
+# @Last Modified time: 2021-06-21 18:04:27
 
 
 import asyncio
@@ -10,7 +10,6 @@ import codecs
 import json
 import logging
 import os
-import shutil
 import struct
 import sys
 import time
@@ -308,8 +307,6 @@ if __name__ == "__main__":
     args = set_args(parser)
     mkdir(data_dir)
     mkdir(websocket_dir)
-    if not os.path.exists(assign_path):
-        shutil.copy(assign_path + ".tmp", assign_path)
 
     """ Test for San Diego demon """
     """ PS: the thread of BSocket have to be currentThread in its processing. """

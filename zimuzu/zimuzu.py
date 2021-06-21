@@ -8,7 +8,6 @@
 import codecs
 import os
 import re
-import shutil
 
 from proxy.getproxy import GetFreeProxy
 from util.util import begin_time, end_time, can_retry, load_cfg
@@ -70,7 +69,5 @@ class zimuzu:
 if __name__ == "__main__":
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
-    if not os.path.exists(configure_path):
-        shutil.copy(configure_path + ".tmp", configure_path)
     zimuzu = zimuzu()
     zimuzu.load_url()

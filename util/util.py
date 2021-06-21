@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:50:17
+# @Last Modified time: 2021-06-21 18:05:05
 
 from __future__ import (
     absolute_import,
@@ -588,8 +588,6 @@ def load_configure():
     global LAST_CONFIG, rec_lists, send_lists, SCKEY, SIGN
     if time_stamp() - LAST_CONFIG < 300:
         return
-    if not os.path.exists(configure_path):
-        shutil.copy(configure_path + ".tmp", configure_path)
     cfg = load_cfg(configure_path)
     rec_list = cfg.get("email", "rec_lists").split(",")
     send_list = cfg.get("email", "send_lists").split(",")
@@ -657,6 +655,8 @@ def write(path: str, text: str, types: str = "w"):
 
 
 def load_cfg(path: str, no_interpolation: bool = False):
+    if not os.path.exists(path):
+        shutil.copy(f"{path}.tmp", path)
     if no_interpolation:
         cfg = ConfigParser(interpolation=None)
     else:

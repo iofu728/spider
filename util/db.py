@@ -2,19 +2,18 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-06-06 13:11:46
+# @Last Modified time: 2021-06-21 17:29:44
 
 import os
 import shutil
 import sys
 import threading
-from configparser import ConfigParser
 
 import pymysql
 import time
 
 sys.path.append(os.getcwd())
-from util.util import echo, read_file
+from util.util import echo, read_file, load_cfg
 
 configure_path = "util/util.ini"
 
@@ -33,8 +32,7 @@ class Db(object):
         """ load configure """
         if not os.path.exists(configure_path):
             shutil.copy(configure_path + ".tmp", configure_path)
-        cfg = ConfigParser()
-        cfg.read(configure_path, "utf-8")
+        cfg = load_cfg(configure_path)
         self.mysql_host = cfg.get("mysql", "hostname")
         self.mysql_user = cfg.get("mysql", "username")
         self.mysql_pw = cfg.get("mysql", "passwd")

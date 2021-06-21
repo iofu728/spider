@@ -2,20 +2,19 @@
 # @Author: gunjianpan
 # @Date:   2020-06-08 21:23:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2020-07-13 22:47:54
+# @Last Modified time: 2021-06-21 17:28:39
 
 
 import json
 import os
 import sys
 import time
-from configparser import RawConfigParser
 
 import numpy as np
 import codecs
 
 sys.path.append(os.getcwd())
-from util.util import basic_req, begin_time, echo, end_time, get_accept, mkdir
+from util.util import basic_req, begin_time, echo, end_time, get_accept, mkdir, load_cfg
 
 
 root_dir = os.path.abspath("buildmd")
@@ -34,8 +33,7 @@ class TBRelated(object):
         self.load_configure()
 
     def load_configure(self):
-        cfg = RawConfigParser()
-        cfg.read(assign_path, "utf-8")
+        cfg = load_cfg(assign_path, True)
         self.cookie = cfg.get("TB", "cookie")[1:-1]
         self.tb_id = cfg.get("TB", "tb_id")
         self.output_path = os.path.join(DATA_DIR, "{}.json".format(self.tb_id))

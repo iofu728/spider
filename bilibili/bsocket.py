@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-05-08 01:07:55
+# @Last Modified time: 2021-06-21 17:22:50
 
 
 import asyncio
@@ -15,7 +15,6 @@ import struct
 import sys
 import time
 from collections import namedtuple
-from configparser import ConfigParser
 from enum import IntEnum
 from ssl import _create_unverified_context
 
@@ -25,7 +24,7 @@ import regex
 sys.path.append(os.getcwd())
 from bilibili.basicBilibili import BasicBilibili
 from proxy.getproxy import GetFreeProxy
-from util.util import basic_req, can_retry, echo, mkdir, time_stamp, time_str
+from util.util import basic_req, can_retry, echo, mkdir, time_stamp, time_str, load_cfg
 
 logger = logging.getLogger(__name__)
 proxy_req = None
@@ -306,8 +305,7 @@ if __name__ == "__main__":
         bv_id = sys.argv[1]
         p = int(sys.argv[2])
     else:
-        cfg = ConfigParser()
-        cfg.read(assign_path, "utf-8")
+        cfg = load_cfg(assign_path)
         bv_id = cfg.getint("basic", "bv_id")
         p = cfg["basic"].getint("pid", -1)
     BSocket(bv_id, p=p)

@@ -2,17 +2,15 @@
 # @Author: gunjianpan
 # @Date:   2021-04-29 18:09:24
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-04-29 23:30:51
+# @Last Modified time: 2021-06-21 17:29:22
 
 import json
 import os
 import regex
 import sys
 
-from configparser import ConfigParser
-
 sys.path.append(os.getcwd())
-from util.util import echo, basic_req, time_stamp, time_str
+from util.util import echo, basic_req, time_stamp, time_str, load_cfg
 
 root_dir = os.path.abspath("buildmd")
 sql_dir = os.path.join(root_dir, "sql")
@@ -42,8 +40,7 @@ class OfficialAccountObject(object):
         self.load_num = 0
 
     def load_configure(self):
-        cfg = ConfigParser(interpolation=None)
-        cfg.read(assign_path, "utf-8")
+        cfg = load_cfg(assign_path, True)
         self.app_id = cfg.get("WX", "app_id")
         self.secret = cfg.get("WX", "secret")
 

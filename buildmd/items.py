@@ -2,14 +2,13 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-11 21:29:14
+# @Last Modified time: 2021-06-21 17:29:04
 
 import os
 import sys
 import json
 import time
 import numpy as np
-from configparser import ConfigParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.append(os.getcwd())
@@ -28,6 +27,7 @@ from util.util import (
     get_accept,
     get_time_str,
     get_use_agent,
+    load_cfg,
     json_str,
     md5,
     mkdir,
@@ -122,8 +122,7 @@ class Items(object):
         self.items_exec = ThreadPoolExecutor(max_workers=5)
 
     def load_configure(self):
-        cfg = ConfigParser()
-        cfg.read(assign_path, "utf-8")
+        cfg = load_cfg(assign_path, True)
         self.appkey = cfg.get("TBK", "appkey")
         self.secret = cfg.get("TBK", "secret")
         self.user_id = cfg.getint("TBK", "user_id")

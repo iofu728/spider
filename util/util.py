@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-16 18:07:49
+# @Last Modified time: 2021-06-21 17:30:16
 
 from __future__ import (
     absolute_import,
@@ -589,8 +589,7 @@ def load_configure():
         return
     if not os.path.exists(configure_path):
         shutil.copy(configure_path + ".tmp", configure_path)
-    cfg = ConfigParser()
-    cfg.read(configure_path, "utf-8")
+    cfg = load_cfg(configure_path)
     rec_list = cfg.get("email", "rec_lists").split(",")
     send_list = cfg.get("email", "send_lists").split(",")
     rec_lists = [ii.split(":") for ii in rec_list]
@@ -621,6 +620,8 @@ def dhash(path: str):
     import cv2
 
     image = cv2.imread(path)
+    if image is None:
+        return ""
     image = cv2.resize(image, (9, 8), interpolation=cv2.INTER_CUBIC)
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     dhash_str = ""
@@ -652,6 +653,15 @@ def map_get(params: dict, key: str):
 def write(path: str, text: str, types: str = "w"):
     with codecs.open(path, types, encoding="utf-8") as f:
         f.write(text)
+
+
+def load_cfg(path: str, no_interpolation: bool = False):
+    if no_interpolation:
+        cfg = ConfigParser(interpolation=None)
+    else:
+        cfg = ConfigParser()
+    cfg.read(path, "utf-8")
+    return cfg
 
 
 headers = {

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-19 20:10:06
+# @Last Modified time: 2021-06-21 17:25:43
 
 import json
 import os
@@ -11,7 +11,6 @@ import threading
 import time
 import urllib
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from configparser import ConfigParser
 from collections import Counter, defaultdict
 from emoji import UNICODE_EMOJI
 
@@ -22,7 +21,7 @@ sys.path.append(os.getcwd())
 import top
 from buildmd.items import Items
 from buildmd.weixin import OfficialAccountObject
-from buildmd.parser import YNParser
+from buildmd.parser import YNParser, YNGoods
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
 from util.util import (
@@ -42,6 +41,7 @@ from util.util import (
     get_use_agent,
     generate_sql,
     headers,
+    load_cfg,
     mkdir,
     read_file,
     send_email,
@@ -78,8 +78,7 @@ class TBK(object):
         # self.load_tbk_info()
 
     def load_configure(self):
-        cfg = ConfigParser(interpolation=None)
-        cfg.read(assign_path, "utf-8")
+        cfg = load_cfg(assign_path, True)
         self.appkey = cfg.get("TBK", "appkey")
         self.secret = cfg.get("TBK", "secret")
         self.user_id = cfg.getint("TBK", "user_id")
@@ -1096,6 +1095,8 @@ class ActivateArticle(TBK):
         if not "id" in item or not item["id"].isdigit():
             if "user_number_id" in item:
                 return "shop{}".format(item["user_number_id"])
+            if "user_id" in item:
+                return "shop{}".format(item["user_id"])
             shop_id = regex.findall("shop(\d*?)\.m\.taobao", item_url)
             if shop_id and shop_id[0] in self.items.shops_detail_map:
                 user_id = self.items.shops_detail_map[shop_id[0]]["user_id"]
@@ -1754,6 +1755,30 @@ class ActivateArticle(TBK):
             return
         self.get_r_tpwds(yd_id, xml)
         return self.parser.parse(xml, yd_id)
+
+    def parser_search(self, goods: YNGoods):
+        results = self.parser.search(goods)
+        for idx, result in enumerate(results):
+            result_set = set(
+                [self.tpwds_map.get(ii.tpwd, {}).get("item_id", "") for ii in result]
+            )
+            echo(
+                1,
+                f"Load {self.parser.RESULT_NAME[idx]} {len(result_set)} items.",
+                result_set,
+            )
+        return results
+
+    def parser_goods_item(self, yd_id: str):
+        goods = self.parser.goods_map.get(yd_id, [])
+        res = []
+        for g in goods:
+            tpwd = g.tpwd
+            item_id = self.tpwds_map.get(tpwd, {}).get("item_id", "")
+            shop_id = self.items.items_detail_map.get(item_id, {}).get("shop_id", "")
+            if not item_id or (not item_id.startswith("shop") and not shop_id):
+                res.append(g)
+        return res
 
 
 if __name__ == "__main__":

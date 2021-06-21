@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-18 21:47:12
+# @Last Modified time: 2021-06-21 17:22:13
 
 import json
 import numpy as np
@@ -10,7 +10,6 @@ import os
 import shutil
 import sys
 import urllib
-from configparser import ConfigParser
 
 sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
@@ -22,6 +21,7 @@ from util.util import (
     encoder_url,
     get_accept,
     get_use_agent,
+    load_cfg,
     md5,
     time_stamp,
     time_str,
@@ -81,8 +81,7 @@ class BasicBilibili(object):
 
     def load_configure(self):
         """ load assign configure """
-        cfg = ConfigParser()
-        cfg.read(assign_path, "utf-8")
+        cfg = load_cfg(assign_path)
         self.assign_author = cfg.get("basic", "author")
         self.assign_mid = cfg["basic"].getint("mid", -1)
         self.assign_rid = cfg.getint("basic", "rid")
@@ -151,8 +150,7 @@ class BasicBilibili(object):
             return {"Accept": get_accept("html"), "Host": self.BILIBILI_URL}
 
     def update_ini(self, bv_id: str):
-        cfg = ConfigParser()
-        cfg.read(assign_path, "utf-8")
+        cfg = load_cfg(assign_path)
         cfg.set("basic", "bv_id", bv_id)
         bv_ids = cfg.get("assign", "bv_ids")
         cfg.set("assign", "bv_ids", f"{bv_ids},{bv_id}")

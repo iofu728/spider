@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-05-29 13:47:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-19 21:44:37
+# @Last Modified time: 2021-06-21 17:31:58
 
 import cv2
 import os
@@ -30,8 +30,18 @@ from util.util import (
 BASIC_IMG_DIR = "buildmd/data/img/"
 
 
-class YNGood(object):
-    KEYS = ["name", "size", "price", "shop", "tpwd", "evaluation", "pic", "picHash"]
+class YNGoods(object):
+    KEYS = [
+        "name",
+        "size",
+        "price",
+        "shop",
+        "tpwd",
+        "evaluation",
+        "pic",
+        "picHash",
+        "ydId",
+    ]
 
     def __init__(self, config: dict):
         for k, v in config.items():
@@ -51,6 +61,7 @@ class YNParser(object):
     PIC_BASIC_URL = "https://note.youdao.com/"
     SESS_URL = f"{PIC_BASIC_URL}login/acc/pe/getsess?product=YNOTE&_=%d"
     RLOG_URL = "https://rlogs.youdao.com/rlog.php"
+    RESULT_NAME = ["pic", "shop", "name"]
 
     def __init__(self):
         mkdir(BASIC_IMG_DIR)
@@ -58,7 +69,8 @@ class YNParser(object):
         self.blocks_map = {}
         self.goods_map = {}
         self.empty_map = {}
-        # self.get_cookie()
+        self.pics_map = {}
+        self.get_cookie()
 
     def get_cookie(self):
         t = int(time_stamp() * 1000)
@@ -153,8 +165,10 @@ class YNParser(object):
             else:
                 texts = p.find_all(regex.compile("source|text"))
                 text = "".join([ii.text for ii in texts])
-            if set(values) == set(["#ffffff", "#aca0f6"]) or set(values) == set(
-                ["#ffffff", "rgb(172, 160, 246)"]
+            if (
+                set(values) == set(["#ffffff", "#aca0f6"])
+                or set(values) == set(["#ffffff", "rgb(172, 160, 246)"])
+                or set(values) == set(["#407600", "#e9f5f4"])
             ):
                 if block and have_tpwd:
                     blocks.append(self.resize_block(block))
@@ -179,7 +193,7 @@ class YNParser(object):
 
     def decoder_basic(self, text: str):
         name, size, price = "", "", ""
-        types = text.split()
+        types = text.replace("//", "").replace("￥", "").split()
         for ii in types:
             if ii.lower() in "xsmxl":
                 size = ii
@@ -191,20 +205,29 @@ class YNParser(object):
                 price = ii
         return name, size, price
 
-    def decode_no_tpwd(self, block: list):
+    def decoder_shop(self, shop: str) -> str:
+        if ":" in shop:
+            shop = shop.split(":", 1)[1]
+        if "：" in shop:
+            shop = shop.split("：", 1)[1]
+        shop = shop.replace("店铺", "").replace("店", "").strip()
+        return shop
+
+    def decode_no_tpwd(self, block: list, yd_id: str):
         text, block = block[0], block[1:]
         name, size, price = self.decoder_basic(text)
-        shop, evaluation, pic = [""] * 3
+        shop, evaluation = [""] * 2
+        pic = []
         for idx, (t, flag) in enumerate(block):
             if "http" in t:
-                pic = t
+                pic.append(t)
             elif "下架" in t:
                 evaluation += t
             elif idx == 0:
-                shop = t
+                shop = self.decoder_shop(t)
             else:
                 evaluation += t
-        return YNGood(
+        return YNGoods(
             {
                 "name": name,
                 "size": size,
@@ -212,38 +235,45 @@ class YNParser(object):
                 "shop": shop,
                 "evaluation": evaluation,
                 "pic": pic,
-                # "picHash": self.md5_pic(pic, yd_id),
+                "picHash": ["" for ii in pic],
+                # "picHash": [self.md5_pic(ii, yd_id) for ii in pic],
+                "ydId": yd_id,
             }
         )
 
     def parse(self, text: str, yd_id: str) -> list:
         res = []
-        blocks, no_tpwds = self.decoder_blocks((text))
-        no_tpwds = [self.decode_no_tpwd(block) for block in no_tpwds]
+        blocks, no_tpwds = self.decoder_blocks(text)
+        no_tpwds = [self.decode_no_tpwd(block, yd_id) for block in no_tpwds]
         for text, block in tqdm(blocks):
             name, size, price = self.decoder_basic(text)
             for b in block:
-                shop, tpwd, evaluation, pic = [""] * 4
+                shop, tpwd, evaluation = [""] * 3
+                pic = []
                 for idx, (t, flag) in enumerate(b):
                     if flag:
                         tpwd = t
                     elif "http" in t:
-                        pic = t
+                        pic.append(t)
                     elif idx == 0 or (idx == 1 and tpwd and "店" in t):
-                        shop = t
+                        shop = self.decoder_shop(t)
                     else:
                         evaluation += t
+                if not pic:
+                    pic = [""]
                 res.append(
-                    YNGood(
+                    YNGoods(
                         {
                             "name": name,
                             "size": size,
                             "price": price,
                             "shop": shop,
-                            "tpwd": tpwd,
+                            "tpwd": regex.findall(self.TPWD_REG, tpwd)[0],
                             "evaluation": evaluation,
                             "pic": pic,
-                            # "picHash": self.md5_pic(pic, yd_id),
+                            "picHash": ["" for ii in pic],
+                            # "picHash": [self.md5_pic(ii, yd_id) for ii in pic],
+                            "ydId": yd_id,
                         }
                     )
                 )
@@ -252,3 +282,59 @@ class YNParser(object):
         self.empty_map[yd_id] = no_tpwds
         echo(2, f"Load {len(res)} goods.", f"And {len(no_tpwds)} no tpwd blocks.")
         return blocks, res, no_tpwds
+
+    def pic_cluster(self):
+        goods_num = 0
+        for goods_list in self.goods_map.values():
+            for goods in goods_list:
+                for picHash in goods.picHash:
+                    if picHash == "":
+                        continue
+                    goods_num += 1
+                    flag = False
+                    for k in self.pics_map.keys():
+                        if hash_distance(k, picHash) > 0.9:
+                            self.pics_map[k].append(goods)
+                            flag = True
+                            break
+                    if not flag:
+                        self.pics_map[picHash] = [goods]
+        echo(1, f"Load {goods_num} Goods and {len(self.pics_map)} picture's clusters.")
+
+    def search_pic(self, picHash: str):
+        if picHash in self.pics_map:
+            return self.pics_map[picHash]
+        for k, v in self.pics_map.items():
+            if hash_distance(k, picHash) > 0.9:
+                return v
+        return {}
+
+    def search(self, goods: YNGoods):
+        if isinstance(goods.picHash, list):
+            pic_results = []
+            for p in goods.picHash:
+                pic_results.extend(self.search_pic(p))
+        else:
+            pic_results = self.search_pic(p)
+        shop_results, name_results = [], []
+        for goods_list in self.goods_map.values():
+            for g in goods_list:
+                if goods.name and goods.name in g.name:
+                    name_results.append(g)
+                if goods.shop and goods.shop in g.shop:
+                    shop_results.append(g)
+        return pic_results, shop_results, name_results
+
+    def load_picHash(self, data: dict):
+        num = 0
+        for yd_id, data_list in tqdm(data.items()):
+            for idx, d in enumerate(data_list):
+                for k, (ii, jj) in enumerate(zip(d.picHash, d.pic)):
+                    if ii or not jj:
+                        continue
+                    print(jj, yd_id)
+                    hash_value = self.md5_pic(jj, yd_id)
+                    data[yd_id][idx].picHash[k] = hash_value
+                    num += 1
+        echo(1, f"Hash {num} pictures.")
+        return data

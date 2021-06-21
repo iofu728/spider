@@ -1,2 +1,3 @@
 [PROXY]
 scraper_key = 123
+scraper_limit = 100

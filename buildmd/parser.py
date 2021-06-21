@@ -2,9 +2,8 @@
 # @Author: gunjianpan
 # @Date:   2021-05-29 13:47:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:31:58
+# @Last Modified time: 2021-06-21 18:24:25
 
-import cv2
 import os
 import regex
 import sys

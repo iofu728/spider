@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 18:44:44
+# @Last Modified time: 2021-06-23 14:08:17
 
 import codecs
 import functools
@@ -806,7 +806,7 @@ class GetFreeProxy:
     def load_configure(self):
         cfg = load_cfg(ASSIGN_PATH)
         self.scraper_key = cfg["PROXY"].get("scraper_key", "")
-        self.scraper_limit = cfg["PROXY"].get("scraper_limit", 0)
+        self.scraper_limit = cfg["PROXY"].getint("scraper_limit", 0)
 
 
 if __name__ == "__main__":

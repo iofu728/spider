@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:57:03
+# @Last Modified time: 2021-06-24 13:39:40
 
 import json
 import os
@@ -741,7 +741,7 @@ class ActivateArticle(TBK):
         )
         echo(2, f"{can_num} tpwds's url can renew.")
         flag = begin_time()
-        self.load_num, shop_num, self.direct_convert_num = [0, 0], 0, 0
+        self.load_num, shop_num, self.direct_convert_num, item_c_shop = [0, 0], 0, 0, 0
         c = self.items.items_detail_map
         s = self.items.shops_detail_map
         su = {v["user_id"]: v for v in s.values()}
@@ -815,16 +815,17 @@ class ActivateArticle(TBK):
             if renew_tpwd is None:
                 m = self.get_item_tpwd(title, item_id, m)
             shop_tpwd = s.get(shop_id, {}).get("tpwd", "")
+            if m["tpwd"] == o_tpwd and use_direct:
+                m["tpwd"] = self.generate_tpwd_from_tpwd(o_tpwd, title)
+                if m["tpwd"] != o_tpwd:
+                    m["commission_rate"] = 3
             if m["tpwd"] == o_tpwd and shop_tpwd:
+                item_c_shop += 1
                 m["tpwd"] = shop_tpwd
                 m["commission_rate"] = 2
                 user_id = s.get(shop_id, {}).get("user_id", "")
                 # m["item_id"] = f"shop{user_id}"
                 shop_num += 1
-            if m["tpwd"] == o_tpwd and use_direct:
-                m["tpwd"] = self.generate_tpwd_from_tpwd(o_tpwd, title)
-                if m["tpwd"] != o_tpwd:
-                    m["commission_rate"] = 3
             if m["tpwd"] != o_tpwd:
                 item2new[item_id] = m
 
@@ -852,7 +853,7 @@ class ActivateArticle(TBK):
 
         echo(
             2,
-            "Update {}/{} Items and {} Tpwds Info Success spend {}!!\n Among, {} renew, {} dg, {} private, {} shop, {} direct.".format(
+            "Update {}/{} Items and {} Tpwds Info Success spend {}!!\n Among, {} renew, {} dg, {} private, {}/{} shop, {} direct.".format(
                 len(item2new),
                 normal_items_num,
                 update_num,
@@ -861,6 +862,7 @@ class ActivateArticle(TBK):
                 self.load_num[0],
                 self.load_num[1],
                 shop_num,
+                item_c_shop,
                 self.direct_convert_num,
             ),
         )

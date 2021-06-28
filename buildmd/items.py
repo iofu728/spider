@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 18:22:04
+# @Last Modified time: 2021-06-29 01:59:54
 
 import os
 import sys
@@ -53,7 +53,8 @@ class Items(object):
     DETAIL_URL = "https://detail.m.tmall.com/item.htm?id=%d"
     ITEM_URL = "https://item.taobao.com/item.htm?id=%d"
     MTOP_URL = "https://h5api.m.taobao.com/h5/%s/%d.0/"
-    API_REFER_URL = "https://h5.m.taobao.com/awp/core/detail.htm?ut_sk=1.WuIHdlPVy%2B4DAClUN4kufI2B_21380790_1621238886992.Copy.1&id=588671617214&sourceType=item&price=99&suid=F278DD60-9271-4AB6-AD90-D909C4D517D6&shareUniqueId=9936381156&un=5af22fd2e5a80220dfb454b3d994b7d3&share_crt_v=1&spm=a2159r.13376460.0.0&sp_tk=RnQ1ZlhWQmVXVnc=&cpp=1&shareurl=true&short_name=h.4rJK5LZ&bxsign=scdYNFfg6E7klM-YCR0m_ZXusSiLmOiiCobSgnoj_upbPSkFAnpffzwC9eaUm6PwTTQzSBLn_gpMX3j_2VoP_snLQwqoz_oDFbm43nAW6V56go&sm=25b3a6&app=macos_safari"
+    LOG_URL = "https://log.mmstat.com/eg.js?t=%d"
+    API_REFER_URL = "https://h5.m.taobao.com/"
     ITEMS_LIST = [
         "`id`",
         "item_id",
@@ -100,6 +101,7 @@ class Items(object):
     ONE_HOURS = 3600
     ONE_DAY = 24
     M = "_m_h5_tk"
+    CNA = "cna"
     FAILURE = "(failure)"
     EXPIRED = "expired"
 
@@ -128,8 +130,7 @@ class Items(object):
         self.appkey = cfg.get("TBK", "appkey")
         self.secret = cfg.get("TBK", "secret")
         self.user_id = cfg.getint("TBK", "user_id")
-        self.site_id = cfg.getint("TBK", "site_id")
-        self.adzone_id = cfg.getint("TBK", "adzone_id")
+        self.site_id, self.adzone_id = cfg.get("TBK", "api_pid").split("_")[-2:]
         self.test_item_id = cfg.getint("TBK", "test_item_id")
         self.test_finger_id = cfg.getint("TBK", "test_finger_id")
         self.uland_url = cfg.get("TBK", "uland_url")
@@ -196,6 +197,7 @@ class Items(object):
                 echo(1, "get {} cookie:".format(key), self.cookies[key])
 
         get_cookie("uland", self.get_uland_url_req, self.uland_url)
+        get_cookie(self.CNA, self.get_log_req)
         if False:
             get_cookie("finger", self.get_finger_req, self.test_item_id)
             get_cookie(
@@ -204,6 +206,12 @@ class Items(object):
                 self.test_item_id,
                 self.test_finger_id,
             )
+
+    def get_log_req(self):
+        url = self.LOG_URL % (int(time_stamp() * 1000))
+        header = self.get_headers()
+        req_func = basic_req if self.use_local else proxy_req
+        return req_func(url, 2, header=header)
 
     def get_baichuan(self, item_id: int):
         baichuan = self.get_m_h5_cookie("baichuan")
@@ -310,6 +318,13 @@ class Items(object):
         j_data = {"type": "jsonp", "callback": "mtopjsonp{}".format(int(step) + 1)}
         return self.get_tb_h5_api(api, jsv, refer_url, {}, cookies=cookies)
 
+    def get_headers(self):
+        return {
+            "Accept": get_accept("all"),
+            "Referer": self.API_REFER_URL,
+            "User-Agent": get_use_agent("mobile"),
+        }
+
     def get_tb_h5_api(
         self,
         api: str,
@@ -329,15 +344,13 @@ class Items(object):
         if data_str is None:
             data_str = json_str(data)
 
-        headers = {
-            "Accept": get_accept("all"),
-            "Referer": self.API_REFER_URL,
-            "User-Agent": get_use_agent("mobile"),
-        }
+        headers = self.get_headers()
         if step:
             headers["Cookie"] = encoder_cookie(cookies)
         if not use_token:
-            headers["Cookie"] = "thw=cn"
+            headers["Cookie"] = (
+                encoder_cookie(cookies) if self.CNA in cookies else "thw=cn"
+            )
         appkey = "12574478"
 
         token = cookies[self.M].split("_")[0] if step and use_token else "undefined"
@@ -361,7 +374,7 @@ class Items(object):
         }
         if mode == 0:
             j_data["data"] = data_str
-        mtop_url = encoder_url(j_data, self.MTOP_URL % (api, int(v)))
+        mtop_url = encoder_url(j_data, self.MTOP_URL % (api.lower(), int(v)))
         req_func = basic_req if self.use_local else proxy_req
         if mode == 0:
             req = req_func(mtop_url, 2, header=headers)
@@ -384,6 +397,7 @@ class Items(object):
         self, item_id: str, is_wait: bool = False, force_update: bool = False
     ):
         """ item detail (apiStack) @2021.04.05 ✔️Tested"""
+        item_id = str(item_id)
         expired_flag = (
             self.config["time_stamp"]
             - time_stamp(
@@ -412,9 +426,9 @@ class Items(object):
             return self.items_detail_map[item_id]
         if is_wait:
             time.sleep(np.random.rand() * 80 + 100)
-        uland = self.get_m_h5_cookie("uland")
+        cna = self.get_m_h5_cookie("cna")
         self.load_num += 1
-        req = self.get_tb_getdetail_req(int(item_id), uland)
+        req = self.get_tb_getdetail_req(int(item_id), cna)
         if req is None:
             return {}
         req_text = req.text

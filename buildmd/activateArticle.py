@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-24 15:07:24
+# @Last Modified time: 2021-06-28 12:06:22
 
 import json
 import os
@@ -13,6 +13,7 @@ import urllib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import Counter, defaultdict
 from emoji import UNICODE_EMOJI
+from tqdm import tqdm
 
 import numpy as np
 import regex
@@ -51,6 +52,9 @@ from util.util import (
     dump_bigger,
     create_argparser,
     set_args,
+    json_str,
+    write,
+    decoder_str,
 )
 
 
@@ -84,8 +88,8 @@ class TBK(object):
         self.appkey = cfg.get("TBK", "appkey")
         self.secret = cfg.get("TBK", "secret")
         self.user_id = cfg.getint("TBK", "user_id")
-        self.site_id = cfg.getint("TBK", "site_id")
-        self.adzone_id = cfg.getint("TBK", "adzone_id")
+        self.site_id, self.adzone_id = cfg.get("TBK", "api_pid").split("_")[-2:]
+        self.sc_site_id, self.sc_adzone_id = cfg.get("TBK", "sc_pid").split("_")[-2:]
         self.test_item_id = cfg.getint("TBK", "test_item_id")
         self.test_finger_id = cfg.getint("TBK", "test_finger_id")
         self.uland_url = cfg.get("TBK", "uland_url")
@@ -100,12 +104,13 @@ class TBK(object):
         self.assign_rec = cfg.get("YNOTE", "assign_email").split(",")
         self.gzh_query = cfg.get("WX", "query")
         self.sougou_cookie = cfg.get("WX", "cookie")[1:-1]
+        self.m_cookie = cfg.get("TB", "m_cookie")[1:-1]
         cookie_de = decoder_cookie(self.cookie)
         self.cstk = cookie_de[self.CSTK_KEY] if self.CSTK_KEY in cookie_de else ""
         top.setDefaultAppInfo(self.appkey, self.secret)
         self.sc_data = {
-            "adzone_id": self.adzone_id,
-            "site_id": self.site_id,
+            "adzone_id": self.sc_adzone_id,
+            "site_id": self.sc_site_id,
             "session": self.sc_session,
         }
 
@@ -147,7 +152,9 @@ class TBK(object):
         req = top.api.TbkDgMaterialOptionalRequest()
         req.adzone_id = self.adzone_id
         req.q = title
-        req.page_size = 30
+        req.npx_level = 2
+        req.material_id = 17004
+        req.page_size = 50
         try:
             goods = req.getResponse()
             goods = goods["tbk_dg_material_optional_response"]["result_list"][
@@ -158,6 +165,22 @@ class TBK(object):
         except Exception as e:
             echo(0, "get dg material failed.", title, num_iid, e)
             return {}
+
+    def get_dg_material_v2(self, q: str, pn: int):
+        time.sleep(2)
+        url = self.SC_URL % "scMaterialOptional"
+        data = {
+            **self.sc_data,
+            "q": q,
+            "material_id": 17004,
+            "npx_level": 2,
+            "start_dsr": 48000,
+            "page_no": pn,
+            "page_size": 50,
+        }
+        req = basic_req(url, 11, data=data)
+        result_list = req.get("result_list", {}).get("map_data", [])
+        return result_list
 
     def get_opt_material(self, material_id: int, page_no: int = 1):
         req = top.api.TbkDgOptimusMaterialRequest()
@@ -264,6 +287,16 @@ class TBK(object):
         if not req or req["errcode"] != 0:
             return ""
         return req.get("data", {}).get("password", "")[1:-1]
+
+    def get_item_simple_detail_req(self, item_ids: list):
+        req = top.api.TbkItemInfoGetRequest()
+        req.num_iids = ",".join([str(ii) for ii in item_ids[:40]])
+        try:
+            items = req.getResponse()
+            return items["tbk_item_info_get_response"]["results"]["n_tbk_item"]
+        except Exception as e:
+            echo(0, "get item detail failed.", item_ids)
+            return []
 
 
 class ActivateArticle(TBK):
@@ -1025,7 +1058,7 @@ class ActivateArticle(TBK):
             else:
                 echo(0, s_click_url, tu_url)
             return
-        redirect_url = urllib.parse.unquote(qso["tu"])
+        redirect_url = decoder_str(qso["tu"])
         return self.get_s_click_detail(redirect_url, tu_url)
 
     def get_headers(self, url: str = "", refer_url: str = "") -> dict:

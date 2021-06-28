@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 18:05:05
+# @Last Modified time: 2021-06-26 21:03:24
 
 from __future__ import (
     absolute_import,
@@ -398,17 +398,21 @@ def mkdir(origin_dir: str):
         os.mkdir(origin_dir)
 
 
-def read_file(read_path: str, mode: int = 0):
+def read_file(read_path: str, mode: str = "list-strip"):
     """ read file """
     if not os.path.exists(read_path):
         return [] if not mode else ""
     with open(read_path, "r", encoding="utf-8", newline="\n") as f:
-        if not mode:
+        if mode == "list-strip":
             data = [ii.strip() for ii in f.readlines()]
-        elif mode == 1:
+        elif mode == "str":
             data = f.read()
-        elif mode == 2:
+        elif mode == "list":
             data = list(f.readlines())
+        elif mode == "json":
+            data = json.loads(f.read())
+        elif mode == "json-list":
+            data = [json.loads(ii) for ii in f.readlines()]
     return data
 
 
@@ -454,9 +458,7 @@ def decoder_url(url: str, do_decoder: bool = False) -> dict:
         echo(2, "decoder url error.", "url:", url)
         return {}
     if do_decoder:
-        decoder_dict = {
-            key: urllib.parse.unquote(value) for key, value in decoder_dict.items()
-        }
+        decoder_dict = {key: decoder_str(value) for key, value in decoder_dict.items()}
     return decoder_dict
 
 
@@ -527,7 +529,7 @@ def replace_params(origin_str: str, reg: str) -> str:
 def decoder_fuzz(reg: str, file_path: str, replace_func=replace_params):
     """ simple decoder of fuzz file """
     file_dir, file_name = os.path.split(file_path)
-    origin_str = read_file(file_path, mode=1)
+    origin_str = read_file(file_path, "str")
     origin_str = codecs.unicode_escape_decode(origin_str)[0]
     origin_str = replace_func(origin_str, reg)
     name1, name2 = file_name.split(".", 1)
@@ -566,7 +568,7 @@ def get_use_agent(types: str = "pc") -> str:
 
 def get_content_type(types: str = "utf8") -> str:
     return "application/x-www-form-urlencoded{}".format(
-        ";charset=UTF-8" if types == "utf8" else ""
+        "; charset=UTF-8" if types == "utf8" else ""
     )
 
 
@@ -678,6 +680,10 @@ def set_args(parser):
     return args
 
 
+def decoder_str(s: str):
+    return urllib.parse.unquote(s)
+
+
 headers = {
     "Cookie": "",
     "Accept": get_accept("html"),
@@ -692,7 +698,7 @@ configure_path = "util/util.ini"
 BASIC_SCURL = "https://sctapi.ftqq.com/%s.send"
 mkdir(data_dir)
 agent_lists = [
-    " ".join(index.split()[1:])[1:-1] for index in read_file("{}agent".format(data_dir))
+    " ".join(index.split()[1:])[1:-1] for index in read_file(f"{data_dir}agent")
 ]
 if not len(agent_lists):
     agent_lists = [headers["User-Agent"]]

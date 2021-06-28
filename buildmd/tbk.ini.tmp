@@ -2,8 +2,8 @@
 appkey = 123
 secret = 123
 user_id = 123
-site_id = 123
-adzone_id = 123
+api_pid = mm_xxx_xxx_xxx
+sc_pid = mm_xxx_xxx_xxx
 uland_url = http://
 test_item_id = 123
 test_finger_id = 111
@@ -21,6 +21,7 @@ assign_email = xxx@qq.com
 
 [TB]
 cookie = ""
+m_cookie = ""
 UserAgent = ""
 tb_id = xxx
 

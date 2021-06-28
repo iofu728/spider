@@ -8,3 +8,8 @@ rec_lists =
 send_lists = 
 [ServerChan]
 SCKEY = 
+[Redis]
+host = localhost
+port = 6379
+db = 0
+password = 

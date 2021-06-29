@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:55:44
+# @Last Modified time: 2021-06-29 20:10:51
 
 
 import codecs
@@ -134,7 +134,11 @@ class Up(BasicBilibili):
         bv_list = self.get_web_api(url, is_proxy=False)
         if not bv_list:
             return
-        bv_ids = {ii["bvid"]: ii for ii in bv_list.get("list", {}).get("vlist", [])}
+        bv_ids = {
+            ii["bvid"]: ii
+            for ii in bv_list.get("list", {}).get("vlist", [])
+            if "bvid" in ii
+        }
         if self.assign_bvid in bv_ids:
             self.send_video_public(bv_ids)
             self.bv_ids = bv_ids
@@ -142,7 +146,10 @@ class Up(BasicBilibili):
     def send_video_public(self, bv_ids: dict):
         if not self.bv_ids or set(self.bv_ids.keys()) == set(bv_ids):
             return
-        bv_id = [ii for ii in bv_ids if ii not in self.bv_ids][0]
+        bv_id = [ii for ii in bv_ids if ii not in self.bv_ids]
+        if not bv_id:
+            return
+        bv_id = bv_id[0]
         space_view = bv_ids[bv_id]
         shell_str = f"nohup python3 bilibili/bsocket.py {bv_id} %d >> log.txt 2>&1 &"
         echo("0|error", "Shell str:", shell_str)

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-29 01:59:54
+# @Last Modified time: 2021-06-29 10:10:20
 
 import os
 import sys
@@ -198,6 +198,8 @@ class Items(object):
 
         get_cookie("uland", self.get_uland_url_req, self.uland_url)
         get_cookie(self.CNA, self.get_log_req)
+        if self.CNA not in self.cookies:
+            get_cookie(self.CNA, self.get_log_req, True)
         if False:
             get_cookie("finger", self.get_finger_req, self.test_item_id)
             get_cookie(
@@ -207,11 +209,20 @@ class Items(object):
                 self.test_finger_id,
             )
 
-    def get_log_req(self):
+    def get_log_req(self, use_local: bool = False):
         url = self.LOG_URL % (int(time_stamp() * 1000))
         header = self.get_headers()
-        req_func = basic_req if self.use_local else proxy_req
-        return req_func(url, 2, header=header)
+        flag = self.use_local or use_local
+        req_func = basic_req if flag else proxy_req
+        req = req_func(url, 2, header=header)
+        if flag:
+            echo("2|debug", "Load CNA by local.")
+        if not req or "goldlog.Etag" not in req.text:
+            if can_retry(self.LOG_URL) and not flag:
+                return self.get_log_req()
+            else:
+                return
+        return req
 
     def get_baichuan(self, item_id: int):
         baichuan = self.get_m_h5_cookie("baichuan")
@@ -381,9 +392,22 @@ class Items(object):
         else:
             req = req_func(mtop_url, 12, data=data, header=headers)
         if req is None:
-            if can_retry(self.MTOP_URL % (api, int(v)), base_wait=base_wait):
+            if (
+                can_retry(self.MTOP_URL % (api, int(v)), base_wait=base_wait)
+                and not self.use_local
+            ):
                 return self.get_tb_h5_api(
-                    api, jsv, refer_url, data, j_data_t, cookies, mode
+                    api,
+                    jsv,
+                    refer_url,
+                    data,
+                    j_data_t,
+                    cookies,
+                    mode,
+                    data_str,
+                    v,
+                    use_token,
+                    base_wait,
                 )
             else:
                 return
@@ -425,7 +449,7 @@ class Items(object):
         ):
             return self.items_detail_map[item_id]
         if is_wait:
-            time.sleep(np.random.rand() * 80 + 100)
+            time.sleep(np.random.rand() * 100 + 100)
         cna = self.get_m_h5_cookie("cna")
         self.load_num += 1
         req = self.get_tb_getdetail_req(int(item_id), cna)

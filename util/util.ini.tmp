@@ -13,3 +13,8 @@ host = localhost
 port = 6379
 db = 0
 password = 
+[ElasticSearch]
+host = localhost
+port = 9200
+username = 
+password = 

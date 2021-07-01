@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-28 00:49:03
+# @Last Modified time: 2021-06-29 22:53:05
 
 import os
 import sys
@@ -11,6 +11,7 @@ import threading
 import pymysql
 import redis
 import time
+from elasticsearch import Elasticsearch
 
 sys.path.append(os.getcwd())
 from util.util import echo, read_file, load_cfg
@@ -19,39 +20,55 @@ configure_path = "util/util.ini"
 
 
 class Db(object):
-    """ db operation, without sql injection """
+    DB_TYPE = {ii: ii for ii in ["redis", "es"]}
 
-    def __init__(self, database: str, return_type: str = "list"):
-        self.load_configure("redis" if database == "redis" else "mysql")
-        if database == "redis":
-            self.r = redis.Redis(
-                host=self.redis_host,
-                port=self.redis_port,
-                db=self.redis_db,
-                password=self.redis_pw,
-            )
-        else:
+    def __init__(
+        self, database: str, return_type: str = "list", local_infile: bool = False
+    ):
+        db_type = self.DB_TYPE.get(database, "mysql")
+        self.load_configure(db_type)
+        if db_type == "mysql":
             self.database = database
             self.return_type = return_type
+            self.local_infile = local_infile
             self.lock = threading.Lock()
             self.reconnect()
+        else:
+            self.connect(db_type)
 
     def load_configure(self, db_type: str = "mysql"):
-        """ load configure """
         cfg = load_cfg(configure_path)
         if db_type == "mysql":
             self.mysql_host = cfg.get("mysql", "hostname")
             self.mysql_user = cfg.get("mysql", "username")
             self.mysql_pw = cfg.get("mysql", "passwd")
             self.mysql_char = cfg.get("mysql", "charset")
-        else:
+        elif db_type == "redis":
             self.redis_host = cfg.get("Redis", "host")
             self.redis_port = cfg.get("Redis", "port")
             self.redis_db = cfg.get("Redis", "db")
             self.redis_pw = cfg.get("Redis", "password")
+        elif db_type == "es":
+            self.es_host = cfg.get("ElasticSearch", "host")
+            self.es_port = cfg.get("ElasticSearch", "port")
+            self.es_user = cfg.get("ElasticSearch", "username")
+            self.es_pw = cfg.get("ElasticSearch", "password")
 
-    def connect_db(self, database: str, return_type: str):
-        """ connect database """
+    def connect(self, db_type: str):
+        if db_type == "redis":
+            self.r = redis.Redis(
+                host=self.redis_host,
+                port=self.redis_port,
+                db=self.redis_db,
+                password=self.redis_pw,
+            )
+        elif db_type == "es":
+            self.es = Elasticsearch(
+                hosts=f"{self.es_host}:{self.es_port}",
+                http_auth=(self.es_user, self.es_pw),
+            )
+
+    def connect_db(self, database: str, return_type: str, local_infile: bool = False):
         cursorclass = (
             pymysql.cursors.DictCursor
             if return_type == "dict"
@@ -65,6 +82,7 @@ class Db(object):
                 db=database,
                 charset=self.mysql_char,
                 cursorclass=cursorclass,
+                local_infile=local_infile,
             )
         except pymysql.OperationalError:
             echo(0, "Please change mysql info in util/db.ini!!!")
@@ -72,7 +90,7 @@ class Db(object):
         except pymysql.InternalError:
             echo(2, "Try to create database in mysql.........")
             if self.create_db(database):
-                self.connect_db(database, return_type)
+                self.connect_db(database, return_type, local_infile)
             else:
                 self.db = False
         except:
@@ -80,7 +98,7 @@ class Db(object):
             self.db = False
 
     def reconnect(self):
-        self.connect_db(self.database, self.return_type)
+        self.connect_db(self.database, self.return_type, self.local_infile)
 
     def ping_db(self, num: int = 20, stime: int = 3):
         _num, status = 0, True
@@ -141,7 +159,8 @@ class Db(object):
                     self.lock.release()
                 return result
         except Exception as e:
-            self.lock.release()
+            if use_lock:
+                self.lock.release()
             echo(0, "execute sql {} error".format(sql), e)
             self.db.rollback()
             return False

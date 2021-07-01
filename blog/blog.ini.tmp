@@ -1,0 +1,19 @@
+[IP2LOCATION]
+token = 123
+[Defender]
+es_body = {"query": {"bool": {"must": [{"term": {"fileset.name.keyword": "access"}},{"range": {"@timestamp": {"gte": "now-1m", "lt": "now"}}}]}}}
+es_index = nginx*
+es_size = 10
+L1_size = 15
+L2_size = 24
+L0_ratio = 0.8
+L1_ratio = 0.1
+L2_ratio = 0.05
+L3_ratio = 0.05
+L0_threshold = 1000
+L1_threshold = 1000
+L2_threshold = 5000
+L3_threshold = 100000
+score_threshold = 60
+delta_ip = 65535
+ipset_name = xxx

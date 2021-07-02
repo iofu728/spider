@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-03-26 10:21:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 18:04:27
+# @Last Modified time: 2021-07-02 19:05:47
 
 
 import asyncio
@@ -304,17 +304,18 @@ def BSocket(bv_id: str, types: int = 0, p: int = -1):
 
 if __name__ == "__main__":
     parser = create_argparser("Bilibili ws")
+    parser.add_argument("--bv", type=str, default="")
+    parser.add_argument("--p", type=int, default=1)
     args = set_args(parser)
+
     mkdir(data_dir)
     mkdir(websocket_dir)
 
     """ Test for San Diego demon """
     """ PS: the thread of BSocket have to be currentThread in its processing. """
-    if len(sys.argv) == 3:
-        bv_id = sys.argv[1]
-        p = int(sys.argv[2])
-    else:
+    bv_id, p = args.bv, args.p
+    if not bv_id:
         cfg = load_cfg(assign_path)
-        bv_id = cfg.getint("basic", "bv_id")
+        bv_id = cfg.get("basic", "bv_id")
         p = cfg["basic"].getint("pid", -1)
     BSocket(bv_id, p=p)

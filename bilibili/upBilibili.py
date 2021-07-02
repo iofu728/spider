@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-29 20:10:51
+# @Last Modified time: 2021-07-02 19:06:23
 
 
 import codecs
@@ -139,7 +139,7 @@ class Up(BasicBilibili):
             for ii in bv_list.get("list", {}).get("vlist", [])
             if "bvid" in ii
         }
-        if self.assign_bvid in bv_ids:
+        if len(bv_ids) == 50 and self.assign_bvid in bv_ids:
             self.send_video_public(bv_ids)
             self.bv_ids = bv_ids
 
@@ -151,7 +151,10 @@ class Up(BasicBilibili):
             return
         bv_id = bv_id[0]
         space_view = bv_ids[bv_id]
-        shell_str = f"nohup python3 bilibili/bsocket.py {bv_id} %d >> log.txt 2>&1 &"
+        created = space_view["created"]
+        if time_stamp() - created >= one_day:
+            return
+        shell_str = f"nohup python3 bilibili/bsocket.py --is_service=True --bv={bv_id} --p=%d >> log.txt 2>&1 &"
         echo("0|error", "Shell str:", shell_str)
         os.system(shell_str % 1)
         os.system(shell_str % 2)

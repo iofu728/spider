@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-26 21:03:24
+# @Last Modified time: 2021-07-02 02:18:33
 
 from __future__ import (
     absolute_import,
@@ -430,6 +430,7 @@ def log(types: str, *log_args: list):
     logging.getLogger("requests").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("chardet").setLevel(logging.WARNING)
+    logging.getLogger("elasticsearch").setLevel(logging.WARNING)
     log_str = " ".join([str(ii) for ii in log_args])
     if types == "critical":
         logging.critical(log_str)

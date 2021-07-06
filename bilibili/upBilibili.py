@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-04-07 20:25:45
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-02 19:06:23
+# @Last Modified time: 2021-07-06 21:18:14
 
 
 import codecs
@@ -139,7 +139,7 @@ class Up(BasicBilibili):
             for ii in bv_list.get("list", {}).get("vlist", [])
             if "bvid" in ii
         }
-        if len(bv_ids) == 50 and self.assign_bvid in bv_ids:
+        if len(bv_ids) >= 50 and self.assign_bvid in bv_ids:
             self.send_video_public(bv_ids)
             self.bv_ids = bv_ids
 

@@ -2,9 +2,10 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-08 15:33:25
+# @Last Modified time: 2021-07-08 16:12:32
 
-import re
+import json
+import regex
 import os
 import sys
 
@@ -20,6 +21,7 @@ from util.util import (
     create_argparser,
     set_args,
     load_cfg,
+    generate_sql,
 )
 
 """
@@ -86,12 +88,12 @@ class TitleViews(object):
             "Accept": get_accept("all"),
             "Cookie": self.zhihu_cookie,
         }
-        req = basic_req(url, 1, headers=header)
+        req = basic_req(url, 1, header=header)
         if not isinstance(req, dict) or list(req.keys()) != ["count", "data", "zetta"]:
             return
         data = req.get("data", [])
         for ii in data:
-            zhihu_idx = ii.get("id", "")
+            zhihu_idx = int(ii.get("id", 0))
             if zhihu_idx in self.zhihu_map:
                 idx = self.zhihu_map[zhihu_idx]
             else:
@@ -100,10 +102,10 @@ class TitleViews(object):
                     echo("0|debug", "zhihu", ii.get("title", ""))
                     continue
             view = ii.get("interaction", {}).get("reading", 0)
-            if view <= self.self.blogs[idx]["zhihu_view"]:
+            if view <= self.blogs_detail_map[idx]["zhihu_views"]:
                 continue
-            self.blogs[idx]["zhihu_id"] = zhihu_idx
-            self.blogs[idx]["zhihu_view"] = view
+            self.blogs_detail_map[idx]["zhihu_id"] = zhihu_idx
+            self.blogs_detail_map[idx]["zhihu_views"] = view
         echo(3, f"Load zhihu {len(data)} blogs.", url)
 
     def get_jianshu_views(self, pn: int = 1):
@@ -114,7 +116,7 @@ class TitleViews(object):
             return
         data = [ii for ii in req.find_all("li") if ii.get("data-note-id")]
         for ii in data:
-            jianshu_id = ii.get("data-note-id")
+            jianshu_id = int(ii.get("data-note-id", 0))
             title = ii.find_all("a", class_="title")[0].text.replace("`", "")
             if jianshu_id in self.jianshu_map:
                 idx = self.jianshu_map[jianshu_id]
@@ -125,48 +127,56 @@ class TitleViews(object):
                     continue
 
             view = int(ii.find_all("a")[-2].text)
-            if view <= self.self.blogs[idx]["jianshu_view"]:
+            if view <= self.blogs_detail_map[idx]["jianshu_views"]:
                 continue
-            self.blogs[idx]["jianshu_id"] = jianshu_id
-            self.blogs[idx]["jianshu_view"] = view
+            self.blogs_detail_map[idx]["jianshu_id"] = jianshu_id
+            self.blogs_detail_map[idx]["jianshu_views"] = view
         echo(3, f"Load jianshu {len(data)} blogs.", url)
 
     def get_csdn_views(self):
         url = self.CSDN_URL % self.csdn_id
-        req = basic_req(url, 0, header=header)
-        if req is None:
+        header = {"accept": get_accept("html")}
+        req = basic_req(url, 3, header=header)
+        if not req:
             return
-        data = req.find_all("article")
+        left = req.index("window.__INITIAL_STATE__")
+        right = req.index("};</script><script type=")
+        data = json.loads(req[left + 26 : right + 1])
+        data = (
+            data.get("pageData", {})
+            .get("data", {})
+            .get("baseInfo", {})
+            .get("latelyList", [])
+        )
         for ii in data:
-            href = ii.a.get("href")
+            href = ii.get("url", "")
             csdn_ids = regex.findall("details/(\d*)", href)
             if not csdn_ids:
-                echo("0|debug", "jianshu", href)
+                echo("0|debug", "csdn", href)
                 continue
-            csdn_id = csdn_ids[0]
-            title = ii.h4.text
+            csdn_id = int(csdn_ids[0])
+            title = ii.get("title", "")
             if csdn_id in self.csdn_map:
                 idx = self.csdn_map[csdn_id]
             else:
                 idx = self.search_blogs(title)
                 if idx == -1:
-                    echo("0|debug", "jianshu", title)
+                    echo("0|debug", "csdn", title)
                     continue
-            view = ii.span.text.replace("阅读", "")
-            view = int(view) if view.isdigit() else 0
-            if view <= self.self.blogs[idx]["csdn_view"]:
+            view = ii.get("viewCount", 0)
+            if view <= self.blogs_detail_map[idx]["csdn_views"]:
                 continue
-            self.blogs[idx]["csdn_id"] = csdn_id
-            self.blogs[idx]["csdn_view"] = view
+            self.blogs_detail_map[idx]["csdn_id"] = csdn_id
+            self.blogs_detail_map[idx]["csdn_views"] = view
         echo(3, f"Load csdn {len(data)} blogs.", url)
 
     def filter_emoji(self, desstr, restr=""):
         """ filter emoji """
         desstr = str(desstr)
         try:
-            co = re.compile("[\U00010000-\U0010ffff]")
-        except re.error:
-            co = re.compile("[\uD800-\uDBFF][\uDC00-\uDFFF]")
+            co = regex.compile("[\U00010000-\U0010ffff]")
+        except regex.error:
+            co = regex.compile("[\uD800-\uDBFF][\uDC00-\uDFFF]")
         return co.sub(restr, desstr)
 
     def load_db(self, is_load: bool = True):
@@ -178,9 +188,9 @@ class TitleViews(object):
         ).copy()
         if is_load:
             self.blogs_detail_map = blogs
-            self.zhihu_map = {ii["zhihu_id"]: ii["`id`"] for ii in blogs}
-            self.csdn_map = {ii["csdn_id"]: ii["`id`"] for ii in blogs}
-            self.jianshu_map = {ii["jianshu_id"]: ii["`id`"] for ii in blogs}
+            self.zhihu_map = {ii["zhihu_id"]: ii["`id`"] for ii in blogs.values()}
+            self.csdn_map = {ii["csdn_id"]: ii["`id`"] for ii in blogs.values()}
+            self.jianshu_map = {ii["jianshu_id"]: ii["`id`"] for ii in blogs.values()}
 
     def store_db(self):
         self.load_db(False)

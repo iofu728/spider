@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-08 15:04:01
+# @Last Modified time: 2021-07-08 16:12:19
 
 import os
 import sys
@@ -175,7 +175,7 @@ class Db(object):
         return self.execute(sql, True) is not False
 
     def load_db_table(self, sql: str, LIST: list, db_map: dict, key: str):
-        lines = self.db.select_db(sql)
+        lines = self.select_db(sql)
         if not lines:
             return {}
         for line in lines:
@@ -190,7 +190,7 @@ class Db(object):
         if not data:
             return
         sql = basic_sql % str(data)[1:-1]
-        flag = self.db.insert_db(sql)
+        flag = self.insert_db(sql)
         if flag:
             echo(3, "{} {} info Success".format(types, len(data)))
         else:

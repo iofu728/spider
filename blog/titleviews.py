@@ -2,31 +2,24 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 17:53:25
+# @Last Modified time: 2021-07-08 15:33:25
 
-import codecs
-import datetime
 import re
 import os
-import threading
+import sys
 
-from bs4 import BeautifulSoup
-from proxy.getproxy import GetFreeProxy
+sys.path.append(os.getcwd())
 from util.db import Db
 from util.util import (
-    begin_time,
-    end_time,
-    changeCookie,
     basic_req,
-    can_retry,
     changeHtmlTimeout,
     echo,
     mkdir,
     read_file,
-    echo,
     get_accept,
     create_argparser,
     set_args,
+    load_cfg,
 )
 
 """
@@ -34,399 +27,195 @@ from util.util import (
   * www.zhihu.com/api/v4/creator/content_statistics
   * www.jianshu.com/u/
   * blog.csdn.net
-    .data/
-    ├── cookie   // zhihu cookie
-    ├── google   // google analysis data
-    ├── slug     // blog title slug
-    └── title    // blog title list
 """
-proxy_req = GetFreeProxy().proxy_req
-data_dir = "blog/data/"
+BASIC_DIR = "blog/"
+DATA_DIR = f"{BASIC_DIR}data/"
+CFG_PATH = f"{BASIC_DIR}blog.ini"
 
 
 class TitleViews(object):
     """ script of load my blog data -> analysis """
 
-    CSDN_URL = "https://blog.csdn.net/iofu728"
-    JIANSHU_URL = "https://www.jianshu.com/u/2e0f69e4a4f0"
-    ZHIHU_URL = "https://www.zhihu.com/api/v4/creator/content_statistics/"
+    CSDN_URL = "https://blog.csdn.net/%s"
+    JIANSHU_URL = "https://www.jianshu.com/u/%s?order_by=shared_at&page=%d"
+    ZHIHU_URL = "https://www.zhihu.com/api/v4/creators/analysis/content?content_type=article&offset=%d&limit=100&order=created_at"
+    BLOG_LIST = [
+        "`id`",
+        "title_name",
+        "local_views",
+        "zhihu_views",
+        "csdn_views",
+        "jianshu_views",
+        "zhihu_id",
+        "csdn_id",
+        "jianshu_id",
+        "created_at",
+    ]
+    S_BLOGS_SQL = generate_sql("select", "title_views", BLOG_LIST)
+    I_BLOGS_SQL = generate_sql("insert", "title_views", BLOG_LIST)
+    R_BLOGS_SQL = generate_sql("replace", "title_views", BLOG_LIST)
+    I_PAGE_SQL = (
+        "INSERT INTO page_views(`date`, `existed_views`, `existed_spider`) VALUES %s"
+    )
+    S_PAGE_SQL = "SELECT `today_views`, `existed_views` from page_views order by `id` desc limit 1"
 
     def __init__(self):
         self.Db = Db("blog")
-        self.local_views = {}
-        self.title_map = {}
-        self.title2slug = {}
-        self.zhihu_views = {}
-        self.zhihu_id = {}
-        self.jianshu_views = {}
-        self.jianshu_id = {}
-        self.csdn_views = {}
-        self.csdn_id = {}
-        self.exist_data = {}
-        self.getTitleMap()
-        self.insert_sql = """INSERT INTO title_views(`title_name`, `local_views`, `zhihu_views`, `csdn_views`, `jianshu_views`, `zhihu_id`, `csdn_id`, `jianshu_id`) VALUES %s"""
-        self.update_sql = """REPLACE INTO title_views(`id`, `title_name`, `local_views`, `zhihu_views`, `csdn_views`, `jianshu_views`, `zhihu_id`, `csdn_id`, `jianshu_id`, `created_at`) VALUES %s"""
-        self.new_day_sql = """INSERT INTO page_views(`date`, `existed_views`, `existed_spider`) VALUES %s"""
+        self.blogs_detail_map = {}
+        self.blogs_detail_db_map = {}
+        self.load_configure()
+        self.load_db()
 
-    def loadLocalView(self):
-        """  load local view """
-        test = read_file("{}google".format(data_dir))[7:]
-        for index in test:
-            arr = index.split(",")
-            slug = self.matchSlug(arr[0])
-            if slug is None or slug not in self.title_map:
-                continue
-            print(slug + " " + str(arr[1]) + " " + arr[0])
-            if slug in self.local_views:
-                self.local_views[slug] += int(arr[1])
-            else:
-                self.local_views[slug] = int(arr[1])
+    def load_configure(self):
+        cfg = load_cfg(CFG_PATH)
+        self.csdn_id = cfg.get("Blog", "csdn_id")
+        self.jianshu_id = cfg.get("Blog", "jianshu_id")
+        self.jianshu_pn = cfg.getint("Blog", "jianshu_pn")
+        self.zhihu_cookie = cfg.get("Blog", "zhihu_cookie")[1:-1]
+        self.expand_path = cfg.get("Blog", "expand_path")
 
-    def getTitleMap(self):
-        """ get title map """
-        slug = read_file("{}slug".format(data_dir))
-        title = read_file("{}title".format(data_dir))
-        self.title_map = {
-            tempslug.split('"')[1]: title[num].split('"')[1]
-            for num, tempslug in enumerate(slug)
+    def search_blogs(self, title: str):
+        for k, v in self.blogs_detail_map.items():
+            if v["title_name"] in title or title in v["title_name"]:
+                return k
+        return -1
+
+    def get_zhihu_views(self):
+        url = self.ZHIHU_URL % 0
+        header = {
+            "Accept": get_accept("all"),
+            "Cookie": self.zhihu_cookie,
         }
-        title2slug = {self.title_map[index]: index for index in self.title_map.keys()}
-        noemoji_title = {
-            self.filter_emoji(self.title_map[index]).replace("\u200d", ""): index
-            for index in self.title_map.keys()
-        }
-        self.title2slug = {**noemoji_title, **title2slug}
-
-    def matchSlug(self, pattern: str):
-        """ match slug """
-        arr = re.search(r"\/([^\/]+).html", pattern)
-        return None if arr is None else arr.group(1)
-
-    def getZhihuView(self):
-        cookie = "".join(read_file("{}cookie".format(data_dir)))
-        changeCookie(cookie)
-        url_basic = [
-            self.ZHIHU_URL,
-            "articles?order_field=object_created&order_sort=descend&begin_date=2018-09-01&end_date=",
-            datetime.datetime.now().strftime("%Y-%m-%d"),
-            "&page_no=",
-        ]
-        url = "".join(url_basic)
-
-        json = self.get_request("{}{}".format(url, 1), 1, lambda i: not i)
-        if not json:
+        req = basic_req(url, 1, headers=header)
+        if not isinstance(req, dict) or list(req.keys()) != ["count", "data", "zetta"]:
             return
-        if not "data" in json:
-            if "code" in json:
-                echo("0|warning", json)
-            return
-        echo(3, "zhihu", json)
-        for index in json["data"]:
-            zhihu_title = index["title"]
-            zhihu_id = int(index["url_token"])
-            zhihu_count = int(index["read_count"])
-
-            if zhihu_title in self.title2slug:
-                temp_slug = self.title2slug[zhihu_title]
-                self.zhihu_id[temp_slug] = zhihu_id
-                self.zhihu_views[temp_slug] = zhihu_count
-            elif zhihu_id in self.zhihu_id_map:
-                temp_slug = self.zhihu_id_map[zhihu_id]
-                self.zhihu_id[temp_slug] = zhihu_id
-                self.zhihu_views[temp_slug] = zhihu_count
+        data = req.get("data", [])
+        for ii in data:
+            zhihu_idx = ii.get("id", "")
+            if zhihu_idx in self.zhihu_map:
+                idx = self.zhihu_map[zhihu_idx]
             else:
-                echo("0|debug", index["title"])
-
-        for index in range(1, json["count"] // 10):
-            echo(1, "zhihu", index)
-            json = self.get_request("{}{}".format(url, 1 + index), 1, lambda i: not i)
-            echo(2, "zhihu", json)
-            if not json:
+                idx = self.search_blogs(ii.get("title", ""))
+                if idx == -1:
+                    echo("0|debug", "zhihu", ii.get("title", ""))
+                    continue
+            view = ii.get("interaction", {}).get("reading", 0)
+            if view <= self.self.blogs[idx]["zhihu_view"]:
                 continue
-            for index in json["data"]:
-                zhihu_title = index["title"]
-                zhihu_id = int(index["url_token"])
-                zhihu_count = int(index["read_count"])
+            self.blogs[idx]["zhihu_id"] = zhihu_idx
+            self.blogs[idx]["zhihu_view"] = view
+        echo(3, f"Load zhihu {len(data)} blogs.", url)
 
-                if zhihu_title in self.title2slug:
-                    temp_slug = self.title2slug[zhihu_title]
-                    self.zhihu_id[temp_slug] = zhihu_id
-                    self.zhihu_views[temp_slug] = zhihu_count
-                elif zhihu_id in self.zhihu_id_map:
-                    temp_slug = self.zhihu_id_map[zhihu_id]
-                    self.zhihu_id[temp_slug] = zhihu_id
-                    self.zhihu_views[temp_slug] = zhihu_count
-                else:
-                    echo("0|debug", index["title"])
-
-    def get_request(self, url: str, types: int, functs, header: dict = {}):
-        if len(header):
-            req = basic_req(url, types, header=header)
-        else:
-            req = basic_req(url, types)
-
-        if functs(req):
-            if can_retry(url):
-                self.get_request(url, types, functs, header)
-            return
-        return req
-
-    def getJianshuViews(self):
-        """ get jianshu views """
+    def get_jianshu_views(self, pn: int = 1):
+        url = self.JIANSHU_URL % (self.jianshu_id, pn)
         header = {"accept": get_accept("html")}
-
-        for rounds in range(1, 4):
-            url = self.JIANSHU_URL
-            if rounds > 1:
-                url += "?order_by=shared_at&page={}".format(rounds)
-            echo("1|debug", "jianshu req url:", url)
-            html = self.get_request(
-                url,
-                0,
-                lambda i: not i or not len(i.find_all("div", class_="content")),
-                header,
-            )
-            if html is None:
-                echo(0, "None")
-                return
-            for index in html.find_all("li", class_=["", "have-img"]):
-                if len(index.find_all("i")) < 3:
+        req = basic_req(url, 0, header=header)
+        if req is None:
+            return
+        data = [ii for ii in req.find_all("li") if ii.get("data-note-id")]
+        for ii in data:
+            jianshu_id = ii.get("data-note-id")
+            title = ii.find_all("a", class_="title")[0].text.replace("`", "")
+            if jianshu_id in self.jianshu_map:
+                idx = self.jianshu_map[jianshu_id]
+            else:
+                idx = self.search_blogs(title)
+                if idx == -1:
+                    echo("0|debug", "jianshu", title)
                     continue
-                title = index.find_all("a", class_="title")[0].text.replace("`", "")
-                jianshu_id = int(index["data-note-id"])
-                jianshu_count = int(index.find_all("a")[-2].text)
-                if title in self.title2slug:
-                    temp_slug = self.title2slug[title]
-                    self.jianshu_id[temp_slug] = jianshu_id
-                    self.jianshu_views[temp_slug] = jianshu_count
-                elif jianshu_id in self.jianshu_id_map:
-                    temp_slug = self.jianshu_id_map[jianshu_id]
-                    self.jianshu_id[temp_slug] = jianshu_id
-                    self.jianshu_views[temp_slug] = jianshu_count
-                else:
-                    echo(1, title)
 
-    def getCsdnViews(self):
-        """ get csdn views """
+            view = int(ii.find_all("a")[-2].text)
+            if view <= self.self.blogs[idx]["jianshu_view"]:
+                continue
+            self.blogs[idx]["jianshu_id"] = jianshu_id
+            self.blogs[idx]["jianshu_view"] = view
+        echo(3, f"Load jianshu {len(data)} blogs.", url)
 
-        for index in range(1, 3):
-            url = self.CSDN_URL
-            if index > 1:
-                url += "/article/list/{}?".format(index)
-            echo(1, "csdn url", url)
-
-            html = self.get_request(
-                url,
-                0,
-                lambda i: i is None
-                or not i
-                or not len(i.find_all("p", class_="content")),
-            )
-            if html is None:
-                echo(0, "None")
-                return
-            for div_lists in html.find_all(
-                "div", class_="article-item-box csdn-tracking-statistics"
-            ):
-                if "style" in div_lists.attrs:
+    def get_csdn_views(self):
+        url = self.CSDN_URL % self.csdn_id
+        req = basic_req(url, 0, header=header)
+        if req is None:
+            return
+        data = req.find_all("article")
+        for ii in data:
+            href = ii.a.get("href")
+            csdn_ids = regex.findall("details/(\d*)", href)
+            if not csdn_ids:
+                echo("0|debug", "jianshu", href)
+                continue
+            csdn_id = csdn_ids[0]
+            title = ii.h4.text
+            if csdn_id in self.csdn_map:
+                idx = self.csdn_map[csdn_id]
+            else:
+                idx = self.search_blogs(title)
+                if idx == -1:
+                    echo("0|debug", "jianshu", title)
                     continue
-                csdn_id = int(div_lists["data-articleid"])
-                title = (
-                    div_lists.a.contents[2].replace("\n", "").strip().replace("`", "")
-                )
-                csdn_count = int(
-                    div_lists.find_all("span", class_="read-num")[0].span.text
-                )
-                if title in self.title2slug:
-                    temp_slug = self.title2slug[title]
-                    self.csdn_id[temp_slug] = csdn_id
-                    self.csdn_views[temp_slug] = csdn_count
-                elif csdn_id in self.csdn_id_map:
-                    temp_slug = self.csdn_id_map[csdn_id]
-                    self.csdn_id[temp_slug] = csdn_id
-                    self.csdn_views[temp_slug] = csdn_count
-                else:
-                    echo(1, title)
+            view = ii.span.text.replace("阅读", "")
+            view = int(view) if view.isdigit() else 0
+            if view <= self.self.blogs[idx]["csdn_view"]:
+                continue
+            self.blogs[idx]["csdn_id"] = csdn_id
+            self.blogs[idx]["csdn_view"] = view
+        echo(3, f"Load csdn {len(data)} blogs.", url)
 
     def filter_emoji(self, desstr, restr=""):
         """ filter emoji """
         desstr = str(desstr)
         try:
-            co = re.compile(u"[\U00010000-\U0010ffff]")
+            co = re.compile("[\U00010000-\U0010ffff]")
         except re.error:
-            co = re.compile(u"[\uD800-\uDBFF][\uDC00-\uDFFF]")
+            co = re.compile("[\uD800-\uDBFF][\uDC00-\uDFFF]")
         return co.sub(restr, desstr)
 
-    def init_db(self):
-        self.loadLocalView()
-        self.getZhihuView()
-        self.getJianshuViews()
-        self.getCsdnViews()
-        insert_list = []
-        for index in self.title_map.keys():
-            insert_list.append(
-                (
-                    index,
-                    self.local_views[index] if index in self.local_views else 0,
-                    self.zhihu_views[index] if index in self.zhihu_views else 0,
-                    self.csdn_views[index] if index in self.csdn_views else 0,
-                    self.jianshu_views[index] if index in self.jianshu_views else 0,
-                    self.zhihu_id[index] if index in self.zhihu_id else 0,
-                    self.csdn_id[index] if index in self.csdn_id else 0,
-                    self.jianshu_id[index] if index in self.jianshu_id else 0,
-                )
-            )
-        # return insert_list
-        results = self.Db.insert_db(self.insert_sql % str(insert_list)[1:-1])
-        if results:
-            if len(insert_list):
-                print("Insert " + str(len(insert_list)) + " Success!")
-        else:
-            pass
+    def load_db(self, is_load: bool = True):
+        blogs = self.Db.load_db_table(
+            self.S_BLOGS_SQL % "",
+            self.BLOG_LIST,
+            self.blogs_detail_db_map,
+            "`id`",
+        ).copy()
+        if is_load:
+            self.blogs_detail_map = blogs
+            self.zhihu_map = {ii["zhihu_id"]: ii["`id`"] for ii in blogs}
+            self.csdn_map = {ii["csdn_id"]: ii["`id`"] for ii in blogs}
+            self.jianshu_map = {ii["jianshu_id"]: ii["`id`"] for ii in blogs}
 
-    def select_all(self):
-        result = self.Db.select_db(
-            "SELECT `id`, `title_name`, `local_views`, `zhihu_views`, `csdn_views`, `jianshu_views`, `zhihu_id`, `csdn_id`, `jianshu_id`, `created_at` from title_views where `is_deleted`=0"
+    def store_db(self):
+        self.load_db(False)
+        self.Db.store_one_table(
+            self.R_BLOGS_SQL,
+            self.I_BLOGS_SQL,
+            self.blogs_detail_map,
+            self.blogs_detail_db_map,
+            self.BLOG_LIST,
+            "blog",
         )
-        if result == False:
-            print("SELECT Error!")
-        else:
-            self.exist_data = {index[1]: list(index) for index in result}
-            self.zhihu_id_map = {index[6]: index[1] for index in result if index[6]}
-            self.csdn_id_map = {index[7]: index[1] for index in result if index[7]}
-            self.jianshu_id_map = {index[8]: index[1] for index in result if index[8]}
-            for index in self.exist_data:
-                self.exist_data[index][-1] = self.exist_data[index][-1].strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
 
     def update_view(self):
         changeHtmlTimeout(10)
-        wait_map = {}
-        self.select_all()
-        self.getZhihuView()
-        self.getJianshuViews()
-        self.getCsdnViews()
-        for index in self.zhihu_views.keys():
-            if (
-                self.zhihu_views[index] == self.exist_data[index][3]
-                and self.zhihu_id[index] == self.exist_data[index][6]
-            ):
-                continue
-            wait_map[index] = self.exist_data[index]
-            wait_map[index][3] = self.zhihu_views[index]
-            wait_map[index][6] = self.zhihu_id[index]
-        for index in self.csdn_views.keys():
-            if (
-                self.csdn_views[index] == self.exist_data[index][4]
-                and self.csdn_id[index] == self.exist_data[index][7]
-            ):
-                continue
-            if index not in wait_map:
-                wait_map[index] = self.exist_data[index]
-            wait_map[index][4] = self.csdn_views[index]
-            wait_map[index][7] = self.csdn_id[index]
-        for index in self.jianshu_views.keys():
-            if (
-                self.jianshu_views[index] == self.exist_data[index][5]
-                and self.jianshu_id[index] == self.exist_data[index][8]
-            ):
-                continue
-            wait_map[index] = self.exist_data[index]
-            wait_map[index][5] = self.jianshu_views[index]
-            wait_map[index][8] = self.jianshu_id[index]
-        update_list = [tuple(index) for index in wait_map.values()]
-        # return update_list:q
-        if not len(update_list):
-            return
-        results = self.Db.update_db(self.update_sql % str(update_list)[1:-1])
-        if results:
-            if len(update_list):
-                print("Update " + str(len(update_list)) + " Success!")
-        else:
-            pass
+        self.get_zhihu_views()
+        for pn in range(1, self.jianshu_pn + 1):
+            self.get_jianshu_views(pn)
+        self.get_csdn_views()
+        self.store_db()
 
     def new_day(self):
-        day_data = self.Db.select_db(
-            "SELECT `today_views`, `existed_views` from page_views order by `id` desc limit 1"
-        )
-        if not os.path.exists("../blog/log/basic"):
-            print("File not exist!!!")
-            return
-        with codecs.open("../blog/log/basic", "r", encoding="utf-8") as f:
-            existed_spider = int(f.readlines()[1])
-        today_date = datetime.datetime.now().strftime("%Y-%m-%d")
-        new_day_list = [(today_date, day_data[0][0] + day_data[0][1], existed_spider)]
-        results = self.Db.insert_db(self.new_day_sql % str(new_day_list)[1:-1])
-        if results:
-            if len(new_day_list):
-                print("New day update" + str(len(new_day_list)) + " Success!")
-        else:
-            pass
-
-    def load_csdn_img(self):
-        """ load csdn img """
-        mkdir(data_dir)
-        urls = ["/article/list/2?", ""]
-        article_ids = []
-        for url in urls:
-            req = basic_req("{}{}".format(self.CSDN_URL, url), 3)
-            article_ids.extend(re.findall('data-articleid="(\w*?)"', req))
-        echo(0, article_ids)
-        article_thread = [
-            threading.Thread(target=self.load_csdn_img_batch, args=(ii,))
-            for ii in article_ids
-        ]
-        for work in article_thread:
-            work.start()
-        for work in article_thread:
-            work.join()
-
-    def load_csdn_img_batch(self, article_id: int):
-        url = "{}/article/details/{}".format(self.CSDN_URL, article_id)
-        req = proxy_req(url, 3)
-        if not "iofu728" in req:
-            if can_retry(url):
-                self.load_csdn_img_batch(article_id)
-            return
-        img_lists = re.findall('"(https://cdn.nlark.com.*)" alt', req)
-        img_thread = [
-            threading.Thread(target=self.load_csdn_img_load, args=(jj, article_id, ii))
-            for ii, jj in enumerate(img_lists)
-        ]
-        echo(1, "Article Need Load {} Img...".format(len(img_lists)))
-        for work in img_thread:
-            work.start()
-        for work in img_thread:
-            work.join()
-
-    def load_csdn_img_load(self, img_url: str, article_id: int, idx: int):
-        img_dir = "{}{}/".format(data_dir, article_id)
-        img_path = "{}{}.png".format(img_dir, idx)
-        if os.path.exists(img_path):
-            return
-        req = proxy_req(img_url, 2)
-        if type(req) == bool or req is None:
-            if can_retry(img_url):
-                self.load_csdn_img_load(img_url, article_id, idx)
-            return
-        mkdir(img_dir)
-        with open(img_path, "wb") as f:
-            f.write(req.content)
+        day_data = self.Db.select_db(self.S_PAGE_SQL)
+        spider = [int(ii) for ii in read_file(self.expand_path)]
+        today_date = time_str(time_format="%Y-%m-%d")
+        new_day_list = [(today_date, day_data[0][0] + day_data[0][1], spider[1])]
+        results = self.Db.insert_db(self.I_PAGE_SQL % str(new_day_list)[1:-1])
+        echo(f"New Day update {'Success' if results else 'Error'}!", len(new_day_list))
 
 
 if __name__ == "__main__":
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+    mkdir(DATA_DIR)
     parser = create_argparser("Blog Script")
-    parser.add_argument(
-        "--model", type=int, default=1, metavar="N", help="model update or new day"
-    )
+    parser.add_argument("--do_new", type=bool, default=False)
     args = set_args(parser)
-    model = args.model
-    tv = TitleViews()
-    if model == 1:
-        tv.update_view()
-    else:
-        tv.new_day()
-        tv.update_view()
+    bt = TitleViews()
+    if args.do_new:
+        bt.new_day()
+    bt.update_view()

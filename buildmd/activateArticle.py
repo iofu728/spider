@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-28 12:06:22
+# @Last Modified time: 2021-07-08 15:34:25
 
 import json
 import os
@@ -457,10 +457,9 @@ class ActivateArticle(TBK):
             echo(1, "Load {} Online Articles.".format(len(self.yd_ids)))
 
     def load_db(self, is_load: bool = True):
-        tpwds = self.items.load_db_table(
-            self.S_TPWD_SQL % "", self.TPWD_LIST, self.tpwds_db_map, "tpwd"
+        tpwds = self.Db.load_db_table(self.S_TPWD_SQL % "", self.TPWD_LIST, self.tpwds_db_map, "tpwd"
         ).copy()
-        lists = self.items.load_db_table(
+        lists = self.Db.load_db_table(
             self.S_LIST_SQL,
             self.LIST_LIST + ["updated_at"],
             self.lists_db_map,
@@ -483,7 +482,7 @@ class ActivateArticle(TBK):
 
     def store_db(self):
         self.load_db(False)
-        self.items.store_one_table(
+        self.Db.store_one_table(
             self.R_TPWD_SQL,
             self.I_TPWD_SQL,
             self.tpwds_map,
@@ -491,7 +490,7 @@ class ActivateArticle(TBK):
             self.TPWD_LIST,
             "tpwd",
         )
-        self.items.store_one_table(
+        self.Db.store_one_table(
             self.R_LIST_SQL,
             self.I_LIST_SQL,
             self.lists_map,
@@ -777,6 +776,13 @@ class ActivateArticle(TBK):
         self.load_num, shop_num, self.direct_convert_num, item_c_shop = [0, 0], 0, 0, []
         c = self.items.items_detail_map
         s = self.items.shops_detail_map
+        i_set = set(
+            [
+                ii["item_id"]
+                for ii in self.tpwds_map.values()
+                if ii["item_id"] not in ["", "0"]
+            ]
+        )
         su = {v["user_id"]: v for v in s.values()}
 
         # counter tpwds -> item_id
@@ -879,7 +885,11 @@ class ActivateArticle(TBK):
             [1 for v in self.new_tpwds_map.values() if v["commission_rate"] > 0]
         )
         normal_items_num = len(
-            [1 for v in self.items.items_detail_map.values() if v["is_expired"] == 0]
+            [
+                1
+                for k, v in self.items.items_detail_map.items()
+                if v["is_expired"] == 0 and k in i_set
+            ]
         )
         renew = len(item2new) - shop_num - sum(self.load_num) - self.direct_convert_num
         spend_time = end_time(flag, 0)

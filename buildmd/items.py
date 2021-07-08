@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-29 10:10:20
+# @Last Modified time: 2021-07-08 15:34:51
 
 import os
 import sys
@@ -606,18 +606,6 @@ class Items(object):
             }
         return self.items_detail_map[item_id]
 
-    def load_db_table(self, sql: str, LIST: list, db_map: dict, key: str):
-        lines = self.Db.select_db(sql)
-        if not lines:
-            return {}
-        for line in lines:
-            line = {
-                ii: jj.strftime("%Y-%m-%d %H:%M:%S") if ii.endswith("_at") else jj
-                for ii, jj in zip(LIST, line)
-            }
-            db_map[line[key]] = line
-        return db_map
-
     def load_db(self, is_load: bool = True):
         self.items = set(
             [
@@ -632,14 +620,17 @@ class Items(object):
                 and ii[0] != "0"
             ]
         )
-        items = self.load_db_table(
+        items = self.Db.load_db_table(
             self.S_ITEMS_SQL % "",
             self.ITEMS_LIST + ["updated_at"],
             self.items_detail_db_map,
             "item_id",
         ).copy()
-        shops = self.load_db_table(
-            self.S_SHOPS_SQL % "", self.SHOPS_LIST, self.shops_detail_db_map, "shop_id"
+        shops = self.Db.load_db_table(
+            self.S_SHOPS_SQL % "",
+            self.SHOPS_LIST,
+            self.shops_detail_db_map,
+            "shop_id",
         ).copy()
         if is_load:
             self.items_detail_map = items
@@ -650,49 +641,9 @@ class Items(object):
             f"Load {len(self.items)} TPWDS_ITEMS {len(self.items_detail_map)} ITEMS and {len(self.shops_detail_map)} SHOPS from db.",
         )
 
-    def update_db(self, data: list, basic_sql: str, types: str):
-        if not data:
-            return
-        sql = basic_sql % str(data)[1:-1]
-        flag = self.Db.insert_db(sql)
-        if flag:
-            echo(3, "{} {} info Success".format(types, len(data)))
-        else:
-            echo(0, "{} failed".format(types))
-
-    def store_one_table(
-        self,
-        update_sql: str,
-        insert_sql: str,
-        detail_map: dict,
-        db_map: dict,
-        LIST: list,
-        types: str,
-    ):
-        def get_update_info(d_map: dict, LIST: list):
-            return {ii: jj for ii, jj in d_map.items() if ii not in [LIST[0], LIST[-1]]}
-
-        update_list, insert_list = [], []
-        for key, value in detail_map.items():
-            if key in db_map:
-                value_db = db_map[key]
-                if get_update_info(value_db, LIST) != get_update_info(value, LIST):
-                    update_list.append(
-                        (
-                            value_db[LIST[0]],
-                            *[value[ii] for ii in LIST[1:-1]],
-                            value_db[LIST[-1]],
-                            0,
-                        )
-                    )
-            else:
-                insert_list.append(tuple([value[ii] for ii in LIST[1:-1]]))
-        self.update_db(update_list, update_sql, f"Update {types.upper()}")
-        self.update_db(insert_list, insert_sql, f"Insert {types.upper()}")
-
     def store_db(self):
         self.load_db(False)
-        self.store_one_table(
+        self.Db.store_one_table(
             self.R_ITEMS_SQL,
             self.I_ITEMS_SQL,
             self.items_detail_map,
@@ -700,7 +651,7 @@ class Items(object):
             self.ITEMS_LIST,
             "items",
         )
-        self.store_one_table(
+        self.Db.store_one_table(
             self.R_SHOPS_SQL,
             self.I_SHOPS_SQL,
             self.shops_detail_map,

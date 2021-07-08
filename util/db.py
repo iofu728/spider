@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-29 22:53:05
+# @Last Modified time: 2021-07-08 15:04:01
 
 import os
 import sys
@@ -173,3 +173,55 @@ class Db(object):
 
     def update_db(self, sql: str):
         return self.execute(sql, True) is not False
+
+    def load_db_table(self, sql: str, LIST: list, db_map: dict, key: str):
+        lines = self.db.select_db(sql)
+        if not lines:
+            return {}
+        for line in lines:
+            line = {
+                ii: jj.strftime("%Y-%m-%d %H:%M:%S") if ii.endswith("_at") else jj
+                for ii, jj in zip(LIST, line)
+            }
+            db_map[line[key]] = line
+        return db_map
+
+    def update_db(self, data: list, basic_sql: str, types: str):
+        if not data:
+            return
+        sql = basic_sql % str(data)[1:-1]
+        flag = self.db.insert_db(sql)
+        if flag:
+            echo(3, "{} {} info Success".format(types, len(data)))
+        else:
+            echo(0, "{} failed".format(types))
+
+    def store_one_table(
+        self,
+        update_sql: str,
+        insert_sql: str,
+        detail_map: dict,
+        db_map: dict,
+        LIST: list,
+        types: str,
+    ):
+        def get_update_info(d_map: dict, LIST: list):
+            return {ii: jj for ii, jj in d_map.items() if ii not in [LIST[0], LIST[-1]]}
+
+        update_list, insert_list = [], []
+        for key, value in detail_map.items():
+            if key in db_map:
+                value_db = db_map[key]
+                if get_update_info(value_db, LIST) != get_update_info(value, LIST):
+                    update_list.append(
+                        (
+                            value_db[LIST[0]],
+                            *[value[ii] for ii in LIST[1:-1]],
+                            value_db[LIST[-1]],
+                            0,
+                        )
+                    )
+            else:
+                insert_list.append(tuple([value[ii] for ii in LIST[1:-1]]))
+        self.update_db(update_list, update_sql, f"Update {types.upper()}")
+        self.update_db(insert_list, insert_sql, f"Insert {types.upper()}")

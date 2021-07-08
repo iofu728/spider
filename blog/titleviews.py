@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-02-09 11:10:52
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-08 16:12:32
+# @Last Modified time: 2021-07-09 00:42:46
 
 import json
 import regex
@@ -22,6 +22,7 @@ from util.util import (
     set_args,
     load_cfg,
     generate_sql,
+    time_str,
 )
 
 """
@@ -217,7 +218,9 @@ class TitleViews(object):
         today_date = time_str(time_format="%Y-%m-%d")
         new_day_list = [(today_date, day_data[0][0] + day_data[0][1], spider[1])]
         results = self.Db.insert_db(self.I_PAGE_SQL % str(new_day_list)[1:-1])
-        echo(f"New Day update {'Success' if results else 'Error'}!", len(new_day_list))
+        echo(
+            1, f"New Day update {'Success' if results else 'Error'}!", len(new_day_list)
+        )
 
 
 if __name__ == "__main__":

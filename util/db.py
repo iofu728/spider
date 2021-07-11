@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-08 16:12:19
+# @Last Modified time: 2021-07-11 22:36:06
 
 import os
 import sys
@@ -186,7 +186,7 @@ class Db(object):
             db_map[line[key]] = line
         return db_map
 
-    def update_db(self, data: list, basic_sql: str, types: str):
+    def updated_db(self, data: list, basic_sql: str, types: str):
         if not data:
             return
         sql = basic_sql % str(data)[1:-1]
@@ -223,5 +223,5 @@ class Db(object):
                     )
             else:
                 insert_list.append(tuple([value[ii] for ii in LIST[1:-1]]))
-        self.update_db(update_list, update_sql, f"Update {types.upper()}")
-        self.update_db(insert_list, insert_sql, f"Insert {types.upper()}")
+        self.updated_db(update_list, update_sql, f"Update {types.upper()}")
+        self.updated_db(insert_list, insert_sql, f"Insert {types.upper()}")

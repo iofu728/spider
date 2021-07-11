@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-08 15:34:25
+# @Last Modified time: 2021-07-11 22:18:58
 
 import json
 import os
@@ -429,6 +429,8 @@ class ActivateArticle(TBK):
         self.yd_ids = []
         self.tpwds_list = {}
         self.ynote_list = {}
+        self.items_hash = defaultdict(list)
+        self.items_hash_cache = {}
         self.load_num = [0, 0]
         self.tpwd_exec = ThreadPoolExecutor(max_workers=5)
         self.pv = {ii: {} for ii in self.PV_KEYS}
@@ -443,6 +445,7 @@ class ActivateArticle(TBK):
         self.items.get_m_h5_tk()
         self.get_ynote_file()
         self.get_ynote_file(1)
+        self.build_item_lists()
 
     def load_yd_ids(self):
         changeJsonTimeout(5)
@@ -457,7 +460,8 @@ class ActivateArticle(TBK):
             echo(1, "Load {} Online Articles.".format(len(self.yd_ids)))
 
     def load_db(self, is_load: bool = True):
-        tpwds = self.Db.load_db_table(self.S_TPWD_SQL % "", self.TPWD_LIST, self.tpwds_db_map, "tpwd"
+        tpwds = self.Db.load_db_table(
+            self.S_TPWD_SQL % "", self.TPWD_LIST, self.tpwds_db_map, "tpwd"
         ).copy()
         lists = self.Db.load_db_table(
             self.S_LIST_SQL,
@@ -776,13 +780,7 @@ class ActivateArticle(TBK):
         self.load_num, shop_num, self.direct_convert_num, item_c_shop = [0, 0], 0, 0, []
         c = self.items.items_detail_map
         s = self.items.shops_detail_map
-        i_set = set(
-            [
-                ii["item_id"]
-                for ii in self.tpwds_map.values()
-                if ii["item_id"] not in ["", "0"]
-            ]
-        )
+        i_set = set(self.items_hash)
         su = {v["user_id"]: v for v in s.values()}
 
         # counter tpwds -> item_id
@@ -1320,7 +1318,10 @@ class ActivateArticle(TBK):
                 continue
             new_m = self.new_tpwds_map[tpwd]
             new_m["is_updated"] = 0
-            self.tpwds_map[new_m["tpwd"]] = new_m
+            replace_tpwd = self.get_replace_tpwd(new_m["item_id"])
+            if not replace_tpwd:
+                replace_tpwd = new_m["tpwd"]
+            self.tpwds_map[replace_tpwd] = new_m
         self.store_db()
 
     def update_normal_tpwd(self, o_tpwd: str, item_id: str, title: str):
@@ -1827,6 +1828,24 @@ class ActivateArticle(TBK):
             if not item_id or (not item_id.startswith("shop") and not shop_id):
                 res.append(g)
         return res
+
+    def build_item_lists(self):
+        tpwds = sorted(
+            [ii for ii, jj in self.tpwds_map.items() if jj["item_id"] not in ["", "0"]],
+            key=lambda i: i["created_at"],
+        )
+        for tpwd in tpwds:
+            self.items_hash[self.tpwds_map[tpwd]["item_id"]].append(tpwd)
+        echo("2|debug", f"Load {len(self.items_hash)} items.")
+
+    def get_replace_tpwd(self, item_id: str):
+        if item_id in self.items_hash_cache:
+            return self.items_hash_cache[item_id]
+        if len(self.items_hash[item_id]) <= 3:
+            return ""
+        tpwd = self.items_hash[item_id][len(self.items_hash[item_id]) // 2]
+        self.items_hash_cache[item_id] = tpwd
+        return tpwd
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-18 23:10:19
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-23 14:08:17
+# @Last Modified time: 2021-07-11 23:02:56
 
 import codecs
 import functools
@@ -121,7 +121,7 @@ class GetFreeProxy:
         else:
             index = random.randint(0, len(proxylist) - 1)
             proxies_url = proxylist[index]
-            proxies = {type_map[httptype]: proxies_url}
+            proxies = {type_map[httptype]: proxies_url.replace("https", "http")}
 
         try:
             result = basic_req(
@@ -306,7 +306,7 @@ class GetFreeProxy:
         """
 
         http_type = "https" in urls
-        proxies = {type_map[http_type]: urls}
+        proxies = {type_map[http_type]: urls.replace("https", "http")}
 
         test_url = (
             type_map[http_type] + "://music.163.com/api/song/lyric?os=pc&id=548556492"

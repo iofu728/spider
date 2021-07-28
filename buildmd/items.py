@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-08 15:34:51
+# @Last Modified time: 2021-07-29 02:15:58
 
 import os
 import sys
@@ -568,7 +568,7 @@ class Items(object):
             quantity = "0"
         if not title and not is_expired:
             return self.items_detail_map.get(item_id, {})
-        self.items_detail_map[item_id] = {
+        details = {
             "item_id": item_id,
             "title": title,
             "shop_id": shop_id,
@@ -588,6 +588,13 @@ class Items(object):
             if item_id in self.items_detail_map and not expired_flag
             else self.config["time_str"],
         }
+        o_details = self.items_detail_map.get(item_id, {})
+        details = {
+            k: o_details[k]
+            for k, v in details.items()
+            if v in ["", 0, "0"] and o_details.get(k, "") not in ["", 0, "0"]
+        }
+        self.items_detail_map[item_id] = details
 
         if shop_id:
             self.shops_detail_map[shop_id] = {

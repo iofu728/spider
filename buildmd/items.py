@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-29 02:15:58
+# @Last Modified time: 2021-08-07 11:15:57
 
 import os
 import sys
@@ -135,6 +135,7 @@ class Items(object):
         self.test_finger_id = cfg.getint("TBK", "test_finger_id")
         self.uland_url = cfg.get("TBK", "uland_url")
         self.api_key = cfg.get("TBK", "apikey")
+        self.x5secs = cfg.get("TBK", "x5secs").split(",")
 
     def get_shop_url(self, item_id: str):
         if not item_id in self.items_detail_map:
@@ -146,9 +147,11 @@ class Items(object):
     def get_tb_getdetail_req(self, item_id: int, cookies: dict = {}):
         """ tb getdetail api 2.6.1 @2021.04.30 ✔️Tested"""
         data = {
+            "id": item_id,
             "detail_v": "3.5.0",
             "exParams": json_str(
                 {
+                    "id": item_id,
                     "appReqFrom": "detail",
                     "container_type": "xdetail",
                     "dinamic_v3": "true",
@@ -451,6 +454,7 @@ class Items(object):
         if is_wait:
             time.sleep(np.random.rand() * 100 + 100)
         cna = self.get_m_h5_cookie("cna")
+        cna["x5sec"] = np.random.choice(self.x5secs)
         self.load_num += 1
         req = self.get_tb_getdetail_req(int(item_id), cna)
         if req is None:
@@ -673,6 +677,7 @@ class Items(object):
         for idx in range(num):
             flag = begin_time()
             self.load_num = 0
+            self.load_configure()
             need_items = list(self.items)
             np.random.shuffle(need_items)
             for item in need_items:

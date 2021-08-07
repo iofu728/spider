@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-11 22:18:58
+# @Last Modified time: 2021-07-11 23:52:37
 
 import json
 import os
@@ -1832,7 +1832,7 @@ class ActivateArticle(TBK):
     def build_item_lists(self):
         tpwds = sorted(
             [ii for ii, jj in self.tpwds_map.items() if jj["item_id"] not in ["", "0"]],
-            key=lambda i: i["created_at"],
+            key=lambda i: self.tpwds_map[i]["created_at"],
         )
         for tpwd in tpwds:
             self.items_hash[self.tpwds_map[tpwd]["item_id"]].append(tpwd)

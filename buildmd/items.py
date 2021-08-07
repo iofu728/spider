@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2021-03-30 21:39:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-08-07 11:15:57
+# @Last Modified time: 2021-08-08 00:44:17
 
 import os
 import sys
@@ -18,6 +18,7 @@ from util.util import (
     basic_req,
     begin_time,
     can_retry,
+    decoder_cookie,
     decoder_url,
     echo,
     encoder_cookie,
@@ -136,6 +137,7 @@ class Items(object):
         self.uland_url = cfg.get("TBK", "uland_url")
         self.api_key = cfg.get("TBK", "apikey")
         self.x5secs = cfg.get("TBK", "x5secs").split(",")
+        self.c = cfg.get("TBK", "c")[1:-1]
 
     def get_shop_url(self, item_id: str):
         if not item_id in self.items_detail_map:
@@ -147,11 +149,11 @@ class Items(object):
     def get_tb_getdetail_req(self, item_id: int, cookies: dict = {}):
         """ tb getdetail api 2.6.1 @2021.04.30 ✔️Tested"""
         data = {
-            "id": item_id,
+            "id": str(item_id),
             "detail_v": "3.5.0",
             "exParams": json_str(
                 {
-                    "id": item_id,
+                    "id": str(item_id),
                     "appReqFrom": "detail",
                     "container_type": "xdetail",
                     "dinamic_v3": "true",
@@ -188,7 +190,12 @@ class Items(object):
     def get_m_h5_cookie(self, key: str):
         if not key in self.cookies or time_stamp() - self.m_time > self.ONE_HOURS / 2:
             self.get_m_h5_tk()
-        return self.cookies.get(key, "")
+        if key == "cna":
+            if self.c:
+                return decoder_cookie(self.c)
+            cna = self.cookies.get(key, {})
+            cna["x5sec"] = np.random.choice(self.x5secs)
+        return self.cookies.get(key, {})
 
     def get_m_h5_tk(self):
         self.m_time = time_stamp()
@@ -454,7 +461,6 @@ class Items(object):
         if is_wait:
             time.sleep(np.random.rand() * 100 + 100)
         cna = self.get_m_h5_cookie("cna")
-        cna["x5sec"] = np.random.choice(self.x5secs)
         self.load_num += 1
         req = self.get_tb_getdetail_req(int(item_id), cna)
         if req is None:
@@ -594,9 +600,12 @@ class Items(object):
         }
         o_details = self.items_detail_map.get(item_id, {})
         details = {
-            k: o_details[k]
-            for k, v in details.items()
-            if v in ["", 0, "0"] and o_details.get(k, "") not in ["", 0, "0"]
+            **details,
+            **{
+                k: o_details[k]
+                for k, v in details.items()
+                if v in ["", 0, "0"] and o_details.get(k, "") not in ["", 0, "0"]
+            },
         }
         self.items_detail_map[item_id] = details
 

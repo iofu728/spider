@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2018-10-19 15:33:46
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-02 02:18:33
+# @Last Modified time: 2021-08-08 00:43:12
 
 from __future__ import (
     absolute_import,
@@ -480,7 +480,10 @@ def json_str(data: dict):
 
 
 def decoder_cookie(cookie: str) -> dict:
-    return {ii.split("=", 1)[0]: ii.split("=", 1)[1] for ii in cookie.split("; ")}
+    return {
+        ii.split("=", 1)[0]: ii.split("=", 1)[1]
+        for ii in cookie.replace("; ", ";").split(";")
+    }
 
 
 def encoder_cookie(cookie_dict: {}) -> str:

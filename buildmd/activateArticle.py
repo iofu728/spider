@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-11 23:52:37
+# @Last Modified time: 2021-08-22 23:25:26
 
 import json
 import os
@@ -10,19 +10,20 @@ import sys
 import threading
 import time
 import urllib
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import Counter, defaultdict
-from emoji import UNICODE_EMOJI
-from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import regex
+from emoji import UNICODE_EMOJI
+from tqdm import tqdm
+
 
 sys.path.append(os.getcwd())
 import top
 from buildmd.items import Items
+from buildmd.parser import YNGoods, YNParser
 from buildmd.weixin import OfficialAccountObject
-from buildmd.parser import YNParser, YNGoods
 from proxy.getproxy import GetFreeProxy
 from util.db import Db
 from util.util import (
@@ -31,30 +32,30 @@ from util.util import (
     can_retry,
     changeHeaders,
     changeJsonTimeout,
+    create_argparser,
     decoder_cookie,
+    decoder_str,
     decoder_url,
+    dump_bigger,
     echo,
     encoder_url,
     end_time,
+    generate_sql,
     get_accept,
     get_content_type,
     get_time_str,
     get_use_agent,
-    generate_sql,
     headers,
+    json_str,
+    load_bigger,
     load_cfg,
     mkdir,
     read_file,
     send_email,
+    set_args,
     time_stamp,
     time_str,
-    load_bigger,
-    dump_bigger,
-    create_argparser,
-    set_args,
-    json_str,
     write,
-    decoder_str,
 )
 
 
@@ -105,6 +106,8 @@ class TBK(object):
         self.gzh_query = cfg.get("WX", "query")
         self.sougou_cookie = cfg.get("WX", "cookie")[1:-1]
         self.m_cookie = cfg.get("TB", "m_cookie")[1:-1]
+        self.item_url = cfg.get("TBK", "ITEM_URL")[1:-1]
+        self.store_url = cfg.get("TBK", "STORE_URL")[1:-1]
         cookie_de = decoder_cookie(self.cookie)
         self.cstk = cookie_de[self.CSTK_KEY] if self.CSTK_KEY in cookie_de else ""
         top.setDefaultAppInfo(self.appkey, self.secret)
@@ -435,6 +438,8 @@ class ActivateArticle(TBK):
         self.tpwd_exec = ThreadPoolExecutor(max_workers=5)
         self.pv = {ii: {} for ii in self.PV_KEYS}
         self.parser = YNParser()
+        self.ITEM_URL = self.item_url
+        self.STORE_URL = self.store_url
 
     def load_process(self):
         self.load_yd_ids()
@@ -1342,9 +1347,9 @@ class ActivateArticle(TBK):
                 return o_tpwd, 0
             if "tpwd" in self.items.shops_detail_map.get(shop_id, {}):
                 return self.items.shops_detail_map.get(shop_id, {})["tpwd"], 5
-            url = self.STORE_URL % user_id
+            url = self.STORE_URL.replace("%s", user_id)
         if not (not item_id or not shop_id or is_expired):
-            url = self.ITEM_URL % int(item_id)
+            url = self.ITEM_URL.replace("%d", str(item_id))
         if not url:
             return o_tpwd, 0
         tpwd = self.generate_normal_tpwd(url, title)

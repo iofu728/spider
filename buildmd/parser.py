@@ -2,29 +2,21 @@
 # @Author: gunjianpan
 # @Date:   2021-05-29 13:47:05
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-06-21 18:24:25
+# @Last Modified time: 2021-08-22 19:34:18
 
 import os
-import regex
 import sys
-import numpy as np
 import time
 
+import numpy as np
+import regex
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
+
 sys.path.append(os.getcwd())
-from util.util import (
-    md5,
-    basic_req,
-    mkdir,
-    dhash,
-    hash_distance,
-    echo,
-    time_stamp,
-    encoder_cookie,
-    encoder_url,
-)
+from util.util import basic_req, dhash, echo, encoder_cookie, encoder_url, hash_distance, md5, mkdir, time_stamp
+
 
 BASIC_IMG_DIR = "buildmd/data/img/"
 
@@ -76,7 +68,8 @@ class YNParser(object):
         _ncoo = 2147483647 * np.random.rand()
         url = self.SESS_URL % t
         req = basic_req(url, 2, config={"allow_redirects": False})
-        self.cookies = req.cookies.get_dict()
+        if req:
+            self.cookies = req.cookies.get_dict()
         params = {
             "_npid": "ynote-web-rlogs",
             "_ncat": "pageview",
@@ -101,6 +94,8 @@ class YNParser(object):
                 "Cookie": encoder_cookie({"OUTFOX_SEARCH_USER_ID_NCOO": _ncoo}),
             },
         )
+        if req is None:
+            return
         self.cookies = {
             **self.cookies,
             **req.cookies.get_dict(),

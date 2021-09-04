@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-08-22 23:25:26
+# @Last Modified time: 2021-09-04 23:11:55
 
 import json
 import os
@@ -301,6 +301,13 @@ class TBK(object):
             echo(0, "get item detail failed.", item_ids)
             return []
 
+    def get_pv(self, tpwd: str):
+        time.sleep(2)
+        url = self.SC_URL % "tpwdReport"
+        data = {**self.sc_data, "tao_password": f"￥{tpwd}￥"}
+        req = basic_req(url, 11, data=data)
+        return req.get("data", {})
+
 
 class ActivateArticle(TBK):
     """ activate article in youdao Cloud and Convert the tpwds to items"""
@@ -402,6 +409,7 @@ class ActivateArticle(TBK):
     )
     PV_KEYS = ["gzh", "overdue"]
     SHOP = "shop"
+    PVS = ['hour_pv', 'hour_uv', 'pv', 'uv']
 
     def __init__(self, is_local: bool = False, is_debug: bool = False):
         super(ActivateArticle, self).__init__()
@@ -1626,6 +1634,8 @@ class ActivateArticle(TBK):
                 self.load_share_total()
             if index % 6 == 4:
                 self.get_gzh_lists(self.gzh_query)
+            if index % 12 == 3:
+                self.send_pv_info()
             spend_time = end_time(flag, 0)
             echo(
                 3,
@@ -1851,6 +1861,22 @@ class ActivateArticle(TBK):
         tpwd = self.items_hash[item_id][len(self.items_hash[item_id]) // 2]
         self.items_hash_cache[item_id] = tpwd
         return tpwd
+
+    def send_pv_info(self):
+        tpwds = [ii for ii, jj in self.tpwds_map.items() if jj["is_existed"]]
+        res = defaultdict(int)
+        for tpwd in tpwds:
+            tmp = self.get_pv(tpwd)
+            for k in self.PVS:
+                res[k] += tmp.get(k, 0)
+        subject = "{}({})pv:{}".format(
+            "点击",
+            time_str(time_format=self.T_FORMAT),
+            res["pv"]
+        )
+        content = "\n".join([f"{ii}:{jj}" for ii, jj in res.items()])
+        send_email(content, subject)
+            
 
 
 if __name__ == "__main__":

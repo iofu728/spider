@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-04 23:11:55
+# @Last Modified time: 2021-09-05 01:39:27
 
 import json
 import os
@@ -1635,7 +1635,7 @@ class ActivateArticle(TBK):
             if index % 6 == 4:
                 self.get_gzh_lists(self.gzh_query)
             if index % 12 == 3:
-                self.send_pv_info()
+                self.load_pv_info()
             spend_time = end_time(flag, 0)
             echo(
                 3,
@@ -1862,20 +1862,46 @@ class ActivateArticle(TBK):
         self.items_hash_cache[item_id] = tpwd
         return tpwd
 
-    def send_pv_info(self):
+    def load_pv_info(self):
         tpwds = [ii for ii, jj in self.tpwds_map.items() if jj["is_existed"]]
-        res = defaultdict(int)
+        res, items = defaultdict(int), defaultdict(dict)
         for tpwd in tpwds:
             tmp = self.get_pv(tpwd)
+            item_id = self.tpwds_map[tpwd].get("item_id", "")
             for k in self.PVS:
                 res[k] += tmp.get(k, 0)
-        subject = "{}({})pv:{}".format(
+            if item_id in ["", "0"]:
+                continue
+            for k in self.PVS:
+                items[item_id][k] = items[item_id].get(k, 0) + tmp.get(k, 0)
+        self.send_pv_info(res, items)
+
+    def send_pv_info(self, res: dict, items: dict): 
+        top_item = sorted(items.keys(), key=lambda x: -(items[x]["pv"]))[:30]
+        top_infos = []
+        for item in top_item:
+            info = self.items.items_detail_map.get(item, {})
+            item_info = items[item]
+            shop_id = info.get("shop_id", "")
+            shop_info = self.items.shops_detail_map.get(shop_id, {})
+            top_infos.append(f"{},{},{},价格{},收藏{},销量{},点击{}/{},小时点击{}/{},链接{}".format(item, info["title"], shop_info["shop_name"], info["price"], info["favcount"], info["month_sales"], item_info["pv"], item_info["uv"], item_info["hour_pv"], item_info["hour_uv"], self.ITEM_URL.replace("%d", item)))
+        content = "\n".join([f"{ii}:{jj}" for ii, jj in res.items()] + ["----------------"] +  top_infos)
+
+        top30_pv, top30_uv = sum([items[ii]["pv"] for ii in top_item]), sum([items[ii]["uv"] for ii in top_item])
+        subject = "{}({}){}人{}次点击, 前30商品{}({:.2f}%)人{}({:.2f}%)次点击".format(
             "点击",
-            time_str(time_format=self.T_FORMAT),
-            res["pv"]
+            time_str(time_format="%m-%d"),
+            res["uv"],
+            res["pv"],
+            top30_uv,
+            top30_uv * 100 / res["uv"],
+            top30_pv,
+            top30_pv * 100 / res["pv"],
         )
-        content = "\n".join([f"{ii}:{jj}" for ii, jj in res.items()])
-        send_email(content, subject)
+        if res["pv"] > 100:
+            send_email(content, subject)
+        else:
+            send_email(content, subject, mode="single")
             
 
 

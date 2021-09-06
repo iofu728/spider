@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-05 23:26:15
+# @Last Modified time: 2021-09-06 20:48:44
 
 import json
 import joblib
@@ -1636,7 +1636,7 @@ class ActivateArticle(TBK):
                 self.load_share_total()
             if index % 6 == 4:
                 self.get_gzh_lists(self.gzh_query)
-            if index % 12 == 0:
+            if index % 6 == 0:
                 self.load_pv_info()
             spend_time = end_time(flag, 0)
             echo(

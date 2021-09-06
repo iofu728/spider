@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-06 20:48:44
+# @Last Modified time: 2021-09-06 20:50:58
 
 import json
 import joblib
@@ -1928,6 +1928,7 @@ class ActivateArticle(TBK):
             top30_pv,
             top30_pv * 100 / res["pv"],
         )
+        echo(2, content)
         if res["pv"] > 100:
             send_email(content, subject)
         else:

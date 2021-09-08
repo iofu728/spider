@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-08 21:47:29
+# @Last Modified time: 2021-09-08 22:02:14
 
 import json
 import joblib
@@ -73,6 +73,7 @@ class TBK(object):
     """ tbk info class """
 
     TKL_DECODER_URL = "https://www.taokouling.com/index/taobao_tkljm"
+    TKL_DECODER_URL_V2 = "https://api.taokouling.com/tkl/viptkljm?apikey=%s&tkl=￥%s￥"
     SC_URL = "http://gateway.kouss.com/tbpub/%s"
     APPTIMES_CREATE_URL = "http://tkapi.apptimes.cn/tao-password/create"
     CSTK_KEY = "YNOTE_CSTK"
@@ -237,6 +238,11 @@ class TBK(object):
         data = {**self.sc_data, "item_id": item_id}
         req = basic_req(url, 11, data=data)
         return req.get("result", {}).get("data", {})
+
+    def decoder_generated_tpwd_v2(self, tpwd: str):
+        url = self.TKL_DECODER_URL_V2 % (self.api_key, tpwd)
+        req = basic_req(url, 1)
+        return {"code": "1", "data": req}
 
     def decoder_generated_tpwd(self, tpwd: str):
         time.sleep(1)
@@ -637,7 +643,7 @@ class ActivateArticle(TBK):
         self.load_num[0] += 1
         if is_wait:
             time.sleep(np.random.rand() * 5 + 2)
-        req = self.decoder_generated_tpwd(tpwd)
+        req = self.decoder_generated_tpwd_v2(tpwd)
         if req is None or not len(req) or req.get("code", "") not in ["1"]:
             return {}
         if req.get("code", "") == "1":

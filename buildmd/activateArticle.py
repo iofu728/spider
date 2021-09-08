@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-08 22:02:14
+# @Last Modified time: 2021-09-08 23:28:47
 
 import json
 import joblib
@@ -408,7 +408,7 @@ class ActivateArticle(TBK):
     TABLE_LISTS = ["tpwd.sql", "article.sql"]
     ONE_HOURS = 3600
     ONE_DAY = 24
-    ZERO_STAMP = "0天0小时0分0秒"
+    ZERO_STAMP = "0天"
     T_FORMAT = "%m-%d %H:%M"
     BASIC_STAMP = (
         time_stamp(time_format="%d天%H小时%M分%S秒", time_str="1天0小时0分0秒")
@@ -650,7 +650,7 @@ class ActivateArticle(TBK):
             is_updated = 1
         req["expire"] = self.BASIC_TIMEX_STR
 
-        if req["data"].get("validDate", "-") == self.ZERO_STAMP or "-" in req["data"].get("validDate", "-"):
+        if self.ZERO_STAMP in req["data"].get("validDate", "-") or "-" in req["data"].get("validDate", "-"):
             validDate = 1500000000
         else:
             validDate = (

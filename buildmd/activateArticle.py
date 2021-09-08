@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-06 20:50:58
+# @Last Modified time: 2021-09-08 21:47:29
 
 import json
 import joblib
@@ -637,12 +637,24 @@ class ActivateArticle(TBK):
         self.load_num[0] += 1
         if is_wait:
             time.sleep(np.random.rand() * 5 + 2)
-        req = self.decoder_tpwd(tpwd)
-        if req is None or not len(req) or req.get("code", "") not in [0, 3]:
+        req = self.decoder_generated_tpwd(tpwd)
+        if req is None or not len(req) or req.get("code", "") not in ["1"]:
             return {}
-        if req.get("code", "") == 3:
+        if req.get("code", "") == "1":
             is_updated = 1
+        req["expire"] = self.BASIC_TIMEX_STR
+
+        if req["data"].get("validDate", "-") == self.ZERO_STAMP or "-" in req["data"].get("validDate", "-"):
+            validDate = 1500000000
+        else:
+            validDate = (
+                time_stamp(time_format="%d天%H小时%M分%S秒", time_str=req["data"]["validDate"])
+                - self.BASIC_STAMP
+                + time_stamp()
+            )
+        req["data"]["expire"] = time_str(validDate)
         NEED_KEY = ["content", "url", "expire", "picUrl"]
+
         content, url, expire_at, picUrl = [
             req["data"].get(ii, jj).strip()
             if "data" in req and req["data"].get(ii, jj).strip()
@@ -1331,7 +1343,7 @@ class ActivateArticle(TBK):
             tpwd = tpwd_pro[1:-1]
             if tpwd not in self.new_tpwds_map:
                 continue
-            new_m = self.new_tpwds_map[tpwd]
+            new_m = self.new_tpwds_map[tpwd].copy()
             new_m["is_updated"] = 0
             replace_tpwd = self.get_replace_tpwd(new_m["item_id"])
             if not replace_tpwd:
@@ -1517,7 +1529,7 @@ class ActivateArticle(TBK):
             echo(
                 "0|error",
                 f"Update atricle {yd_id} Error",
-                req.json() if req is not None else "",
+                req,
             )
             return False
         echo("1|warning", f"Update atricle {yd_id} Success!!!")
@@ -1655,7 +1667,7 @@ class ActivateArticle(TBK):
         old, _, _ = load_bigger(TPWDLIST_PATH)
         return int(old != self.tpwd_list)
 
-    def generate_local_yd_info(self, yd_path: str):
+    def generate_local_yd_info(self, yd_path: str, need_keywords: bool = True):
         o_text = "\n".join(read_file(yd_path))
         for tpwd in set(self.tpwds_list[yd_path]):
             item_id = self.tpwds_map.get(tpwd, {}).get("item_id", "")
@@ -1679,7 +1691,7 @@ class ActivateArticle(TBK):
                 replace_str = f"\n店铺 {shop_name}" + replace_str
             if price:
                 replace_str = f" {price}" + replace_str
-            if rate_keywords:
+            if rate_keywords and need_keywords:
                 keywords_list = sorted(
                     [ii.split(":") for ii in rate_keywords.split(",")],
                     key=lambda i: -int(i[1]),

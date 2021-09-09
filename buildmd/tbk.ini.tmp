@@ -14,6 +14,7 @@ tkl_cookie = 111
 apptimes_key = 111
 apptimes_secret = 111
 x5secs = 111
+UST_gap = 0
 
 [YNOTE]
 cookie = "123456"

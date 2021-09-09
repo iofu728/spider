@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-09 21:42:57
+# @Last Modified time: 2021-09-09 21:55:29
 
 import json
 import joblib
@@ -111,6 +111,7 @@ class TBK(object):
         self.m_cookie = cfg.get("TB", "m_cookie")[1:-1]
         self.item_url = cfg.get("TBK", "ITEM_URL")[1:-1]
         self.store_url = cfg.get("TBK", "STORE_URL")[1:-1]
+        self.UST_gap = cfg.getint("TBK", "UST_gap")
         cookie_de = decoder_cookie(self.cookie)
         self.cstk = cookie_de[self.CSTK_KEY] if self.CSTK_KEY in cookie_de else ""
         top.setDefaultAppInfo(self.appkey, self.secret)
@@ -1656,7 +1657,8 @@ class ActivateArticle(TBK):
                 self.load_share_total()
             if index % 6 == 4:
                 self.get_gzh_lists(self.gzh_query)
-            if index % 6 == 0:
+            hour = int(time_str(time_stamp(), time_format="%H")) + self.UST_gap
+            if 24 - hour <= 4:
                 self.load_pv_info()
             spend_time = end_time(flag, 0)
             echo(

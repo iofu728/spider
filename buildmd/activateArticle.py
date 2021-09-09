@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-09 21:55:29
+# @Last Modified time: 2021-09-09 21:57:32
 
 import json
 import joblib
@@ -311,7 +311,9 @@ class TBK(object):
             echo(0, "get item detail failed.", item_ids)
             return []
 
-    def get_pv(self, tpwd: str, sc_data: dict = self.sc_data):
+    def get_pv(self, tpwd: str, sc_data: dict = None):
+        if sc_data is None:
+            sc_data = self.sc_data
         time.sleep(2)
         url = self.SC_URL % "tpwdReport"
         data = {**sc_data, "tao_password": f"￥{tpwd}￥"}

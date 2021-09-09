@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-08 23:28:47
+# @Last Modified time: 2021-09-09 21:42:57
 
 import json
 import joblib
@@ -93,6 +93,7 @@ class TBK(object):
         self.user_id = cfg.getint("TBK", "user_id")
         self.site_id, self.adzone_id = cfg.get("TBK", "api_pid").split("_")[-2:]
         self.sc_site_id, self.sc_adzone_id = cfg.get("TBK", "sc_pid").split("_")[-2:]
+        search_pids = [ii.split("_")[-2:] for ii in cfg.get("search_pids").split(",")]
         self.test_item_id = cfg.getint("TBK", "test_item_id")
         self.test_finger_id = cfg.getint("TBK", "test_finger_id")
         self.uland_url = cfg.get("TBK", "uland_url")
@@ -118,6 +119,7 @@ class TBK(object):
             "site_id": self.sc_site_id,
             "session": self.sc_session,
         }
+        self.search_scs = [{"adzone_id": jj, "site_id": ii, "session": self.sc_session} for ii, jj in search_pids]
 
     def load_tbk_info(self):
         favorites = self.get_uatm_favor()
@@ -308,10 +310,10 @@ class TBK(object):
             echo(0, "get item detail failed.", item_ids)
             return []
 
-    def get_pv(self, tpwd: str):
+    def get_pv(self, tpwd: str, sc_data: dict = self.sc_data):
         time.sleep(2)
         url = self.SC_URL % "tpwdReport"
-        data = {**self.sc_data, "tao_password": f"￥{tpwd}￥"}
+        data = {**sc_data, "tao_password": f"￥{tpwd}￥"}
         req = basic_req(url, 11, data=data)
         return req.get("data", {})
 
@@ -1886,7 +1888,10 @@ class ActivateArticle(TBK):
         tpwds = [ii for ii, jj in self.tpwds_map.items() if jj["is_existed"]]
         res, items, shops, articles = defaultdict(int), defaultdict(dict), defaultdict(dict), defaultdict(dict)
         for tpwd in tpwds:
-            tmp = self.get_pv(tpwd)
+            for sc in self.search_scs:
+                tmp = self.get_pv(tpwd)
+                if tmp.get("pv") != 0:
+                    break
             item_id = self.tpwds_map[tpwd].get("item_id", "")
             article_ids = [ii for ii, jj in self.tpwds_list.items() if tpwd in jj]
             for k in self.PVS:

@@ -2,13 +2,15 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-06 21:18:26
+# @Last Modified time: 2021-09-09 18:28:05
 
 import json
-import numpy as np
 import os
 import sys
 import urllib
+
+import numpy as np
+
 
 sys.path.append(os.getcwd())
 from proxy.getproxy import GetFreeProxy
@@ -130,7 +132,7 @@ class BasicBilibili(object):
         if types % 10 == 3 and is_jsonp:
             req = self.decoder_jp(req)
         if not req or (
-            types == 1 and (list(req.keys()) != self.JSON_KEYS or req["code"] != 0)
+            types == 1 and isinstance(req, dict) and (list(req.keys()) != self.JSON_KEYS or req["code"] != 0)
         ):
             if is_proxy and can_retry(url):
                 return self.get_web_api(url, types, data, is_proxy, is_jsonp)
@@ -252,8 +254,8 @@ class BasicBilibili(object):
         return self.get_web_api(comment_url)
 
     def get_dm_info(self, bv_id: str, cid: str):
-        from google.protobuf.json_format import MessageToDict
         import bilibili.grpc.community.service.dm.v1_pb2 as Danmaku
+        from google.protobuf.json_format import MessageToDict
 
         dm_url = self.DM_URL % (str(cid), self.bv2av(bv_id))
         dm = self.get_web_api(dm_url, 2)

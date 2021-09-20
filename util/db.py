@@ -2,19 +2,22 @@
 # @Author: gunjianpan
 # @Date:   2018-10-24 13:32:39
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-07-11 22:36:06
+# @Last Modified time: 2021-09-20 19:05:48
 
 import os
 import sys
 import threading
+import time
 
 import pymysql
 import redis
-import time
 from elasticsearch import Elasticsearch
+from elasticsearch.helpers import bulk
+
 
 sys.path.append(os.getcwd())
-from util.util import echo, read_file, load_cfg
+from util.util import echo, load_cfg, read_file
+
 
 configure_path = "util/util.ini"
 
@@ -225,3 +228,7 @@ class Db(object):
                 insert_list.append(tuple([value[ii] for ii in LIST[1:-1]]))
         self.updated_db(update_list, update_sql, f"Update {types.upper()}")
         self.updated_db(insert_list, insert_sql, f"Insert {types.upper()}")
+
+    @staticmethod
+    def es_action(es, action):
+        return bulk(es, action)

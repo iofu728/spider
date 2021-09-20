@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-09 21:57:32
+# @Last Modified time: 2021-09-20 21:15:31
 
 import json
 import joblib
@@ -93,7 +93,9 @@ class TBK(object):
         self.user_id = cfg.getint("TBK", "user_id")
         self.site_id, self.adzone_id = cfg.get("TBK", "api_pid").split("_")[-2:]
         self.sc_site_id, self.sc_adzone_id = cfg.get("TBK", "sc_pid").split("_")[-2:]
-        search_pids = [ii.split("_")[-2:] for ii in cfg.get("search_pids").split(",")]
+        search_pids = [
+            ii.split("_")[-2:] for ii in cfg.get("TBK", "search_pids").split(",")
+        ]
         self.test_item_id = cfg.getint("TBK", "test_item_id")
         self.test_finger_id = cfg.getint("TBK", "test_finger_id")
         self.uland_url = cfg.get("TBK", "uland_url")
@@ -120,7 +122,10 @@ class TBK(object):
             "site_id": self.sc_site_id,
             "session": self.sc_session,
         }
-        self.search_scs = [{"adzone_id": jj, "site_id": ii, "session": self.sc_session} for ii, jj in search_pids]
+        self.search_scs = [
+            {"adzone_id": jj, "site_id": ii, "session": self.sc_session}
+            for ii, jj in search_pids
+        ]
 
     def load_tbk_info(self):
         favorites = self.get_uatm_favor()
@@ -421,7 +426,7 @@ class ActivateArticle(TBK):
     )
     PV_KEYS = ["gzh", "overdue"]
     SHOP = "shop"
-    PVS = ['hour_pv', 'hour_uv', 'pv', 'uv']
+    PVS = ["hour_pv", "hour_uv", "pv", "uv"]
     TOP_SPLIT = "-------Top %s---------"
 
     def __init__(self, is_local: bool = False, is_debug: bool = False):
@@ -445,6 +450,7 @@ class ActivateArticle(TBK):
         self.Db = self.items.Db
         for table in self.TABLE_LISTS:
             self.Db.create_table(os.path.join(sql_dir, table))
+        self.es = Db("es").es
         self.tpwds_map = {}
         self.lists_map = {}
         self.tpwds_db_map = {}
@@ -655,11 +661,15 @@ class ActivateArticle(TBK):
             is_updated = 1
         req["expire"] = self.BASIC_TIMEX_STR
 
-        if self.ZERO_STAMP in req["data"].get("validDate", "-") or "-" in req["data"].get("validDate", "-"):
+        if self.ZERO_STAMP in req["data"].get("validDate", "-") or "-" in req[
+            "data"
+        ].get("validDate", "-"):
             validDate = 1500000000
         else:
             validDate = (
-                time_stamp(time_format="%d天%H小时%M分%S秒", time_str=req["data"]["validDate"])
+                time_stamp(
+                    time_format="%d天%H小时%M分%S秒", time_str=req["data"]["validDate"]
+                )
                 - self.BASIC_STAMP
                 + time_stamp()
             )
@@ -1659,9 +1669,19 @@ class ActivateArticle(TBK):
                 self.load_share_total()
             if index % 6 == 4:
                 self.get_gzh_lists(self.gzh_query)
-            hour = int(time_str(time_stamp(), time_format="%H")) + self.UST_gap
-            if 24 - hour <= 4:
+            spend_time = end_time(flag, 0)
+            gap_time = (
+                time_stamp(
+                    "{} {}:00:00".format(
+                        time_str(time_format="%Y-%m-%d"), 23 - self.UST_gap
+                    )
+                )
+                - time_stamp()
+            )
+            if -1 * spend_time <= gap_time <= self.ONE_HOURS * 4:
+                time.sleep(max(gap_time, 0))
                 self.load_pv_info()
+
             spend_time = end_time(flag, 0)
             echo(
                 3,
@@ -1889,78 +1909,224 @@ class ActivateArticle(TBK):
         return tpwd
 
     def load_pv_info(self):
-        tpwds = [ii for ii, jj in self.tpwds_map.items() if jj["is_existed"]]
-        res, items, shops, articles = defaultdict(int), defaultdict(dict), defaultdict(dict), defaultdict(dict)
+        echo(2, "PV Load Start.")
+        tpwds = set([jj for key in self.yd_ids for jj in self.tpwds_list[key]])
+        x = set([jj for key in self.yd_ids[:7] for jj in self.tpwds_list[key]])
+        res, items, shops, articles = (
+            defaultdict(int),
+            defaultdict(dict),
+            defaultdict(dict),
+            defaultdict(dict),
+        )
         for tpwd in tpwds:
             for sc in self.search_scs:
-                tmp = self.get_pv(tpwd)
-                if tmp.get("pv") != 0:
+                tmp = self.get_pv(tpwd, sc)
+                if tmp.get("pv") != 0 or tpwd not in x:
                     break
             item_id = self.tpwds_map[tpwd].get("item_id", "")
             article_ids = [ii for ii, jj in self.tpwds_list.items() if tpwd in jj]
             for k in self.PVS:
                 res[k] += tmp.get(k, 0)
                 for article_id in article_ids:
-                    articles[article_id][k] = articles[article_id].get(k, 0) + tmp.get(k, 0)
+                    articles[article_id][k] = articles[article_id].get(k, 0) + tmp.get(
+                        k, 0
+                    )
             if item_id in ["", "0"]:
                 continue
             if item_id.startswith("shop"):
-                shop_id = self.items.shops_seller_map.get(item_id[4:], {}).get("shop_id", "")
+                shop_id = self.items.shops_seller_map.get(item_id[4:], {}).get(
+                    "shop_id", ""
+                )
             else:
-                shop_id = self.items.items_detail_map.get(item_id, {}).get("shop_id", "")
+                shop_id = self.items.items_detail_map.get(item_id, {}).get(
+                    "shop_id", ""
+                )
             for k in self.PVS:
                 items[item_id][k] = items[item_id].get(k, 0) + tmp.get(k, 0)
                 if shop_id not in ["", "0"]:
                     shops[shop_id][k] = shops[shop_id].get(k, 0) + tmp.get(k, 0)
         self.send_pv_info(res, items, shops, articles)
+        self.send_pv2es(res, items, shops, articles)
 
-    def send_pv_info(self, res: dict, items: dict, shops: dict, articles: dict): 
+    def send_pv2es(self, res: dict, items: dict, shops: dict, articles: dict):
+        def pick_action(data: list, name: str, types: str = "index"):
+            return [
+                {
+                    "_op_type": types,
+                    "_index": "pv_{}_{}".format(name, time_str(time_format="%Y.%m.%d")),
+                    "_source": {
+                        **ii,
+                        "@timestamp": time_str(
+                            time_s=time_stamp() + self.UST_gap * self.ONE_HOURS,
+                            time_format="%Y-%m-%dT%H:%M:%S.000+0800",
+                        ),
+                    },
+                }
+                for ii in data
+            ]
+
+        def index2es(data, name):
+            res = Db.es_action(self.es, pick_action(data, name))
+            echo(2, f"{name} index to elastic {res} items.")
+
+        items_data, shops_data, articles_data = [], [], []
+        for item_id, jj in items.items():
+            if not jj.get("pv", 0):
+                continue
+            info = self.items.items_detail_map.get(item_id, {})
+            shop_id = info.get("shop_id", "")
+            shop_info = self.items.shops_detail_map.get(shop_id, {})
+            items_data.append(
+                {
+                    "item_id": item_id,
+                    "pv": jj["pv"],
+                    "uv": jj["uv"],
+                    "hour_pv": jj["hour_pv"],
+                    "hour_uv": jj["hour_uv"],
+                    "name": info.get("title", ""),
+                    "shop_name": shop_info.get("shop_name", ""),
+                    "price": info.get("price", ""),
+                    "favcount": info.get("favcount", ""),
+                    "month_sales": info.get("month_sales", ""),
+                }
+            )
+        for shop_id, jj in shops.items():
+            if not jj.get("pv", 0):
+                continue
+            info = self.items.shops_detail_map.get(shop_id, {})
+            shops_data.append(
+                {
+                    "shop_id": shop_id,
+                    "pv": jj["pv"],
+                    "uv": jj["uv"],
+                    "hour_pv": jj["hour_pv"],
+                    "hour_uv": jj["hour_uv"],
+                    "shop_name": info.get("shop_name", ""),
+                    "fans_count": info.get("fans_count", ""),
+                    "item_count": info.get("item_count", ""),
+                    "good_rate_perc": info.get("good_rate_perc", ""),
+                    "item_desc_rate": info.get("item_desc_rate", ""),
+                    "start_at": info.get("start_at", ""),
+                }
+            )
+        for article_id, jj in articles.items():
+            if not jj.get("pv", 0):
+                continue
+            info = self.lists_map.get(article_id, {})
+            articles_data.append(
+                {
+                    "article_id": article_id,
+                    "pv": jj["pv"],
+                    "uv": jj["uv"],
+                    "hour_pv": jj["hour_pv"],
+                    "hour_uv": jj["hour_uv"],
+                    "title": info.get("title", ""),
+                    "established_at": info.get("established_at", ""),
+                    "modified_at": info.get("modified_at", ""),
+                }
+            )
+        index2es(items_data, "items")
+        index2es(shops_data, "shops")
+        index2es(articles_data, "articles")
+
+    def send_pv_info(self, res: dict, items: dict, shops: dict, articles: dict):
         joblib.dump([res, items, shops, articles], "pv.pkl")
         top_item = sorted(items.keys(), key=lambda x: -(items[x]["pv"]))[:30]
         top_shop = sorted(shops.keys(), key=lambda x: -(shops[x]["pv"]))[:10]
         top_article = sorted(articles.keys(), key=lambda x: -(articles[x]["pv"]))[:10]
-        top_infos, top_shop_infos, top_article_infos = [self.TOP_SPLIT % "Items"], [self.TOP_SPLIT % "Shops"], [self.TOP_SPLIT % "Articles"]
+        top_infos, top_shop_infos, top_article_infos = (
+            [self.TOP_SPLIT % "Items"],
+            [self.TOP_SPLIT % "Shops"],
+            [self.TOP_SPLIT % "Articles"],
+        )
         for idx, item in enumerate(top_item):
-            info = self.items.items_detail_map.get(item, {})
             item_info = items[item]
             if item_info["pv"] == 0:
                 continue
+            info = self.items.items_detail_map.get(item, {})
             shop_id = info.get("shop_id", "")
             shop_info = self.items.shops_detail_map.get(shop_id, {})
-            top_infos.append("[No.{}]{}\n\t\t店铺:{}\n\t\t价格{},收藏{},销量{},点击{}/{},小时点击{}/{}\n\t\t链接{}".format(idx + 1, info.get("title", ""), shop_info.get("shop_name", ""), info.get("price", ""), info.get("favcount", ""), info.get("month_sales", ""), item_info.get("pv", ""), item_info.get("uv", ""), item_info.get("hour_pv", ""), item_info.get("hour_uv", ""), self.ITEM_URL.replace("%d", item)))
+            top_infos.append(
+                "[No.{}]{}\n\t\t店铺:{}\n\t\t价格{},收藏{},销量{},点击{}/{},小时点击{}/{}\n\t\t链接{}".format(
+                    idx + 1,
+                    info.get("title", ""),
+                    shop_info.get("shop_name", ""),
+                    info.get("price", ""),
+                    info.get("favcount", ""),
+                    info.get("month_sales", ""),
+                    item_info.get("pv", ""),
+                    item_info.get("uv", ""),
+                    item_info.get("hour_pv", ""),
+                    item_info.get("hour_uv", ""),
+                    self.ITEM_URL.replace("%d", item),
+                )
+            )
 
         for idx, shop in enumerate(top_shop):
-            info = self.items.shops_detail_map.get(shop, {})
             shop_info = shops[shop]
             if shop_info["pv"] == 0:
                 continue
-            top_shop_infos.append("[No.{}]店铺:{}\n\t\t粉丝数{},商品数{},好评率{},评分{},开店{},点击{}/{},小时点击{}/{}\n\t\t链接{}".format(idx + 1, info.get("shop_name", ""), info.get("fans_count", ""), info.get("item_count", ""), info.get("good_rate_perc", ""), info.get("item_desc_rate", ""), info.get("start_at", ""), shop_info.get("pv", ""), shop_info.get("uv", ""), shop_info.get("hour_pv", ""), shop_info.get("hour_uv", ""), self.STORE_URL.replace("%s", shop)))
+            info = self.items.shops_detail_map.get(shop, {})
+            top_shop_infos.append(
+                "[No.{}]店铺:{}\n\t\t粉丝数{},商品数{},好评率{},评分{},开店{},点击{}/{},小时点击{}/{}\n\t\t链接{}".format(
+                    idx + 1,
+                    info.get("shop_name", ""),
+                    info.get("fans_count", ""),
+                    info.get("item_count", ""),
+                    info.get("good_rate_perc", ""),
+                    info.get("item_desc_rate", ""),
+                    info.get("start_at", ""),
+                    shop_info.get("pv", ""),
+                    shop_info.get("uv", ""),
+                    shop_info.get("hour_pv", ""),
+                    shop_info.get("hour_uv", ""),
+                    self.STORE_URL.replace("%s", shop),
+                )
+            )
 
         for idx, article in enumerate(top_article):
-            info = self.lists_map.get(article, {})
             article_info = articles[article]
             if article_info["pv"] == 0:
                 continue
-            top_article_infos.append("[No.{}]推文:{},创建时间:{},修改时间:{},点击{}/{},小时点击{}/{}\n\t\t链接{}".format(idx + 1, info.get("title", ""), info.get("established_at", ""), info.get("modified_at", ""), article_info.get("pv", ""), article_info.get("uv", ""), article_info.get("hour_pv", ""), article_info.get("hour_uv", ""), self.SHARE_URL % article))
-        content = "\n".join([f"{ii}:{jj}" for ii, jj in res.items()] + top_article_infos + top_shop_infos + top_infos)
+            info = self.lists_map.get(article, {})
+            top_article_infos.append(
+                "[No.{}]推文:{},创建时间:{},修改时间:{},点击{}/{},小时点击{}/{}\n\t\t链接{}".format(
+                    idx + 1,
+                    info.get("title", ""),
+                    info.get("established_at", ""),
+                    info.get("modified_at", ""),
+                    article_info.get("pv", ""),
+                    article_info.get("uv", ""),
+                    article_info.get("hour_pv", ""),
+                    article_info.get("hour_uv", ""),
+                    self.SHARE_URL % article,
+                )
+            )
+        content = "\n".join(
+            [f"{ii}:{jj}" for ii, jj in res.items()]
+            + top_article_infos
+            + top_shop_infos
+            + top_infos
+        )
 
-        top30_pv, top30_uv = sum([items[ii]["pv"] for ii in top_item]), sum([items[ii]["uv"] for ii in top_item])
+        top30_pv, top30_uv = sum([items[ii]["pv"] for ii in top_item]), sum(
+            [items[ii]["uv"] for ii in top_item]
+        )
         subject = "{}({}){}人{}次点击, 前30商品{}({:.2f}%)人{}({:.2f}%)次点击".format(
             "点击",
             time_str(time_format="%m-%d"),
             res["uv"],
             res["pv"],
             top30_uv,
-            top30_uv * 100 / res["uv"],
+            top30_uv * 100 / (res["uv"] + 1e-3),
             top30_pv,
-            top30_pv * 100 / res["pv"],
+            top30_pv * 100 / (res["pv"] + 1e-3),
         )
         echo(2, content)
         if res["pv"] > 100:
             send_email(content, subject)
         else:
             send_email(content, subject, mode="single")
-            
 
 
 if __name__ == "__main__":

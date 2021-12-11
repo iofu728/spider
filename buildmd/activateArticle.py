@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-12-11 15:05:16
+# @Last Modified time: 2021-12-11 21:06:42
 
 import json
 import joblib
@@ -593,7 +593,7 @@ class ActivateArticle(TBK):
             .replace("background-color:#ffffff;", "")
             .replace('<span style="">', "")
             .replace("</span>", "")
-            .replace("\\u003", "=")
+            .replace("\\u003d", "=")
         )
 
     def get_yd_tpwds_detail(

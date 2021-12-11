@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-20 21:15:31
+# @Last Modified time: 2021-12-11 12:57:38
 
 import json
 import joblib
@@ -333,7 +333,7 @@ class ActivateArticle(TBK):
     WEB_URL = f"{Y_URL}web/"
     API_P_URL = f"{Y_URL}yws/api/personal/"
     SYNC_URL = f"{API_P_URL}sync?method=%s&keyfrom=web&cstk=%s"
-    NOTE_URL = f"{Y_URL}yws/public/note/%s?editorType=0"
+    NOTE_URL = f"{Y_URL}yws/api/note/%s?sev=j1&editorType=1&editorVersion=new-json-editor"
     SHARE_URL = f"{Y_URL}ynoteshare1/index.html?id=%s&type=note"
     GET_SHARE_URL = f"{API_P_URL}share?method=get&shareKey=%s"
     LISTRECENT_URL = (
@@ -386,19 +386,7 @@ class ActivateArticle(TBK):
     TPWD_REG2 = "(\p{Sc}\w{8,12}\p{Sc})"
     TPWD_REG3 = "(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》\(\/])([a-zA-Z0-9]{8,12}?)(\p{Sc}|[\u4e00-\u9fff。！，？；“”’【】、「」《》\)\/])"
     TPWD_REG4 = "(\p{Sc}\w{8,12}\p{Sc})/\(已失效\)"
-    JSON_KEYS = [
-        "p",
-        "ct",
-        "su",
-        "pr",
-        "au",
-        "pv",
-        "mt",
-        "sz",
-        "domain",
-        "tl",
-        "content",
-    ]
+    JSON_KEYS = ['p', 'ct', 'su', 'pr', 'au', 'pv', 'mt', 'sz', 'domain', 'tl', 'isFinanceNote', 'content']
     URL_DOMAIN = {
         0: "s.click.taobao.com",
         1: "item.taobao.com",
@@ -485,7 +473,8 @@ class ActivateArticle(TBK):
         if req == "":
             echo("0|error", "Get The Home Page Info Error!!! Please retry->->->")
             return
-        self.yd_ids = regex.findall("id=(\w*?)<", req)
+        self.yd_ids = regex.findall("id=(\w*?)\"", req)
+        self.yd_ids = sorted(set(self.yd_ids), key=lambda i:self.yd_ids.index(i))
         if len(self.yd_ids) < 30:
             echo("0|error", "The Num of id is error!! Please check it.")
         else:
@@ -604,6 +593,7 @@ class ActivateArticle(TBK):
             .replace("background-color:#ffffff;", "")
             .replace('<span style="">', "")
             .replace("</span>", "")
+            .replace("\\u003", "=")
         )
 
     def get_yd_tpwds_detail(
@@ -648,7 +638,7 @@ class ActivateArticle(TBK):
             tpwd in self.tpwds_map
             and is_updated
             and not force_update
-            # and np.random.rand() > 0.975
+            # and np.random.rand() > 0.99
         ):
             return self.tpwds_map[tpwd]
         self.load_num[0] += 1
@@ -830,6 +820,9 @@ class ActivateArticle(TBK):
         s = self.items.shops_detail_map
         i_set = set(self.items_hash)
         su = {v["user_id"]: v for v in s.values()}
+        if yd_id:
+            self.get_article_tpwds(yd_id)
+            items_ids = set([self.tpwds_map.get(ii, {}).get("item_id", "") for ii in self.tpwds_list[yd_id]])
 
         # counter tpwds -> item_id
         item2tpwds = defaultdict(set)
@@ -837,7 +830,7 @@ class ActivateArticle(TBK):
             item_id = m.get("item_id", "")
             if item_id not in ["", "0"] and (
                 item_id.startswith(self.SHOP) or item_id.isdigit()
-            ):
+            ) and (yd_id and item_id in items_ids):
                 item2tpwds[item_id].add(o_tpwd)
 
         # generate new tpwd for each item_id
@@ -1372,7 +1365,7 @@ class ActivateArticle(TBK):
             self.tpwds_map[replace_tpwd] = new_m
         self.store_db()
 
-    def update_normal_tpwd(self, o_tpwd: str, item_id: str, title: str):
+    def update_normal_tpwd(self, o_tpwd: str, item_id: str, title: str, is_new: bool = False):
         update_num = 0
         is_expired = self.items.items_detail_map.get(item_id, {}).get("is_expired", 1)
         shop_id = self.items.items_detail_map.get(item_id, {}).get("shop_id", "")
@@ -1391,7 +1384,7 @@ class ActivateArticle(TBK):
             if "tpwd" in self.items.shops_detail_map.get(shop_id, {}):
                 return self.items.shops_detail_map.get(shop_id, {})["tpwd"], 5
             url = self.STORE_URL.replace("%s", user_id)
-        if not (not item_id or not shop_id or is_expired):
+        if not (not item_id or not shop_id or is_expired) or is_new:
             url = self.ITEM_URL.replace("%d", str(item_id))
         if not url:
             return o_tpwd, 0
@@ -1569,6 +1562,7 @@ class ActivateArticle(TBK):
 
     def load_article_local(self, yd_path: str):
         self.change_tpwd(yd_path)
+
         self.get_article_tpwds(yd_path, mode="local")
         self.load_num = [0, 0]
         for tpwd in set(self.tpwds_list[yd_path]):
@@ -1680,6 +1674,9 @@ class ActivateArticle(TBK):
             )
             if -1 * spend_time <= gap_time <= self.ONE_HOURS * 4:
                 time.sleep(max(gap_time, 0))
+                tpwds = set([jj for key in self.yd_ids for jj in self.tpwds_list.get(key, [])])
+                if not tpwds:
+                    self.load_yds()
                 self.load_pv_info()
 
             spend_time = end_time(flag, 0)
@@ -1742,8 +1739,8 @@ class ActivateArticle(TBK):
         with open(yd_path, "w") as f:
             f.write(o_text)
 
-    def change_tpwd(self, yd_path):
-        origin = read_file(yd_path)
+    def change_tpwd(self, yd_id: str):
+        origin = read_file(yd_id)
         origin = [
             "".join(["￥" if jj in UNICODE_EMOJI["en"] else jj for jj in ii])
             for ii in origin
@@ -1752,9 +1749,19 @@ class ActivateArticle(TBK):
             text = origin[ii]
             tpwds = regex.findall(self.TPWD_REG3, text)
             if tpwds:
-                text = f"3￥{tpwds[0][1]}￥/"
-                origin[ii] = text
-        with open(yd_path, "w") as f:
+                origin[ii] = f"3￥{tpwds[0][1]}￥/"
+        with open(yd_id, "w") as f:
+            f.write("\n".join(origin))
+
+    def zh2tpwds(self, yd_id: str):
+        origin = read_file(yd_id)
+        for ii in range(len(origin)):
+            text = origin[ii]
+            tpwds = regex.findall("\d{2}[\u4e00-\u9fa5！，]{8,20}.*https://.*", text)
+            if tpwds:
+                tpwd = self.convert_zh2tpwd(text, yd_id)
+                origin[ii] = f"3￥{tpwd}￥/"
+        with open(yd_id, "w") as f:
             f.write("\n".join(origin))
 
     def get_r_tpwds(self, yd_id: str, xml: str = None):
@@ -1910,8 +1917,8 @@ class ActivateArticle(TBK):
 
     def load_pv_info(self):
         echo(2, "PV Load Start.")
-        tpwds = set([jj for key in self.yd_ids for jj in self.tpwds_list[key]])
-        x = set([jj for key in self.yd_ids[:7] for jj in self.tpwds_list[key]])
+        tpwds = set([jj for key in self.yd_ids for jj in self.tpwds_list.get(key, [])])
+        x = set([jj for key in self.yd_ids[:7] for jj in self.tpwds_list.get(key, [])])
         res, items, shops, articles = (
             defaultdict(int),
             defaultdict(dict),
@@ -1925,6 +1932,8 @@ class ActivateArticle(TBK):
                     break
             item_id = self.tpwds_map[tpwd].get("item_id", "")
             article_ids = [ii for ii, jj in self.tpwds_list.items() if tpwd in jj]
+            if tmp.get("uv", 0) and tmp.get("pv", 0) / tmp.get("uv", 0) > 4.5:
+                continue
             for k in self.PVS:
                 res[k] += tmp.get(k, 0)
                 for article_id in article_ids:
@@ -2127,6 +2136,21 @@ class ActivateArticle(TBK):
             send_email(content, subject)
         else:
             send_email(content, subject, mode="single")
+
+    def convert_zh2tpwd(self, text: str, yd_id: str):
+        tpwd_info = self.get_tpwd_detail_pro(text, yd_id)
+        item_id = tpwd_info.get("item_id", "")
+        title = tpwd_info.get("content", "")
+        if item_id in ["", "0"] or not title:
+            return text
+
+        private = self.generate_private_tpwd(item_id)
+        if not private:
+            return self.update_normal_tpwd(text, item_id, title, True)[0]
+
+        url = private.get("coupon_click_url", private.get("item_url", ""))
+        tpwd = self.convert2tpwd(url, title)
+        return tpwd
 
 
 if __name__ == "__main__":

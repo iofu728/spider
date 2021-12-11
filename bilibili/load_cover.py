@@ -1,20 +1,23 @@
 import os
-import regex
 import sys
+
+import regex
+
 
 sys.path.append(os.getcwd())
 from bilibili.basicBilibili import BasicBilibili
 from util.util import (
-    time_str,
-    echo,
     basic_req,
-    mkdir,
     begin_time,
+    create_argparser,
+    echo,
     end_time,
     get_accept,
-    create_argparser,
+    mkdir,
     set_args,
+    time_str,
 )
+
 
 SPACE_AVS_URL = "https://api.bilibili.com/x/space/arc/search?mid=%s&ps=50&tid=0&pn=%s&keyword=&order=pubdate&jsonp=jsonp"
 PIC_DIR = "bilibili/data/cover"
@@ -64,14 +67,12 @@ def load_gzh_img(url: str):
     for ii, jj in enumerate(img_list):
         load_picture(jj, ii + 1)
     spend_time = end_time(flag, 0)
-    optim_image()
     echo(2, "Load {} img spend {:.2f}s.".format(len(img_list), spend_time))
 
 
 def update_cover(dir: str):
     global PIC_DIR
     PIC_DIR = PIC_DIR.replace("cover", dir)
-    optim_image()
 
 
 def optim_image():
@@ -89,3 +90,4 @@ if __name__ == "__main__":
     else:
         assign_mid = BasicBilibili().assign_mid
         load_cover_pipeline(assign_mid)
+    optim_image()

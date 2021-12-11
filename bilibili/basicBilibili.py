@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-09-14 14:49:01
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-09-09 18:28:05
+# @Last Modified time: 2021-12-10 21:56:13
 
 import json
 import os
@@ -44,7 +44,7 @@ class BasicBilibili(object):
     STAT_URL = f"{API_WEB_URL}archive/stat?bvid=%s"
     VIEW_URL = f"{API_WEB_URL}view?bvid=%s"
     RELATION_STAT_URL = f"{API_BASIC_URL}relation/stat?vmid=%s"
-    SPACE_AVS_URL = f"{API_BASIC_URL}space/arc/search?mid=%s&pn=%d&ps=100&jsonp=jsonp"
+    SPACE_AVS_URL = f"{API_BASIC_URL}space/arc/search?mid=%s&pn=%d&ps=50&jsonp=jsonp"
     REPLY_V2_URL = f"{API_BASIC_URL}v2/reply?pn=%d&type=1&oid=%s&sort=%d&ps=49"
     RANKING_URL = f"{API_WEB_URL}ranking/v2?rid=%d"
     RANK_REGION_URL = f"{API_WEB_URL}ranking/region?rid=%d&day=%d"

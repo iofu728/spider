@@ -2,16 +2,16 @@
  * @Author: gunjianpan
  * @Date:   2021-04-30 01:49:27
  * @Last Modified by:   gunjianpan
- * @Last Modified time: 2021-05-02 03:12:38
+ * @Last Modified time: 2021-12-11 18:52:37
  */
 
 // find tpwds length
 content = wx.cgiData.app_msg_info["item"][0]["content"]
-content.match(/\p{Sc}\w{8,12}\p{Sc}/gu)
+content.match(/\p{Sc}[\w\u4e00-\u9fa5]{8,12}\p{Sc}/gu)
 
 // replace tpwds Part.1
 content = infos["item"][0]["multi_item"][0]["content"]
-tpwds = content.match(/\p{Sc}\w{8,12}\p{Sc}/gu)
+tpwds = content.match(/\p{Sc}[\w\u4e00-\u9fa5]{8,12}\p{Sc}/gu)
 r_tpwds = []
 for(let i = 0; i < tpwds.length; i++){
     tpwd = tpwds[i];

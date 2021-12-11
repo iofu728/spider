@@ -2,7 +2,7 @@
 # @Author: gunjianpan
 # @Date:   2019-08-26 20:46:29
 # @Last Modified by:   gunjianpan
-# @Last Modified time: 2021-12-11 12:57:38
+# @Last Modified time: 2021-12-11 15:05:16
 
 import json
 import joblib
@@ -779,7 +779,7 @@ class ActivateArticle(TBK):
         )
 
     def can_tpwd_popup(self, tpwd: str):
-        check_data = self.decoder_generated_tpwd(tpwd)
+        check_data = self.decoder_generated_tpwd_v2(tpwd)
         if (
             check_data is None
             or not isinstance(check_data, dict)
@@ -830,7 +830,7 @@ class ActivateArticle(TBK):
             item_id = m.get("item_id", "")
             if item_id not in ["", "0"] and (
                 item_id.startswith(self.SHOP) or item_id.isdigit()
-            ) and (yd_id and item_id in items_ids):
+            ) and (not yd_id or item_id in items_ids):
                 item2tpwds[item_id].add(o_tpwd)
 
         # generate new tpwd for each item_id
